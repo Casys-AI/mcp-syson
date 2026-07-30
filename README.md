@@ -1,6 +1,6 @@
 # @casys/mcp-syson
 
-MCP server for [SysON](https://mbse-syson.org) — SysML v2 model-based systems engineering (MBSE) — **24 tools** across **5 categories**, with **3 interactive UI viewers**.
+MCP server for [SysON](https://mbse-syson.org) — SysML v2 model-based systems engineering (MBSE) — **30 tools** across **7 categories**, with **5 interactive UI viewers**.
 
 Every tool is a primitive: it reads or writes the model and reports exactly what is there. None calls a language model, so the same model always yields the same answer. Aggregation, judgement and orchestration stay with the calling agent — `syson_query_aql` gives it the full power of AQL to compose whatever it needs.
 
@@ -60,7 +60,7 @@ Load only the categories you need — useful to keep an agent's tool list small:
 deno run --allow-all server.ts --categories=project,element,query
 ```
 
-## Tools (24)
+## Tools (30)
 
 Every tool needs an `editing_context_id`, obtained from `syson_project_get`. Start with `syson_project_list`.
 
@@ -113,6 +113,28 @@ Every tool needs an `editing_context_id`, obtained from `syson_project_get`. Sta
 | `syson_diagram_arrange` | Auto-layout all elements on a diagram |
 | `syson_diagram_snapshot` | Capture a diagram for rendering |
 
+### Constraint (4)
+
+Constraint checking is delegated to [`@casys/constraint-solver`](https://jsr.io/@casys/constraint-solver): units are part of the value (2.5 kg against a 4 lb limit **fails**, since 2.5 kg is 5.51 lb), and a missing value is `unresolved`, never zero.
+
+| Tool | Description |
+|------|-------------|
+| `syson_constraint_validate` | One call: extract, resolve values, evaluate, report with margins. `values` overrides enable what-if scenarios |
+| `syson_constraint_extract` | Extract ConstraintUsage expressions as structured constraints |
+| `syson_constraint_evaluate` | Evaluate constraints against provided or model-resolved values |
+| `syson_constraint_solve` | Satisfiability, solving, optimisation — `unsat` names the conflicting constraints. Needs the `z3` executable (`apt install z3`) |
+
+`syson_constraint_solve` answers what no evaluation can: whether constraints can hold together at all. An agent that writes `mass <= 2` and `mass >= 5` learns immediately that it contradicted itself, with both ids named.
+
+**Known limitation** — values resolved from the model are dimensionless (SysML v2 attaches units through MeasurementReferences this server does not read yet). A constraint whose literal carries a unit then reports an `error` rather than silently comparing bare numbers; pass explicit `values` overrides with units when needed.
+
+### Value (2)
+
+| Tool | Description |
+|------|-------------|
+| `syson_value_read` | Read a numeric attribute value (handles negated literals) |
+| `syson_value_set` | Write a numeric attribute value via AQL `eSet`, with read-back verification |
+
 ### Why there are no analysis or agent tools
 
 Two families of tools were deliberately left out.
@@ -125,13 +147,15 @@ If a real need for context reduction on very large models shows up, the fix is o
 
 ## UI Viewers
 
-Four tools return an [MCP App](https://modelcontextprotocol.io) UI resource next to their JSON payload, so a UI-capable host renders the result instead of printing raw data. The hint is additive — tools stay fully usable without it.
+Several tools return an [MCP App](https://modelcontextprotocol.io) UI resource next to their JSON payload, so a UI-capable host renders the result instead of printing raw data. The hint is additive — tools stay fully usable without it.
 
 | Viewer | Renders | Backing tools |
 |--------|---------|---------------|
 | `query-results-viewer` | Query result tables | `syson_search`, `syson_query_eval` |
 | `requirements-trace-viewer` | Requirement → satisfying element coverage | `syson_query_requirements_trace` |
 | `diagram-viewer` | Diagram snapshots | `syson_diagram_snapshot` |
+| `validation-viewer` | Constraint validation reports with margins | `syson_constraint_validate` |
+| `value-change-viewer` | Attribute value changes | `syson_value_read`, `syson_value_set` |
 | `model-explorer-viewer` | Model tree exploration | *not yet wired to a tool* |
 
 Viewers are served as `ui://mcp-syson/<name>`, discovered from `src/ui/dist/` at startup, and must be built before the server can serve them:
@@ -162,6 +186,9 @@ src/
     queries.ts         # GraphQL queries
     mutations.ts       # GraphQL mutations
     types.ts           # Payload types
+  constraints/
+    ast-parser.ts      # SysON KerML expression tree -> constraint AST
+    resolver.ts        # Feature reference -> model value resolution
   tools/
     aql.ts             # Shared AQL evaluation + traversal helpers
     project.ts         # 5 project tools
@@ -169,6 +196,8 @@ src/
     element.ts         # 6 element tools
     query.ts           # 4 AQL / search / trace tools
     diagram.ts         # 5 diagram tools
+    constraint.ts      # 4 constraint tools (extract/evaluate/validate/solve)
+    value.ts           # 2 value tools
     mod.ts             # Registry
     types.ts           # Tool interface
   client.ts            # SysonToolsClient
@@ -191,7 +220,7 @@ Most write operations go through the generic `evaluateExpression` AQL mutation r
 # Type check
 deno check mod.ts server.ts
 
-# Run tests (36 tests, no SysON instance needed — GraphQL is mocked)
+# Run tests (63 tests, no SysON instance needed — GraphQL is mocked)
 deno test --allow-all tests/
 
 # Build UI viewers

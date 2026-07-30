@@ -45,7 +45,11 @@ export type SysonToolCategory =
   | "element"
   | "query"
   | "model"
-  | "diagram";
+  | "diagram"
+  // Constraint extraction, evaluation and solving (@casys/constraint-solver)
+  | "constraint"
+  // Numeric attribute read/write
+  | "value";
 
 /** SysON tool handler function type */
 export type SysonToolHandler = (args: Record<string, unknown>) => Promise<unknown> | unknown;

@@ -50,7 +50,20 @@ export {
   elementTools,
   queryTools,
   diagramTools,
+  constraintTools,
+  valueTools,
 } from "./src/tools/mod.ts";
+
+// Constraint infrastructure — AST parsing and model value resolution
+export { normalizeKind, parseAstNode } from "./src/constraints/ast-parser.ts";
+export type { SysonAstNode } from "./src/constraints/ast-parser.ts";
+export {
+  collectAllRefs,
+  collectRefs,
+  readAttributeValue,
+  resolveValues,
+} from "./src/constraints/resolver.ts";
+export type { AttributeReading } from "./src/constraints/resolver.ts";
 
 // Re-export shared AQL helpers — the building blocks every tool traverses with
 export {

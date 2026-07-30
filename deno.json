@@ -1,6 +1,6 @@
 {
   "name": "@casys/mcp-syson",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "nodeModulesDir": "auto",
   "tasks": {
     "serve": "deno run --allow-all server.ts --http --port=3009",
@@ -29,6 +29,7 @@
   },
   "imports": {
     "@casys/mcp-server": "jsr:@casys/mcp-server@^0.22.0",
+    "@casys/constraint-solver": "jsr:@casys/constraint-solver@^0.1.0",
     "ajv": "npm:ajv@^8.17.1",
     "hono": "npm:hono@^4",
     "hono/cors": "npm:hono@^4/cors",

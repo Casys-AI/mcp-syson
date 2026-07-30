@@ -53,7 +53,7 @@ async function main() {
 
   const server = new ConcurrentMCPServer({
     name: "mcp-syson",
-    version: "0.1.0",
+    version: "0.2.0",
     maxConcurrent: 10,
     backpressureStrategy: "queue",
     validateSchema: true,

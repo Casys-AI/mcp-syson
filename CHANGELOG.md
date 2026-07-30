@@ -2,6 +2,24 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.2.0] - 2026-07-30
+
+Absorbs the constraint stack from the internal `lib/sim` module, which is retired. 24 → 30 tools.
+
+### Added
+
+- **Constraint category (4 tools)** — `syson_constraint_extract` (ConstraintUsage → structured AST), `syson_constraint_evaluate`, `syson_constraint_validate` (one-shot extract + resolve + evaluate with margins and what-if `values` overrides), and **`syson_constraint_solve`**: satisfiability, solving and optimisation via [`@casys/constraint-solver`](https://jsr.io/@casys/constraint-solver). A contradiction (`mass <= 2` and `mass >= 5`) returns `unsat` with the conflicting constraint ids — the question no evaluation can answer. Solving requires the `z3` executable.
+- **Value category (2 tools)** — `syson_value_read` / `syson_value_set` for numeric attributes, with negation handling and read-back verification.
+- **Two MCP App viewers** — `validation-viewer` and `value-change-viewer`, ported from `lib/sim` under the `ui://mcp-syson/*` namespace.
+- **Constraint infrastructure exported** — `parseAstNode` (KerML expression tree → constraint AST), `resolveValues`, `readAttributeValue`, for downstream packages.
+
+### Fixed relative to the `lib/sim` code this replaces
+
+- **Unit-blind comparisons.** The old evaluator displayed units but compared bare numbers: `totalMass ≤ 4 lb` with a 2.5 kg mass reported **pass** (2.5 kg is 5.51 lb). Evaluation now goes through `@casys/constraint-solver`, where units convert and incompatible dimensions are errors.
+- **`LiteralBoolean` crashed the parser.** Prefixed kinds (`sysml::LiteralBoolean`) were not recognised; boolean literals now parse to 1/0.
+- **`parseConstraintNodes` dropped.** Its error path substituted a fake `literal 0` constraint for anything unparseable — a silent fallback. Parse failures are now reported per constraint, never replaced by a value.
+- **Model-resolved values are explicitly dimensionless.** A unit-carrying constraint evaluated against them reports an `error` instead of silently comparing bare numbers, until MeasurementReference reading is implemented.
+
 ## [0.1.0] - 2026-07-30
 
 Initial public release.

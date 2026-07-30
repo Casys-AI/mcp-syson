@@ -15,6 +15,9 @@ jobs:
         with:
           deno-version: v2.x
 
+      - name: Install z3 (syson_constraint_solve backend)
+        run: sudo apt-get update && sudo apt-get install -y z3
+
       - name: Type check
         run: deno check mod.ts server.ts
 
