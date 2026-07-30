@@ -193,9 +193,13 @@ Deno.test("syson_query_eval - throws on error payload", async () => {
 });
 
 Deno.test("queryTools - has correct tool count and categories", () => {
-  assertEquals(queryTools.length, 4);
+  assertEquals(queryTools.length, 5);
   for (const tool of queryTools) {
     assertEquals(tool.category, "query");
-    assertEquals(tool.name.startsWith("syson_query_") || tool.name.startsWith("syson_search"), true);
+    assertEquals(
+      tool.name.startsWith("syson_query_") || tool.name.startsWith("syson_search") ||
+        tool.name === "syson_part_structure",
+      true,
+    );
   }
 });

@@ -1,6 +1,6 @@
 # @casys/mcp-syson
 
-MCP server for [SysON](https://mbse-syson.org) — SysML v2 model-based systems engineering (MBSE) — **30 tools** across **7 categories**, with **5 interactive UI viewers**.
+MCP server for [SysON](https://mbse-syson.org) — SysML v2 model-based systems engineering (MBSE) — **31 tools** across **7 categories**, with **5 interactive UI viewers**.
 
 Every tool is a primitive: it reads or writes the model and reports exactly what is there. None calls a language model, so the same model always yields the same answer. Aggregation, judgement and orchestration stay with the calling agent — `syson_query_aql` gives it the full power of AQL to compose whatever it needs.
 
@@ -60,7 +60,7 @@ Load only the categories you need — useful to keep an agent's tool list small:
 deno run --allow-all server.ts --categories=project,element,query
 ```
 
-## Tools (30)
+## Tools (31)
 
 Every tool needs an `editing_context_id`, obtained from `syson_project_get`. Start with `syson_project_list`.
 
@@ -94,7 +94,7 @@ Every tool needs an `editing_context_id`, obtained from `syson_project_get`. Sta
 | `syson_element_rename` | Rename an element (AQL `eSet` on `declaredName`) |
 | `syson_element_delete` | Delete an element and its children (irreversible) |
 
-### Query (4)
+### Query (5)
 
 | Tool | Description |
 |------|-------------|
@@ -102,6 +102,11 @@ Every tool needs an `editing_context_id`, obtained from `syson_project_get`. Sta
 | `syson_query_eval` | Evaluate an AQL expression across several elements at once |
 | `syson_search` | Full-text search over element names and content; supports regex |
 | `syson_query_requirements_trace` | Trace requirements to satisfying elements, with coverage metrics |
+| `syson_part_structure` | Derive the product breakdown structure (parts, hierarchy, quantities, numeric attributes) from a model |
+
+#### Structure here, costs in the ERP
+
+`syson_part_structure` derives the product breakdown from the model — which parts, how they nest, their quantities and numeric attributes. It never touches price or material: those belong to the ERP, which costs from real purchasing data instead of guessing. The full bill-of-materials flow needs no glue code: `syson_part_structure` → `erpnext_doc_create` with `doctype: "BOM"` (from [`@casys/mcp-erpnext`](https://jsr.io/@casys/mcp-erpnext)) turns model structure into a costed BOM using ERPNext's generic document operations. This replaces the retired `plm_bom_generate`, which derived cost from name-matched materials and hardcoded default masses.
 
 ### Diagram (5)
 
@@ -194,7 +199,7 @@ src/
     project.ts         # 5 project tools
     model.ts           # 4 model/document tools
     element.ts         # 6 element tools
-    query.ts           # 4 AQL / search / trace tools
+    query.ts           # 5 AQL / search / trace / part-structure tools
     diagram.ts         # 5 diagram tools
     constraint.ts      # 4 constraint tools (extract/evaluate/validate/solve)
     value.ts           # 2 value tools
@@ -220,7 +225,7 @@ Most write operations go through the generic `evaluateExpression` AQL mutation r
 # Type check
 deno check mod.ts server.ts
 
-# Run tests (63 tests, no SysON instance needed — GraphQL is mocked)
+# Run tests (71 tests, no SysON instance needed — GraphQL is mocked)
 deno test --allow-all tests/
 
 # Build UI viewers

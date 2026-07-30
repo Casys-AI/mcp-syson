@@ -10,8 +10,184 @@
 import type { SysonTool } from "./types.ts";
 import { getSysonClient } from "../api/graphql-client.ts";
 import { SEARCH_ELEMENTS } from "../api/queries.ts";
-import { evalAql } from "./aql.ts";
-import type { SearchResult } from "../api/types.ts";
+import { evalAql, getChildren, getSelf } from "./aql.ts";
+import type { GqlObject, SearchResult } from "../api/types.ts";
+import { normalizeKind } from "../constraints/ast-parser.ts";
+import { readAttributeValue } from "../constraints/resolver.ts";
+
+// ============================================================================
+// syson_part_structure — product breakdown traversal
+// ============================================================================
+
+/** A numeric attribute read off a part; `value: null` means present but unvalued. */
+interface PartAttribute {
+  name: string;
+  value: number | null;
+}
+
+/** One node of the part hierarchy. Root itself is not a PartNode — see below. */
+interface PartNode {
+  id: string;
+  label: string;
+  kind: string;
+  quantity: number;
+  quantitySource: "model" | "sysml-default";
+  attributes?: PartAttribute[];
+  children: PartNode[];
+}
+
+/** A flattened row of the tree with the path-multiplied quantity. */
+interface FlatEntry {
+  path: string;
+  id: string;
+  label: string;
+  quantity: number;
+  effectiveQuantity: number;
+}
+
+interface TraversalState {
+  partCount: number;
+  maxDepthReached: boolean;
+}
+
+const DEFAULT_MULTIPLICITY = { quantity: 1, quantitySource: "sysml-default" as const };
+
+/**
+ * Read a PartUsage's multiplicity as a plain count.
+ *
+ * SysML's own default multiplicity is 1 when none is declared — that is not
+ * a guess this tool makes, so it is reported as `quantitySource:
+ * "sysml-default"` rather than silently presented the same as a value read
+ * from the model. Any failure along the way (no multiplicity object, no
+ * LiteralInteger among its descendants, an AQL error) collapses to the same
+ * labelled default — the caller can always tell a modelled quantity from
+ * SysML's fallback.
+ */
+async function readMultiplicity(
+  ecId: string,
+  elementId: string,
+): Promise<{ quantity: number; quantitySource: "model" | "sysml-default" }> {
+  try {
+    const multResult = await evalAql(ecId, "aql:self.multiplicity", [elementId]);
+    if (multResult.__typename !== "ObjectExpressionResult") return DEFAULT_MULTIPLICITY;
+
+    const literalResult = await evalAql(
+      ecId,
+      "aql:self.eAllContents()->select(e | e.oclIsKindOf(sysml::LiteralInteger))->first()",
+      [multResult.objValue.id],
+    );
+    if (literalResult.__typename !== "ObjectExpressionResult") return DEFAULT_MULTIPLICITY;
+
+    const valueResult = await evalAql(
+      ecId,
+      "aql:self.oclAsType(sysml::LiteralInteger).value.toString()",
+      [literalResult.objValue.id],
+    );
+
+    if (valueResult.__typename === "StringExpressionResult") {
+      const parsed = parseInt(valueResult.strValue, 10);
+      return isNaN(parsed) ? DEFAULT_MULTIPLICITY : { quantity: parsed, quantitySource: "model" };
+    }
+    if (valueResult.__typename === "IntExpressionResult") {
+      return { quantity: valueResult.intValue, quantitySource: "model" };
+    }
+    return DEFAULT_MULTIPLICITY;
+  } catch {
+    return DEFAULT_MULTIPLICITY;
+  }
+}
+
+/**
+ * Read the numeric AttributeUsage children of a part. An attribute without a
+ * resolvable numeric literal is still reported, with `value: null` — it
+ * exists on the model and hiding it would look like the model has less on
+ * it than it does.
+ */
+async function readPartAttributes(
+  ecId: string,
+  kids: GqlObject[],
+): Promise<PartAttribute[] | undefined> {
+  const attributeKids = kids.filter((k) => normalizeKind(k.kind).includes("AttributeUsage"));
+  if (attributeKids.length === 0) return undefined;
+
+  const attributes: PartAttribute[] = [];
+  for (const kid of attributeKids) {
+    const reading = await readAttributeValue(ecId, kid.id);
+    attributes.push({ name: kid.label, value: reading?.value ?? null });
+  }
+  return attributes;
+}
+
+/**
+ * Build one PartNode and recurse into its PartUsage children, up to
+ * `maxDepth`. Sequential (not Promise.all) so callers get a deterministic
+ * AQL call order — this traversal is already the slow path of the tool, and
+ * predictability matters more here than shaving round-trips.
+ */
+async function buildPartNode(
+  ecId: string,
+  obj: GqlObject,
+  depth: number,
+  maxDepth: number,
+  includeAttributes: boolean,
+  state: TraversalState,
+): Promise<PartNode> {
+  state.partCount++;
+
+  const { quantity, quantitySource } = await readMultiplicity(ecId, obj.id);
+  const kids = await getChildren(ecId, obj.id);
+
+  const node: PartNode = {
+    id: obj.id,
+    label: obj.label,
+    kind: obj.kind,
+    quantity,
+    quantitySource,
+    children: [],
+  };
+
+  if (includeAttributes) {
+    const attributes = await readPartAttributes(ecId, kids);
+    if (attributes) node.attributes = attributes;
+  }
+
+  const partKids = kids.filter((k) => normalizeKind(k.kind).includes("PartUsage"));
+
+  if (depth < maxDepth) {
+    for (const kid of partKids) {
+      node.children.push(
+        await buildPartNode(ecId, kid, depth + 1, maxDepth, includeAttributes, state),
+      );
+    }
+  } else if (partKids.length > 0) {
+    // Truncated here — never silently, the caller sees maxDepthReached.
+    state.maxDepthReached = true;
+  }
+
+  return node;
+}
+
+/** Flatten the tree into rows with quantities multiplied along the path. */
+function flattenTree(
+  nodes: PartNode[],
+  parentPath: string[],
+  parentEffectiveQuantity: number,
+): FlatEntry[] {
+  const entries: FlatEntry[] = [];
+  for (const node of nodes) {
+    const path = [...parentPath, node.label];
+    const effectiveQuantity = parentEffectiveQuantity * node.quantity;
+    entries.push({
+      path: path.join("."),
+      id: node.id,
+      label: node.label,
+      quantity: node.quantity,
+      effectiveQuantity,
+    });
+    entries.push(...flattenTree(node.children, path, effectiveQuantity));
+  }
+  return entries;
+}
 
 export const queryTools: SysonTool[] = [
   {
@@ -331,6 +507,87 @@ export const queryTools: SysonTool[] = [
           percentage: total > 0 ? Math.round((satisfied / total) * 100) : 0,
         },
       };
+    },
+  },
+
+  {
+    name: "syson_part_structure",
+    description:
+      "Derive the product breakdown structure (parts, hierarchy, quantities, " +
+      "numeric attributes) from a SysML v2 model. Structure only — no prices, " +
+      "no inferred materials. Costing belongs to the ERP: feed this tool's " +
+      "output to erpnext_doc_create with doctype 'BOM' for actual costs.",
+    category: "query",
+    inputSchema: {
+      type: "object",
+      properties: {
+        editing_context_id: {
+          type: "string",
+          description: "Editing context ID",
+        },
+        root_element_id: {
+          type: "string",
+          description: "Root element ID to derive the structure from (a package or a part)",
+        },
+        max_depth: {
+          type: "number",
+          description: "Maximum recursion depth into nested parts. Default: 10",
+        },
+        include_attributes: {
+          type: "boolean",
+          description:
+            "Include each part's numeric AttributeUsage children (value: null when " +
+            "present but unvalued). Default: true",
+        },
+        flatten: {
+          type: "boolean",
+          description:
+            "Also return a flat list with quantities multiplied along each part's " +
+            "path. Default: false",
+        },
+      },
+      required: ["editing_context_id", "root_element_id"],
+    },
+    handler: async (args) => {
+      const ecId = args.editing_context_id as string;
+      const rootId = args.root_element_id as string;
+      const maxDepth = (args.max_depth as number | undefined) ?? 10;
+      const includeAttributes = (args.include_attributes as boolean | undefined) ?? true;
+      const flatten = (args.flatten as boolean | undefined) ?? false;
+
+      const rootObj = await getSelf(ecId, rootId);
+      if (!rootObj) {
+        throw new Error(
+          `[lib/syson] syson_part_structure: element ${rootId} not found in editing context ${ecId}`,
+        );
+      }
+
+      const rootChildren = await getChildren(ecId, rootId);
+      const partChildren = rootChildren.filter((c) => normalizeKind(c.kind).includes("PartUsage"));
+
+      const state: TraversalState = { partCount: 0, maxDepthReached: false };
+      const tree: PartNode[] = [];
+
+      if (maxDepth >= 1) {
+        for (const child of partChildren) {
+          tree.push(await buildPartNode(ecId, child, 1, maxDepth, includeAttributes, state));
+        }
+      } else if (partChildren.length > 0) {
+        state.maxDepthReached = true;
+      }
+
+      const result: Record<string, unknown> = {
+        root: { id: rootObj.id, label: rootObj.label, kind: rootObj.kind },
+        tree,
+        partCount: state.partCount,
+        maxDepthReached: state.maxDepthReached,
+      };
+
+      if (flatten) {
+        result.flat = flattenTree(tree, [], 1);
+      }
+
+      return result;
     },
   },
 ];

@@ -2,6 +2,14 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.3.0] - 2026-07-30
+
+### Added
+
+- **`syson_part_structure`** (query category, 30 → 31 tools) — derives the product breakdown structure (parts, hierarchy, quantities, numeric attributes) from a SysML v2 model by recursive AQL traversal of `PartUsage` elements. Quantity comes from the model's multiplicity when readable; when it isn't, the tool reports SysML's own default of 1 labelled as `quantitySource: "sysml-default"` — never a silent, unlabelled 1. Numeric `AttributeUsage` children are read via the existing `readAttributeValue` resolver and listed even when unvalued (`value: null`), never omitted. Optional `flatten` adds a flat list with quantities multiplied along each part's path; `max_depth` bounds recursion and `maxDepthReached` reports truncation rather than hiding it.
+- **eBOM/mBOM separation, made explicit in the tool surface.** `syson_part_structure` derives structure only — no prices, no inferred materials. Costing is entirely the ERP's job: the full bill-of-materials flow is `syson_part_structure` (structure) → `erpnext_doc_create` with `doctype: "BOM"` (cost, from ERPNext's real purchasing prices) — zero glue code required, since ERPNext's generic document operations already cover every doctype.
+- This is the definitive replacement for the retired `plm_bom_generate`, which derived cost from name-matched materials and hardcoded default masses — exactly the kind of invented data this tool refuses to produce (see `.claude/rules/no-hidden-heuristics.md`). `plm/` has been removed from the monorepo; `syson_part_structure` is the one tool that survives the dissolution.
+
 ## [0.2.1] - 2026-07-30
 
 ### Security
