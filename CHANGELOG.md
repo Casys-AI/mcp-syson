@@ -2,6 +2,12 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.3.1] - 2026-07-30
+
+### Fixed
+
+- **MCP App bundles are now static package dependencies.** JSR did publish the generated HTML, but Deno only fetched the imported module graph and the former runtime directory scan could not retrieve those unimported assets. The UI build now produces an imported TypeScript bundle; all six viewers are registered as readable MCP resources and checked in CI before JSR publication. `model-explorer-viewer` is available as a resource even though no tool attaches it yet.
+
 ## [0.3.0] - 2026-07-30
 
 ### Added

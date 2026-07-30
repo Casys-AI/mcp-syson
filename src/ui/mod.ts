@@ -1,11 +1,13 @@
 /**
- * UI resource discovery and loading for lib/syson
+ * Bundled MCP App resources for mcp-syson.
  *
- * Auto-discovers viewer HTML bundles from dist/ folder.
- * Serves viewers under the ui://mcp-syson/ namespace.
- *
- * @module lib/syson/src/ui/mod
+ * The generated TypeScript bundle must remain a static import. A JSR package
+ * is fetched as a Deno module graph, so a later Deno.readTextFile() of a
+ * dynamically discovered HTML asset cannot retrieve a file never imported
+ * into that graph.
  */
+
+import { UI_HTML_BY_NAME } from "./bundles.ts";
 
 export interface UIResourceMeta {
   name: string;
@@ -15,74 +17,67 @@ export interface UIResourceMeta {
 
 const NAMESPACE = "mcp-syson";
 
-/**
- * Auto-discover UI resources from dist/ folder.
- * Each subdirectory with an index.html is a UI resource.
- */
-function discoverUiResources(): Record<string, UIResourceMeta> {
-  const resources: Record<string, UIResourceMeta> = {};
+const UI_BUNDLES = {
+  "ui://mcp-syson/diagram-viewer": {
+    html: UI_HTML_BY_NAME["diagram-viewer"],
+    name: "Diagram Viewer",
+    description: "SysON UI: diagram-viewer",
+    tools: ["syson_diagram_snapshot"],
+  },
+  "ui://mcp-syson/model-explorer-viewer": {
+    html: UI_HTML_BY_NAME["model-explorer-viewer"],
+    name: "Model Explorer Viewer",
+    description: "SysON UI: model-explorer-viewer",
+    tools: [],
+  },
+  "ui://mcp-syson/query-results-viewer": {
+    html: UI_HTML_BY_NAME["query-results-viewer"],
+    name: "Query Results Viewer",
+    description: "SysON UI: query-results-viewer",
+    tools: ["syson_search", "syson_query_eval"],
+  },
+  "ui://mcp-syson/requirements-trace-viewer": {
+    html: UI_HTML_BY_NAME["requirements-trace-viewer"],
+    name: "Requirements Trace Viewer",
+    description: "SysON UI: requirements-trace-viewer",
+    tools: ["syson_query_requirements_trace"],
+  },
+  "ui://mcp-syson/validation-viewer": {
+    html: UI_HTML_BY_NAME["validation-viewer"],
+    name: "Validation Viewer",
+    description: "SysON UI: validation-viewer",
+    tools: ["syson_constraint_validate"],
+  },
+  "ui://mcp-syson/value-change-viewer": {
+    html: UI_HTML_BY_NAME["value-change-viewer"],
+    name: "Value Change Viewer",
+    description: "SysON UI: value-change-viewer",
+    tools: ["syson_value_read", "syson_value_set"],
+  },
+} as const;
 
-  try {
-    const distPath = new URL("./dist", import.meta.url).pathname;
+export const UI_RESOURCE_URIS = Object.freeze(Object.keys(UI_BUNDLES));
 
-    for (const entry of Deno.readDirSync(distPath)) {
-      if (entry.isDirectory) {
-        const uiName = entry.name;
-        const uri = `ui://${NAMESPACE}/${uiName}`;
-        const htmlPath = `${distPath}/${uiName}/index.html`;
-
-        try {
-          Deno.statSync(htmlPath);
-          resources[uri] = {
-            name: uiName
-              .split("-")
-              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-              .join(" "),
-            description: `SysON UI: ${uiName}`,
-            tools: [],
-          };
-        } catch {
-          // No index.html in this directory — skip
-        }
-      }
-    }
-  } catch {
-    // dist/ folder doesn't exist yet (UI not built) — no resources
-  }
-
-  return resources;
-}
-
-export const UI_RESOURCES: Record<string, UIResourceMeta> = discoverUiResources();
-
-/**
- * Convert a ui:// URI to the local file path of its index.html.
- */
-function uriToPath(uri: string): string | null {
-  const prefix = `ui://${NAMESPACE}/`;
-  if (!uri.startsWith(prefix)) return null;
-
-  const viewerName = uri.slice(prefix.length);
-  if (!viewerName || viewerName.includes("..")) return null;
-
-  const distPath = new URL("./dist", import.meta.url).pathname;
-  return `${distPath}/${viewerName}/index.html`;
-}
+export const UI_RESOURCES: Record<string, UIResourceMeta> = Object.fromEntries(
+  Object.entries(UI_BUNDLES).map(([uri, bundle]) => [uri, {
+    name: bundle.name,
+    description: bundle.description,
+    tools: [...bundle.tools],
+  }]),
+);
 
 /**
- * Load the HTML content of a UI resource.
- *
- * @param uri The ui:// URI (e.g., "ui://mcp-syson/diagram-viewer")
- * @returns The full HTML content as a string
+ * Return the HTML for a registered `ui://mcp-syson/*` resource.
  */
 export async function loadUiHtml(uri: string): Promise<string> {
-  const uiPath = uriToPath(uri);
-  if (uiPath) {
-    try {
-      return await Deno.readTextFile(uiPath);
-    } catch (e) {
-      console.error(`[mcp-syson] Failed to load UI: ${uiPath}`, e);
-    }
+  if (!uri.startsWith(`ui://${NAMESPACE}/`)) {
+    throw new Error(`[mcp-syson] UI resource not found: ${uri}`);
   }
-  throw new Error(`[mcp-syson] UI resource not found: ${uri}`);
+
+  const bundle = UI_BUNDLES[uri as keyof typeof UI_BUNDLES];
+  if (!bundle) {
+    throw new Error(`[mcp-syson] UI resource not found: ${uri}`);
+  }
+
+  return bundle.html;
 }

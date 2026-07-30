@@ -1,12 +1,13 @@
 {
   "name": "@casys/mcp-syson",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "nodeModulesDir": "auto",
   "tasks": {
     "serve": "deno run --allow-all server.ts --http --port=3009",
     "compile": "deno compile -A --output mcp-syson server.ts",
     "test": "deno test --allow-all tests/",
-    "ui:build": "cd src/ui && node build-all.mjs"
+    "ui:build": "cd src/ui && node build-all.mjs",
+    "ui:verify": "deno run --allow-read scripts/verify-ui-bundles.ts"
   },
   "exports": {
     ".": "./mod.ts",
@@ -17,14 +18,14 @@
       "mod.ts",
       "server.ts",
       "src/**/*.ts",
-      "src/ui/dist/",
       "README.md",
       "LICENSE"
     ],
     "exclude": [
       "**/*_test.ts",
       "**/*.test.ts",
-      "**/*.bench.ts"
+      "**/*.bench.ts",
+      "!src/ui/bundles.ts"
     ]
   },
   "imports": {

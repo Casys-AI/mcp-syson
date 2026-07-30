@@ -26,9 +26,40 @@
 
 import { ConcurrentMCPServer, MCP_APP_MIME_TYPE } from "@casys/mcp-server";
 import { SysonToolsClient } from "./src/client.ts";
-import { UI_RESOURCES, loadUiHtml } from "./src/ui/mod.ts";
+import { loadUiHtml, UI_RESOURCES } from "./src/ui/mod.ts";
 
 const DEFAULT_HTTP_PORT = 3009;
+
+/**
+ * Register every shipped viewer, including viewers not yet attached to a
+ * tool. Registering only tool-referenced viewers made model-explorer
+ * undiscoverable and made a missing bundle look like a valid resource URI.
+ */
+export function registerUiResources(
+  server: Pick<ConcurrentMCPServer, "registerResource">,
+): ReadonlySet<string> {
+  const registeredUris = new Set<string>();
+
+  for (const [uri, resourceMeta] of Object.entries(UI_RESOURCES)) {
+    server.registerResource(
+      {
+        uri,
+        name: resourceMeta.name,
+        description: resourceMeta.description,
+        mimeType: MCP_APP_MIME_TYPE,
+      },
+      async () => ({
+        uri,
+        mimeType: MCP_APP_MIME_TYPE,
+        text: await loadUiHtml(uri),
+      }),
+    );
+    registeredUris.add(uri);
+    console.error(`[mcp-syson] Registered UI resource: ${uri}`);
+  }
+
+  return registeredUris;
+}
 
 async function main() {
   const args = Deno.args;
@@ -42,7 +73,9 @@ async function main() {
   // HTTP mode
   const httpFlag = args.includes("--http");
   const portArg = args.find((arg) => arg.startsWith("--port="));
-  const httpPort = portArg ? parseInt(portArg.split("=")[1], 10) : DEFAULT_HTTP_PORT;
+  const httpPort = portArg
+    ? parseInt(portArg.split("=")[1], 10)
+    : DEFAULT_HTTP_PORT;
   const hostnameArg = args.find((arg) => arg.startsWith("--hostname="));
   const hostname = hostnameArg ? hostnameArg.split("=")[1] : "0.0.0.0";
 
@@ -53,7 +86,7 @@ async function main() {
 
   const server = new ConcurrentMCPServer({
     name: "mcp-syson",
-    version: "0.3.0",
+    version: "0.3.1",
     maxConcurrent: 10,
     backpressureStrategy: "queue",
     validateSchema: true,
@@ -70,33 +103,17 @@ async function main() {
 
   server.registerTools(mcpTools, handlers);
 
-  // Register UI resources from tools with _meta.ui
-  const registeredUris = new Set<string>();
+  const registeredUris = registerUiResources(server);
+
+  // A tool may only advertise a resource that this server can actually read.
+  // Treat a mismatch as a startup error rather than sending clients an
+  // unreadable resourceUri.
   for (const tool of toolsClient.listTools()) {
     const ui = tool._meta?.ui;
     if (ui?.resourceUri && !registeredUris.has(ui.resourceUri)) {
-      registeredUris.add(ui.resourceUri);
-      const resourceMeta = UI_RESOURCES[ui.resourceUri];
-      if (resourceMeta) {
-        server.registerResource(
-          {
-            uri: ui.resourceUri,
-            name: resourceMeta.name,
-            description: resourceMeta.description,
-            mimeType: MCP_APP_MIME_TYPE,
-          },
-          async () => {
-            const html = await loadUiHtml(ui.resourceUri);
-            return { uri: ui.resourceUri, mimeType: MCP_APP_MIME_TYPE, text: html };
-          },
-        );
-        console.error(`[mcp-syson] Registered UI resource: ${ui.resourceUri}`);
-      } else {
-        console.error(
-          `[mcp-syson] Warning: No UI resource found for ${ui.resourceUri}. ` +
-          `Run 'cd lib/syson/src/ui && node build-all.mjs' first.`,
-        );
-      }
+      throw new Error(
+        `[mcp-syson] Tool ${tool.name} advertises an unregistered UI resource: ${ui.resourceUri}`,
+      );
     }
   }
 

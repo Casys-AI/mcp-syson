@@ -15,6 +15,9 @@
 #     `docker compose down` silently discards all models.
 #   - Healthcheck on the database so `depends_on` actually waits for a
 #     database that accepts connections instead of one that merely started.
+#   - Elasticsearch is an experimental, opt-in SysON integration. It is not
+#     part of this topology, so its auto-configured health indicator is
+#     explicitly disabled instead of making the application report DOWN.
 
 services:
   database:
@@ -35,6 +38,9 @@ services:
 
   app:
     image: "${SYSON_IMAGE:-eclipsesyson/syson:v2026.7.0}"
+    # SysON does not publish an arm64 image; Docker Desktop/Colima emulates it
+    # on Apple Silicon instead of failing image resolution.
+    platform: linux/amd64
     ports:
       - "127.0.0.1:8180:8080"
     environment:
@@ -43,9 +49,18 @@ services:
       SPRING_DATASOURCE_PASSWORD: syson
       SIRIUS_COMPONENTS_CORS_ALLOWEDORIGINPATTERNS: "*"
       SERVER_PORT: 8080
+      MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED: "false"
     depends_on:
       database:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      # SysON loads its standard libraries at boot; under amd64 emulation this
+      # took 217 seconds in the integration check.
+      start_period: 240s
     networks:
       - syson
 

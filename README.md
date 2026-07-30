@@ -1,6 +1,6 @@
 # @casys/mcp-syson
 
-MCP server for [SysON](https://mbse-syson.org) — SysML v2 model-based systems engineering (MBSE) — **31 tools** across **7 categories**, with **5 interactive UI viewers**.
+MCP server for [SysON](https://mbse-syson.org) — SysML v2 model-based systems engineering (MBSE) — **31 tools** across **7 categories**, with **six MCP App viewers** (five tool-backed, plus the standalone model explorer).
 
 Every tool is a primitive: it reads or writes the model and reports exactly what is there. None calls a language model, so the same model always yields the same answer. Aggregation, judgement and orchestration stay with the calling agent — `syson_query_aql` gives it the full power of AQL to compose whatever it needs.
 
@@ -163,13 +163,14 @@ Several tools return an [MCP App](https://modelcontextprotocol.io) UI resource n
 | `value-change-viewer` | Attribute value changes | `syson_value_read`, `syson_value_set` |
 | `model-explorer-viewer` | Model tree exploration | *not yet wired to a tool* |
 
-Viewers are served as `ui://mcp-syson/<name>`, discovered from `src/ui/dist/` at startup, and must be built before the server can serve them:
+Viewers are served as `ui://mcp-syson/<name>`. The build generates a TypeScript bundle that is statically imported by the server, so a JSR/Deno consumer fetches the viewer HTML with its module graph; all six bundles are registered as MCP resources, including `model-explorer-viewer` while it remains unwired to a tool. Build them before local development or test runs:
 
 ```bash
 deno task ui:build     # cd src/ui && node build-all.mjs
+deno task ui:verify    # asserts each bundle is readable and registered
 ```
 
-The JSR package ships `src/ui/dist/`, so registry consumers get built viewers without a Node toolchain.
+The JSR package ships the generated TypeScript bundle, so registry consumers get built viewers without a Node toolchain.
 
 ## Environment Variables
 
