@@ -1,0 +1,56 @@
+# SysON + PostgreSQL for @casys/mcp-syson
+#
+# Brings up a local SysON instance this MCP server can talk to:
+#   docker compose up -d
+#   export SYSON_URL=http://localhost:8180
+#   deno task serve
+#
+# SysON UI: http://localhost:8180
+# GraphQL endpoint (what the MCP server calls): http://localhost:8180/api/graphql
+#
+# Differences from the upstream eclipse-syson compose file:
+#   - Port mapped to 8180 to avoid colliding with the many services that
+#     default to 8080, and bound to loopback rather than every interface.
+#   - Named volume for the database. Upstream has none, so every
+#     `docker compose down` silently discards all models.
+#   - Healthcheck on the database so `depends_on` actually waits for a
+#     database that accepts connections instead of one that merely started.
+
+services:
+  database:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: syson
+      POSTGRES_USER: syson
+      POSTGRES_PASSWORD: syson
+    volumes:
+      - syson-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syson -d syson"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - syson
+
+  app:
+    image: "${SYSON_IMAGE:-eclipsesyson/syson:v2026.7.0}"
+    ports:
+      - "127.0.0.1:8180:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database/syson
+      SPRING_DATASOURCE_USERNAME: syson
+      SPRING_DATASOURCE_PASSWORD: syson
+      SIRIUS_COMPONENTS_CORS_ALLOWEDORIGINPATTERNS: "*"
+      SERVER_PORT: 8080
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - syson
+
+networks:
+  syson:
+
+volumes:
+  syson-db-data:

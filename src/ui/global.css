@@ -1,0 +1,69 @@
+@import "tailwindcss" source(".");
+
+@theme {
+  --color-fg-default: var(--fg-default, #1a1a1a);
+  --color-fg-muted: var(--fg-muted, #6b7280);
+  --color-fg-dim: var(--fg-dim, #8a8078);
+  --color-bg-canvas: var(--bg-canvas, #ffffff);
+  --color-bg-subtle: var(--bg-subtle, #f9fafb);
+  --color-bg-muted: var(--bg-muted, #f3f4f6);
+  --color-border-default: var(--border-default, #e5e7eb);
+  --color-border-subtle: var(--border-subtle, #f3f4f6);
+  --color-border-strong: var(--border-strong, #d1d5db);
+  --color-accent: var(--accent, #ffb86f);
+  --color-accent-dim: var(--accent-dim, rgba(255, 184, 111, 0.1));
+  --color-success: var(--success, #4ade80);
+  --color-warning: var(--warning, #fbbf24);
+  --color-error: var(--error, #f87171);
+  --color-info: var(--info, #60a5fa);
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Menlo", monospace;
+}
+
+:root {
+  --fg-default: #f5f0ea;
+  --fg-muted: #d5c3b5;
+  --fg-dim: #8a8078;
+  --bg-canvas: #0a0908;
+  --bg-subtle: #12110f;
+  --bg-muted: #1a1816;
+  --border-default: rgba(255, 184, 111, 0.1);
+  --border-subtle: rgba(255, 184, 111, 0.06);
+  --border-strong: rgba(255, 184, 111, 0.2);
+  --accent: #ffb86f;
+  --accent-dim: rgba(255, 184, 111, 0.1);
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --info: #60a5fa;
+}
+
+.light {
+  --fg-default: #1a1a1a;
+  --fg-muted: #6b7280;
+  --fg-dim: #9ca3af;
+  --bg-canvas: #ffffff;
+  --bg-subtle: #f9fafb;
+  --bg-muted: #f3f4f6;
+  --border-default: #e5e7eb;
+  --border-subtle: #f3f4f6;
+  --border-strong: #d1d5db;
+  --accent: #d97706;
+  --accent-dim: rgba(217, 119, 6, 0.1);
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+}
+
+@layer base {
+  body {
+    @apply font-sans text-fg-default bg-bg-canvas;
+  }
+}
+
+/* SysON branding — indigo accent for distinction from PLM (amber) and SIM (default) */
+.syson-brand {
+  --syson-brand: #818cf8;
+  --syson-brand-dim: rgba(99, 102, 241, 0.15);
+}

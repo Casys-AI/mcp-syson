@@ -1,0 +1,39 @@
+{
+  "name": "@casys/mcp-syson",
+  "version": "0.1.0",
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "serve": "deno run --allow-all server.ts --http --port=3009",
+    "compile": "deno compile -A --output mcp-syson server.ts",
+    "test": "deno test --allow-all tests/",
+    "ui:build": "cd src/ui && node build-all.mjs"
+  },
+  "exports": {
+    ".": "./mod.ts",
+    "./server": "./server.ts"
+  },
+  "publish": {
+    "include": [
+      "mod.ts",
+      "server.ts",
+      "src/**/*.ts",
+      "src/ui/dist/",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "**/*_test.ts",
+      "**/*.test.ts",
+      "**/*.bench.ts"
+    ]
+  },
+  "imports": {
+    "@casys/mcp-server": "jsr:@casys/mcp-server@^0.22.0",
+    "ajv": "npm:ajv@^8.17.1",
+    "hono": "npm:hono@^4",
+    "hono/cors": "npm:hono@^4/cors",
+    "jose": "npm:jose@^6.0.0",
+    "@opentelemetry/api": "npm:@opentelemetry/api@^1.9.0",
+    "@std/yaml": "jsr:@std/yaml@^1"
+  }
+}
