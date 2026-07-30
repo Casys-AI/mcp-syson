@@ -36,5 +36,6 @@
     "jose": "npm:jose@^6.0.0",
     "@opentelemetry/api": "npm:@opentelemetry/api@^1.9.0",
     "@std/yaml": "jsr:@std/yaml@^1"
-  }
+  },
+  "minimumDependencyAge": "0"
 }
