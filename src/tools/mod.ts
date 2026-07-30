@@ -12,7 +12,17 @@ export { modelTools } from "./model.ts";
 export { elementTools } from "./element.ts";
 export { queryTools } from "./query.ts";
 export { diagramTools } from "./diagram.ts";
-export { agentTools, createAgenticSamplingClient, setSamplingClient } from "./agent.ts";
+
+// Shared AQL helpers
+export {
+  evalAql,
+  evalAqlObjects,
+  getChildren,
+  getDescendants,
+  getParent,
+  getSelf,
+} from "./aql.ts";
+export type { ExprResult } from "./aql.ts";
 
 // Imports for combined arrays
 import { projectTools } from "./project.ts";
@@ -20,7 +30,6 @@ import { modelTools } from "./model.ts";
 import { elementTools } from "./element.ts";
 import { queryTools } from "./query.ts";
 import { diagramTools } from "./diagram.ts";
-import { agentTools } from "./agent.ts";
 import type { SysonTool } from "./types.ts";
 
 /** All SysON tools combined */
@@ -30,7 +39,6 @@ export const allTools: SysonTool[] = [
   ...elementTools,
   ...queryTools,
   ...diagramTools,
-  ...agentTools,
 ];
 
 /** Tools organized by category */
@@ -40,7 +48,6 @@ export const toolsByCategory: Record<string, SysonTool[]> = {
   element: elementTools,
   query: queryTools,
   diagram: diagramTools,
-  agent: agentTools,
 };
 
 /** Get tools by category */

@@ -43,9 +43,6 @@ export {
 } from "./src/client.ts";
 export type { SysonGraphQLClientOptions } from "./src/client.ts";
 
-// Re-export sampling client injection
-export { setSamplingClient } from "./src/tools/agent.ts";
-
 // Re-export individual tool arrays
 export {
   projectTools,
@@ -53,5 +50,15 @@ export {
   elementTools,
   queryTools,
   diagramTools,
-  agentTools,
 } from "./src/tools/mod.ts";
+
+// Re-export shared AQL helpers — the building blocks every tool traverses with
+export {
+  evalAql,
+  evalAqlObjects,
+  getChildren,
+  getDescendants,
+  getParent,
+  getSelf,
+} from "./src/tools/mod.ts";
+export type { ExprResult } from "./src/tools/mod.ts";

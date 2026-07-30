@@ -24,8 +24,6 @@ export {
   toolsByCategory,
 };
 
-// Re-export sampling client injection
-export { setSamplingClient } from "./tools/agent.ts";
 export type { SysonTool };
 export type {
   MCPClientBase,

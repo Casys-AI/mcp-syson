@@ -45,9 +45,7 @@ export type SysonToolCategory =
   | "element"
   | "query"
   | "model"
-  | "diagram"
-  // Agent tools (MCP Sampling) — Phase 3
-  | "agent";
+  | "diagram";
 
 /** SysON tool handler function type */
 export type SysonToolHandler = (args: Record<string, unknown>) => Promise<unknown> | unknown;

@@ -1,6 +1,8 @@
 # @casys/mcp-syson
 
-MCP server for [SysON](https://mbse-syson.org) — SysML v2 model-based systems engineering (MBSE) — **29 tools** across **6 categories**, with **4 interactive UI viewers**.
+MCP server for [SysON](https://mbse-syson.org) — SysML v2 model-based systems engineering (MBSE) — **24 tools** across **5 categories**, with **3 interactive UI viewers**.
+
+Every tool is a primitive: it reads or writes the model and reports exactly what is there. None calls a language model, so the same model always yields the same answer. Aggregation, judgement and orchestration stay with the calling agent — `syson_query_aql` gives it the full power of AQL to compose whatever it needs.
 
 Connect any MCP-compatible AI agent (Claude Desktop, PML, custom) to a SysON instance via the standard [Model Context Protocol](https://modelcontextprotocol.io). Agents can browse and edit SysML v2 models, run AQL queries, trace requirements, and drive diagrams.
 
@@ -58,7 +60,7 @@ Load only the categories you need — useful to keep an agent's tool list small:
 deno run --allow-all server.ts --categories=project,element,query
 ```
 
-## Tools (29)
+## Tools (24)
 
 Every tool needs an `editing_context_id`, obtained from `syson_project_get`. Start with `syson_project_list`.
 
@@ -111,19 +113,15 @@ Every tool needs an `editing_context_id`, obtained from `syson_project_get`. Sta
 | `syson_diagram_arrange` | Auto-layout all elements on a diagram |
 | `syson_diagram_snapshot` | Capture a diagram for rendering |
 
-### Agent (5)
+### Why there are no analysis or agent tools
 
-These tools run agentic loops through **MCP sampling** — the server asks the host to run a model, then acts on the answer. They only work on hosts that implement `sampling/createMessage`; on hosts that don't, prefer the tools above and keep the loop on your side.
+Two families of tools were deliberately left out.
 
-> **Sampling is deprecated as of MCP [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog)** and scheduled for removal after 2027-07-28. That revision drops the server→client request channel entirely; server-initiated input now uses [Multi Round-Trip Requests](https://blog.modelcontextprotocol.io/posts/2026-07-28/) (SEP-2322), where a handler returns an `InputRequiredResult` with an opaque `requestState` and the client re-issues the call carrying `inputResponses`. These five tools still work on current hosts, but the loop will have to be reified as serialisable state rather than driven from inside the server. Tracked for a future release; the other 24 tools are unaffected.
+**LLM-backed tools.** Earlier drafts exposed `syson_agent_*` tools running agentic loops via MCP sampling. The caller is already a language model, so asking the host to run *another* model added indirection without adding information. Sampling was also [deprecated in MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog), and its replacement ([Multi Round-Trip Requests](https://blog.modelcontextprotocol.io/posts/2026-07-28/), SEP-2322) surfaces every round-trip to the client — removing the only real benefit, which was saving client context. Generating SysML is the caller's job; `syson_element_insert_sysml` writes it.
 
-| Tool | Description |
-|------|-------------|
-| `syson_agent_generate_sysml` | Generate SysML v2 structures from a natural-language description |
-| `syson_agent_analyze_model` | Analyse a model and report findings |
-| `syson_agent_review` | Review a model against modelling conventions |
-| `syson_agent_impact` | Assess the impact of a proposed change |
-| `syson_agent_delegate` | Run a free-form agentic task over the model tools |
+**Convenience aggregators.** A `syson_model_overview` was prototyped and dropped: it needed three AQL round-trips to produce what `syson_query_aql("aql:self.eAllContents()")` returns in one, and its "unnamed element" detection inferred intent from SysON's label fallback rather than reading the model. An agent composing AQL itself gets more, more cheaply, and without a heuristic that would silently break if SysON changed how it labels unnamed elements.
+
+If a real need for context reduction on very large models shows up, the fix is one targeted tool backed by a measurement — not a speculative aggregation layer.
 
 ## UI Viewers
 
@@ -155,7 +153,7 @@ The JSR package ships `src/ui/dist/`, so registry consumers get built viewers wi
 
 ```
 mod.ts                 # Public API
-server.ts              # MCP server (stdio + HTTP), sampling bridge wiring
+server.ts              # MCP server (stdio + HTTP)
 deno.json              # Package config
 docker-compose.yml     # SysON + PostgreSQL for local use
 src/
@@ -165,12 +163,12 @@ src/
     mutations.ts       # GraphQL mutations
     types.ts           # Payload types
   tools/
+    aql.ts             # Shared AQL evaluation + traversal helpers
     project.ts         # 5 project tools
     model.ts           # 4 model/document tools
     element.ts         # 6 element tools
     query.ts           # 4 AQL / search / trace tools
     diagram.ts         # 5 diagram tools
-    agent.ts           # 5 sampling-driven agentic tools
     mod.ts             # Registry
     types.ts           # Tool interface
   client.ts            # SysonToolsClient
@@ -193,7 +191,7 @@ Most write operations go through the generic `evaluateExpression` AQL mutation r
 # Type check
 deno check mod.ts server.ts
 
-# Run tests (48 tests, no SysON instance needed — GraphQL is mocked)
+# Run tests (36 tests, no SysON instance needed — GraphQL is mocked)
 deno test --allow-all tests/
 
 # Build UI viewers

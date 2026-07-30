@@ -14,13 +14,12 @@ import { GET_CHILD_CREATION_DESCRIPTIONS, GET_OBJECT } from "../api/queries.ts";
 import {
   CREATE_CHILD,
   DELETE_TREE_ITEM,
-  EVALUATE_EXPRESSION,
   INSERT_TEXTUAL_SYSMLV2,
 } from "../api/mutations.ts";
+import { evalAql, getChildren } from "./aql.ts";
 import type {
   CreateChildResult,
   DeleteTreeItemResult,
-  EvaluateExpressionResult,
   GetChildCreationDescriptionsResult,
   GetObjectResult,
   InsertTextualSysMLv2Result,
@@ -47,22 +46,12 @@ function unwrapMutation<T extends object>(
  * This is the reliable way — renameTreeItem requires a representationId we don't have.
  */
 async function renameViaAql(ecId: string, elementId: string, newName: string): Promise<void> {
-  const client = getSysonClient();
-  const mutationId = crypto.randomUUID();
-
-  const data = await client.mutate<EvaluateExpressionResult>(EVALUATE_EXPRESSION, {
-    input: {
-      id: mutationId,
-      editingContextId: ecId,
-      expression: `aql:self.eSet(self.eClass().getEStructuralFeature('declaredName'), '${newName.replace(/'/g, "\\'")}')`,
-      selectedObjectIds: [elementId],
-    },
-  });
-
-  const result = data.evaluateExpression;
-  if (result.__typename === "ErrorPayload") {
-    throw new Error(`[lib/syson] rename via AQL failed: ${result.message}`);
-  }
+  const escaped = newName.replace(/'/g, "\\'");
+  await evalAql(
+    ecId,
+    `aql:self.eSet(self.eClass().getEStructuralFeature('declaredName'), '${escaped}')`,
+    [elementId],
+  );
 }
 
 export const elementTools: SysonTool[] = [
@@ -227,38 +216,19 @@ export const elementTools: SysonTool[] = [
       required: ["editing_context_id", "element_id"],
     },
     handler: async ({ editing_context_id, element_id }) => {
-      const client = getSysonClient();
-      const ecId = editing_context_id as string;
-      const elemId = element_id as string;
-      const mutationId = crypto.randomUUID();
-
-      const data = await client.mutate<EvaluateExpressionResult>(EVALUATE_EXPRESSION, {
-        input: {
-          id: mutationId,
-          editingContextId: ecId,
-          expression: "aql:self.ownedElement",
-          selectedObjectIds: [elemId],
-        },
-      });
-
-      const result = data.evaluateExpression;
-      if (result.__typename === "ErrorPayload") {
-        throw new Error(`[lib/syson] syson_element_children failed: ${result.message}`);
-      }
-
-      const exprResult = result.result;
-      if (exprResult.__typename !== "ObjectsExpressionResult") {
-        return { parentId: element_id, children: [], count: 0 };
-      }
+      const children = await getChildren(
+        editing_context_id as string,
+        element_id as string,
+      );
 
       return {
         parentId: element_id,
-        children: exprResult.objsValue.map((obj) => ({
+        children: children.map((obj) => ({
           id: obj.id,
           kind: obj.kind,
           label: obj.label,
         })),
-        count: exprResult.objsValue.length,
+        count: children.length,
       };
     },
   },

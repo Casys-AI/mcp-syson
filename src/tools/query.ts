@@ -10,39 +10,8 @@
 import type { SysonTool } from "./types.ts";
 import { getSysonClient } from "../api/graphql-client.ts";
 import { SEARCH_ELEMENTS } from "../api/queries.ts";
-import { EVALUATE_EXPRESSION } from "../api/mutations.ts";
-import type {
-  EvaluateExpressionResult,
-  SearchResult,
-} from "../api/types.ts";
-
-/**
- * Helper: evaluate an AQL expression via the evaluateExpression mutation.
- * Returns the typed result from the EvaluateExpressionSuccessPayload.
- */
-async function evalAql(
-  ecId: string,
-  expression: string,
-  selectedObjectIds: string[],
-) {
-  const client = getSysonClient();
-  const mutationId = crypto.randomUUID();
-
-  const data = await client.mutate<EvaluateExpressionResult>(EVALUATE_EXPRESSION, {
-    input: {
-      id: mutationId,
-      editingContextId: ecId,
-      expression,
-      selectedObjectIds,
-    },
-  });
-
-  const result = data.evaluateExpression;
-  if (result.__typename === "ErrorPayload") {
-    throw new Error(`[lib/syson] evaluateExpression failed: ${result.message}`);
-  }
-  return result.result;
-}
+import { evalAql } from "./aql.ts";
+import type { SearchResult } from "../api/types.ts";
 
 export const queryTools: SysonTool[] = [
   {
