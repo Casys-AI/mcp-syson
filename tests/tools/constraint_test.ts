@@ -174,3 +174,19 @@ Deno.test("constraintTools - every required field exists in properties", () => {
     }
   }
 });
+
+// ── AQL injection hardening ─────────────────────────────────────────────────
+
+Deno.test("aqlEscape - quotes and backslashes cannot break out of AQL strings", async () => {
+  const { aqlEscape } = await import("../../src/tools/aql.ts");
+
+  // The classic breakout: close the string, inject an expression.
+  assertEquals(
+    aqlEscape("x') or true or ('"),
+    "x\\') or true or (\\'",
+  );
+  // Backslashes are escaped first, so a crafted \' cannot re-open the string.
+  assertEquals(aqlEscape("a\\'b"), "a\\\\\\'b");
+  // Benign names pass through untouched.
+  assertEquals(aqlEscape("totalMass"), "totalMass");
+});

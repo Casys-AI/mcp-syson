@@ -2,6 +2,12 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.2.1] - 2026-07-30
+
+### Security
+
+- **AQL injection via element names.** The value resolver ported from `lib/sim` interpolated feature names into AQL `select(e | e.declaredName = '…')` expressions without escaping. AQL runs server-side with full model access (`eSet`, deletion), so an element named `x') or …` was an injection vector, not a display quirk. Every dynamic value embedded in AQL now goes through a shared `aqlEscape` (backslashes first, then quotes) — including the SysON-provided ids in `syson_value_set`, as defence in depth.
+
 ## [0.2.0] - 2026-07-30
 
 Absorbs the constraint stack from the internal `lib/sim` module, which is retired. 24 → 30 tools.

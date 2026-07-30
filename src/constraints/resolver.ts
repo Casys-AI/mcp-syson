@@ -22,7 +22,7 @@
  */
 
 import type { Constraint, ConstraintExpr, ValueMap } from "@casys/constraint-solver";
-import { evalAql } from "../tools/aql.ts";
+import { aqlEscape, evalAql } from "../tools/aql.ts";
 import { normalizeKind } from "./ast-parser.ts";
 
 // ============================================================================
@@ -152,9 +152,9 @@ export async function readAttributeValue(
 function buildNestedAql(featurePath: string[]): string {
   let aql = "aql:self";
   for (let i = 0; i < featurePath.length - 1; i++) {
-    aql += `.ownedElement->select(e | e.declaredName = '${featurePath[i]}')->first()`;
+    aql += `.ownedElement->select(e | e.declaredName = '${aqlEscape(featurePath[i])}')->first()`;
   }
-  const last = featurePath[featurePath.length - 1];
+  const last = aqlEscape(featurePath[featurePath.length - 1]);
   aql +=
     `.ownedElement->select(e | e.oclIsKindOf(sysml::AttributeUsage))->select(e | e.declaredName = '${last}')`;
   return aql;
@@ -170,7 +170,7 @@ async function resolveFeature(
   contextElementId: string,
   featurePath: string[],
 ): Promise<number | undefined> {
-  const featureName = featurePath[featurePath.length - 1];
+  const featureName = aqlEscape(featurePath[featurePath.length - 1]);
   const aql = featurePath.length === 1
     ? `aql:self.ownedElement->select(e | e.oclIsKindOf(sysml::AttributeUsage))->select(e | e.declaredName = '${featureName}')`
     : buildNestedAql(featurePath);

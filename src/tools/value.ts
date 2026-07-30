@@ -9,7 +9,7 @@
  */
 
 import type { SysonTool } from "./types.ts";
-import { evalAql, evalAqlObjects } from "./aql.ts";
+import { aqlEscape, evalAql } from "./aql.ts";
 import { readAttributeValue } from "../constraints/resolver.ts";
 
 // ============================================================================
@@ -57,13 +57,13 @@ async function tryRemoveNegation(ecId: string, attributeId: string): Promise<boo
     await evalAql(
       ecId,
       `aql:self.eGet(self.eClass().getEStructuralFeature('ownedRelationship')).add(` +
-        `self.eResource().getEObject('${litMembershipId}'))`,
+        `self.eResource().getEObject('${aqlEscape(litMembershipId)}'))`,
       [featureValueId],
     );
     await evalAql(
       ecId,
       `aql:self.eGet(self.eClass().getEStructuralFeature('ownedRelationship')).remove(` +
-        `self.eResource().getEObject('${opMembershipId}'))`,
+        `self.eResource().getEObject('${aqlEscape(opMembershipId)}'))`,
       [featureValueId],
     );
     return true;

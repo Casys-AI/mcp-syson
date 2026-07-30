@@ -16,7 +16,7 @@ import {
   DELETE_TREE_ITEM,
   INSERT_TEXTUAL_SYSMLV2,
 } from "../api/mutations.ts";
-import { evalAql, getChildren } from "./aql.ts";
+import { aqlEscape, evalAql, getChildren } from "./aql.ts";
 import type {
   CreateChildResult,
   DeleteTreeItemResult,
@@ -46,10 +46,9 @@ function unwrapMutation<T extends object>(
  * This is the reliable way — renameTreeItem requires a representationId we don't have.
  */
 async function renameViaAql(ecId: string, elementId: string, newName: string): Promise<void> {
-  const escaped = newName.replace(/'/g, "\\'");
   await evalAql(
     ecId,
-    `aql:self.eSet(self.eClass().getEStructuralFeature('declaredName'), '${escaped}')`,
+    `aql:self.eSet(self.eClass().getEStructuralFeature('declaredName'), '${aqlEscape(newName)}')`,
     [elementId],
   );
 }

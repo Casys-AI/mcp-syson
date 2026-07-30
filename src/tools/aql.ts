@@ -20,6 +20,17 @@ export type ExprResult = Extract<
 >["result"];
 
 /**
+ * Escape a value for interpolation inside an AQL single-quoted string.
+ *
+ * Every dynamic name or id embedded in an AQL expression MUST go through
+ * this — AQL runs server-side with full model access (eSet, deletion), so an
+ * unescaped quote in an element name is an injection vector, not a typo.
+ */
+export function aqlEscape(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+/**
  * Evaluate an AQL expression against one or more elements.
  *
  * @param ecId Editing context ID
