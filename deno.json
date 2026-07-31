@@ -1,11 +1,14 @@
 {
   "name": "@casys/mcp-syson",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "nodeModulesDir": "auto",
   "tasks": {
-    "serve": "deno run --allow-all server.ts --http --port=3009",
+    "serve": "deno run --allow-all server.ts --port=3009",
     "compile": "deno compile -A --output mcp-syson server.ts",
     "test": "deno test --allow-all tests/",
+    "check": "deno check mod.ts server.ts",
+    "fmt": "deno fmt --check deno.json server.ts src/client.ts src/tools/constraint.ts src/tools/types.ts tests/server_test.ts scripts/verify-ui-bundles.ts",
+    "lint": "deno lint mod.ts server.ts src/client.ts src/tools/constraint.ts src/tools/types.ts tests/server_test.ts scripts/verify-ui-bundles.ts",
     "ui:build": "cd src/ui && node build-all.mjs",
     "ui:verify": "deno run --allow-read scripts/verify-ui-bundles.ts"
   },
@@ -29,14 +32,14 @@
     ]
   },
   "imports": {
-    "@casys/mcp-server": "jsr:@casys/mcp-server@^0.22.0",
-    "@casys/constraint-solver": "jsr:@casys/constraint-solver@^0.1.0",
+    "@std/assert": "jsr:@std/assert@1",
+    "@casys/mcp-server": "jsr:@casys/mcp-server@0.24.0",
+    "@casys/constraint-solver": "jsr:@casys/constraint-solver@0.1.0",
     "ajv": "npm:ajv@^8.17.1",
     "hono": "npm:hono@^4",
     "hono/cors": "npm:hono@^4/cors",
     "jose": "npm:jose@^6.0.0",
     "@opentelemetry/api": "npm:@opentelemetry/api@^1.9.0",
     "@std/yaml": "jsr:@std/yaml@^1"
-  },
-  "minimumDependencyAge": "0"
+  }
 }

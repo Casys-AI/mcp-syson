@@ -11,6 +11,8 @@ import { App } from "@modelcontextprotocol/ext-apps";
 import { cx, containers, typography } from "../../shared/interactions";
 import "../../global.css";
 
+const app = new App({ name: "Value Change Viewer", version: "1.0.0" });
+
 interface SetValueResult {
   element_id: string;
   old_value: number;
@@ -125,17 +127,25 @@ function ValueViewer() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const app = new App();
-    app.on("data", (payload: unknown) => {
+    app.ontoolresult = (result: {
+      content?: Array<{ type: string; text?: string }>;
+      structuredContent?: unknown;
+    }) => {
       try {
-        const d = (typeof payload === "string" ? JSON.parse(payload) : payload) as ValueResult;
+        const text = result.content?.find((content) => content.type === "text")?.text;
+        const d = (result.structuredContent ?? (text ? JSON.parse(text) : null)) as ValueResult | null;
+        if (!d) {
+          setData(null);
+          return;
+        }
         setData(d);
         setError(null);
       } catch (e) {
         setError(`Invalid data: ${(e as Error).message}`);
       }
-    });
-    app.init();
+    };
+    app.ontoolinputpartial = () => setError(null);
+    app.connect().catch(() => {});
   }, []);
 
   if (error) return <div class={containers.centered}>{error}</div>;

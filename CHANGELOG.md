@@ -2,6 +2,23 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.4.0] - 2026-07-31
+
+### Changed
+
+- **Breaking transport migration: stateless HTTP only.** The server now runs
+  only on `/mcp` with the MCP 2026-07-28 stateless HTTP transport. stdio,
+  session state, SSE, and the former `--http` switch are removed. `--port`,
+  `--hostname`, and category filtering remain; the default bind is now
+  `127.0.0.1`.
+- **`syson_constraint_evaluate` now declares and returns a closed structured
+  output.** Its concise text fallback is accompanied by `structuredContent`
+  containing results, summary, and resolved values, so strict MCP clients can
+  validate the response without parsing prose.
+- **MCP App handshake order.** All six viewer sources register their one-shot
+  result handler before `app.connect()`, and the bundle verifier enforces the
+  ordering before publication.
+
 ## [0.3.1] - 2026-07-30
 
 ### Fixed

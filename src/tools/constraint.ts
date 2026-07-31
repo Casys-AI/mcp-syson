@@ -19,9 +19,14 @@ import {
   toValueMap,
   type ValueMap,
 } from "@casys/constraint-solver";
+import type { StructuredToolResult } from "@casys/mcp-server";
 import type { SysonTool } from "./types.ts";
 import { evalAql, evalAqlObjects, getSelf } from "./aql.ts";
-import { normalizeKind, parseAstNode, type SysonAstNode } from "../constraints/ast-parser.ts";
+import {
+  normalizeKind,
+  parseAstNode,
+  type SysonAstNode,
+} from "../constraints/ast-parser.ts";
 import { resolveValues } from "../constraints/resolver.ts";
 import type { GqlObject } from "../api/types.ts";
 
@@ -38,7 +43,11 @@ async function buildAstTree(
   elementId: string,
   obj: GqlObject,
 ): Promise<SysonAstNode> {
-  const children = await evalAqlObjects(ecId, "aql:self.ownedElement", elementId);
+  const children = await evalAqlObjects(
+    ecId,
+    "aql:self.ownedElement",
+    elementId,
+  );
   const shortKind = normalizeKind(obj.kind);
 
   let props: Record<string, string | number | boolean> | undefined;
@@ -68,7 +77,9 @@ async function buildAstTree(
 
   if (shortKind.includes("FeatureReferenceExpression")) {
     try {
-      const ref = await evalAql(ecId, "aql:self.referent.declaredName", [elementId]);
+      const ref = await evalAql(ecId, "aql:self.referent.declaredName", [
+        elementId,
+      ]);
       if (ref.__typename === "StringExpressionResult") {
         props = { ...props, referentName: ref.strValue };
       }
@@ -115,14 +126,22 @@ async function extractConstraints(
 
   for (const obj of found) {
     try {
-      const bodyChildren = await evalAqlObjects(ecId, "aql:self.ownedElement", obj.id);
+      const bodyChildren = await evalAqlObjects(
+        ecId,
+        "aql:self.ownedElement",
+        obj.id,
+      );
       const bodyExpr = bodyChildren.find((c) => {
         const k = normalizeKind(c.kind);
         return k.includes("Expression") || k.includes("Literal");
       });
 
       if (!bodyExpr) {
-        errors.push({ id: obj.id, name: obj.label, error: "No body expression found" });
+        errors.push({
+          id: obj.id,
+          name: obj.label,
+          error: "No body expression found",
+        });
         continue;
       }
 
@@ -148,9 +167,90 @@ async function extractConstraints(
 /** Values as the tools accept them: bare numbers or { value, unit }. */
 type ValuesInput = Record<string, number | { value: number; unit?: string }>;
 
+type ConstraintEvaluationOutput = {
+  results: ConstraintResult[];
+  summary: {
+    total: number;
+    pass: number;
+    fail: number;
+    error: number;
+    unresolved: number;
+  };
+  resolvedValues: Record<string, QuantityValue>;
+} & Record<string, unknown>;
+
+const quantityOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    value: { type: "number" },
+    unit: { type: "string" },
+  },
+  required: ["value"],
+};
+
+const constraintResultOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    constraintId: { type: "string" },
+    constraintName: { type: "string" },
+    status: { enum: ["pass", "fail", "error", "unresolved"] },
+    expression: { type: "string" },
+    computedValue: { type: "number" },
+    threshold: { type: "number" },
+    margin: { type: "number" },
+    marginPercent: { type: "number" },
+    unit: { type: "string" },
+    error: { type: "string" },
+    unresolvedRefs: { type: "array", items: { type: "string" } },
+  },
+  required: ["constraintId", "constraintName", "status", "expression"],
+};
+
+/** Closed contract for the explicit, offline-capable constraint evaluation output. */
+export const constraintEvaluateOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    results: { type: "array", items: constraintResultOutputSchema },
+    summary: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        total: { type: "integer", minimum: 0 },
+        pass: { type: "integer", minimum: 0 },
+        fail: { type: "integer", minimum: 0 },
+        error: { type: "integer", minimum: 0 },
+        unresolved: { type: "integer", minimum: 0 },
+      },
+      required: ["total", "pass", "fail", "error", "unresolved"],
+    },
+    resolvedValues: {
+      type: "object",
+      additionalProperties: quantityOutputSchema,
+    },
+  },
+  required: ["results", "summary", "resolvedValues"],
+};
+
 /** Serialise a ValueMap for the tool response. */
 function valuesToJson(values: ValueMap): Record<string, QuantityValue> {
   return Object.fromEntries(values);
+}
+
+/** Keep the text fallback concise while strict clients use structuredContent. */
+export function toConstraintEvaluateResult(
+  value: unknown,
+): StructuredToolResult {
+  const report = value as ConstraintEvaluationOutput;
+  const { summary } = report;
+  return {
+    content: `Evaluated ${summary.total} constraint${
+      summary.total === 1 ? "" : "s"
+    }: ${summary.pass} pass, ${summary.fail} fail, ${summary.error} error, ${summary.unresolved} unresolved.`,
+    structuredContent: report,
+  };
 }
 
 /** Count statuses over results that may include extraction errors. */
@@ -171,8 +271,7 @@ function summarise(results: ConstraintResult[]) {
 export const constraintTools: SysonTool[] = [
   {
     name: "syson_constraint_extract",
-    description:
-      "Extract constraint definitions from a SysML element. " +
+    description: "Extract constraint definitions from a SysML element. " +
       "Returns structured constraints (operator, operands, thresholds) plus " +
       "parse errors for any ConstraintUsage that could not be read. " +
       "Pass the result to syson_constraint_evaluate or syson_constraint_solve. " +
@@ -244,6 +343,7 @@ export const constraintTools: SysonTool[] = [
       },
       required: ["constraints"],
     },
+    outputSchema: constraintEvaluateOutputSchema,
     handler: async (args) => {
       const constraints = args.constraints as Constraint[];
       const provided = args.values as ValuesInput | undefined;
@@ -263,7 +363,10 @@ export const constraintTools: SysonTool[] = [
       }
 
       const report = evaluateAll(constraints, values);
-      return { ...report, resolvedValues: valuesToJson(values) };
+      return {
+        ...report,
+        resolvedValues: valuesToJson(values),
+      } satisfies ConstraintEvaluationOutput;
     },
   },
 
@@ -371,11 +474,15 @@ export const constraintTools: SysonTool[] = [
         objective: {
           type: "object",
           properties: {
-            variable: { type: "string", description: "Feature path to optimise" },
+            variable: {
+              type: "string",
+              description: "Feature path to optimise",
+            },
             direction: { type: "string", enum: ["minimize", "maximize"] },
           },
           required: ["variable", "direction"],
-          description: "Optimise one variable instead of returning any solution",
+          description:
+            "Optimise one variable instead of returning any solution",
         },
         fixed: {
           type: "object",

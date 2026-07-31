@@ -1,7 +1,9 @@
 node_modules/
 deno.lock
+!deno.lock
 src/ui/dist/
 src/ui/bundles.ts
+!src/ui/bundles.ts
 src/ui/node_modules/
 
 # Credentials — never commit SysON credentials

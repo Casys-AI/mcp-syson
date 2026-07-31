@@ -211,8 +211,6 @@ function DiagramViewer() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
-    app.connect().then(() => { appConnected = true; }).catch(() => {});
-
     app.ontoolresult = (result: { content?: { type: string; text?: string }[] }) => {
       setLoading(false);
       setError(null);
@@ -226,6 +224,7 @@ function DiagramViewer() {
       }
     };
     app.ontoolinputpartial = () => setLoading(true);
+    app.connect().then(() => { appConnected = true; }).catch(() => {});
   }, []);
 
   const handleSelectNode = useCallback((node: DiagramNode) => {

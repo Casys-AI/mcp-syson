@@ -13,7 +13,13 @@ import {
   getToolsByCategory,
   toolsByCategory,
 } from "./tools/mod.ts";
-import type { MCPClientBase, MCPTool, MCPToolWireFormat, SysonTool } from "./tools/types.ts";
+import { toConstraintEvaluateResult } from "./tools/constraint.ts";
+import type {
+  MCPClientBase,
+  MCPTool,
+  MCPToolWireFormat,
+  SysonTool,
+} from "./tools/types.ts";
 
 // Re-export from tools
 export {
@@ -75,6 +81,7 @@ export class SysonToolsClient {
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema,
+      ...(t.outputSchema && { outputSchema: t.outputSchema }),
       ...(t._meta && { _meta: t._meta }),
     }));
   }
@@ -91,6 +98,22 @@ export class SysonToolsClient {
   /** Get tool count */
   get count(): number {
     return this.tools.length;
+  }
+
+  /** Bind the one explicit SysON output contract to the MCP wire response. */
+  buildHandlersMap(): Map<
+    string,
+    (args: Record<string, unknown>) => Promise<unknown>
+  > {
+    return new Map(this.tools.map((tool) => [
+      tool.name,
+      async (args: Record<string, unknown>) => {
+        const result = await tool.handler(args);
+        return tool.name === "syson_constraint_evaluate"
+          ? toConstraintEvaluateResult(result)
+          : result;
+      },
+    ]));
   }
 }
 
@@ -115,23 +138,25 @@ export class SysonToolsMCP implements MCPClientBase {
     this.client = new SysonToolsClient();
   }
 
-  async connect(): Promise<void> {
+  connect(): Promise<void> {
     this.connected = true;
+    return Promise.resolve();
   }
 
-  async listTools(): Promise<MCPTool[]> {
-    return this.client.toMCPFormat();
+  listTools(): Promise<MCPTool[]> {
+    return Promise.resolve(this.client.toMCPFormat());
   }
 
-  async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+  callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     if (!this.connected) {
       throw new Error("Client not connected");
     }
     return this.client.execute(name, args);
   }
 
-  async disconnect(): Promise<void> {
+  disconnect(): Promise<void> {
     this.connected = false;
+    return Promise.resolve();
   }
 
   getClient(): SysonToolsClient {

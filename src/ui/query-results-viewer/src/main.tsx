@@ -221,8 +221,6 @@ function QueryResults() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    app.connect().then(() => { appConnected = true; }).catch(() => {});
-
     app.ontoolresult = (result: { content?: { type: string; text?: string }[] }) => {
       setLoading(false);
       setError(null);
@@ -235,6 +233,7 @@ function QueryResults() {
       }
     };
     app.ontoolinputpartial = () => setLoading(true);
+    app.connect().then(() => { appConnected = true; }).catch(() => {});
   }, []);
 
   if (loading) return <ContentSkeleton />;

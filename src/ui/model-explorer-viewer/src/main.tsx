@@ -141,8 +141,6 @@ function ModelExplorer() {
   const [filter, setFilter] = useState("");
 
   useEffect(() => {
-    app.connect().then(() => { appConnected = true; }).catch(() => {});
-
     app.ontoolresult = (result: { content?: { type: string; text?: string }[] }) => {
       setLoading(false);
       setError(null);
@@ -155,6 +153,7 @@ function ModelExplorer() {
       }
     };
     app.ontoolinputpartial = () => setLoading(true);
+    app.connect().then(() => { appConnected = true; }).catch(() => {});
   }, []);
 
   const handleSelect = useCallback((el: ModelElement) => {
