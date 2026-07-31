@@ -167,15 +167,6 @@ function ValidationViewer() {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
-    app.connect()
-      .then(() => {
-        appConnected = true;
-        console.log("[validation-viewer] Connected to MCP host");
-      })
-      .catch(() => {
-        console.log("[validation-viewer] No MCP host (standalone mode)");
-      });
-
     app.ontoolresult = (result: { content?: Array<{ type: string; text?: string }> }) => {
       setLoading(false);
       const textContent = result.content?.find((c) => c.type === "text");
@@ -190,6 +181,14 @@ function ValidationViewer() {
     };
 
     (app as any).ontoolinputpartial = () => setLoading(true);
+    app.connect()
+      .then(() => {
+        appConnected = true;
+        console.log("[validation-viewer] Connected to MCP host");
+      })
+      .catch(() => {
+        console.log("[validation-viewer] No MCP host (standalone mode)");
+      });
   }, []);
 
   // Loading

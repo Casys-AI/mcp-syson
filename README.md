@@ -26,31 +26,18 @@ The server talks to `$SYSON_URL/api/graphql`. There is **no default URL** — if
 
 ## Quick Start
 
-### stdio mode (Claude Desktop / PML)
-
-Add to your MCP config (e.g. `.pml.json` or `claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "syson": {
-      "command": "deno",
-      "args": ["run", "--allow-all", "jsr:@casys/mcp-syson/server"],
-      "env": {
-        "SYSON_URL": "http://localhost:8180"
-      }
-    }
-  }
-}
-```
-
-### HTTP mode
+### Stateless HTTP
 
 ```bash
 SYSON_URL=http://localhost:8180 deno task serve      # port 3009
 SYSON_URL=http://localhost:8180 \
-  deno run --allow-all server.ts --http --port=3009 --hostname=127.0.0.1
+  deno run --allow-all server.ts --port=3009 --hostname=127.0.0.1
 ```
+
+Connect MCP clients to `http://127.0.0.1:3009/mcp` using the 2026-07-28
+stateless HTTP protocol. There is no stdio, session, SSE, or `--http`
+compatibility mode. `--port` and `--hostname` accept either `--name=value` or
+`--name value` forms; the default hostname is loopback-only.
 
 ### Category filtering
 
@@ -183,7 +170,7 @@ The JSR package ships the generated TypeScript bundle, so registry consumers get
 
 ```
 mod.ts                 # Public API
-server.ts              # MCP server (stdio + HTTP)
+server.ts              # Stateless HTTP MCP server
 deno.json              # Package config
 docker-compose.yml     # SysON + PostgreSQL for local use
 src/
@@ -223,11 +210,13 @@ Most write operations go through the generic `evaluateExpression` AQL mutation r
 ## Development
 
 ```bash
-# Type check
-deno check mod.ts server.ts
+# Type check, lint and format validation
+deno task check
+deno task lint
+deno task fmt
 
-# Run tests (71 tests, no SysON instance needed — GraphQL is mocked)
-deno test --allow-all tests/
+# Run tests (76 tests, no SysON instance needed — GraphQL is mocked)
+deno task test
 
 # Build UI viewers
 deno task ui:build

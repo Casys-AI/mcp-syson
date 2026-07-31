@@ -151,8 +151,6 @@ function RequirementsTrace() {
   const [showOnly, setShowOnly] = useState<"all" | "covered" | "uncovered">("all");
 
   useEffect(() => {
-    app.connect().then(() => { appConnected = true; }).catch(() => {});
-
     app.ontoolresult = (result: { content?: { type: string; text?: string }[] }) => {
       setLoading(false);
       setError(null);
@@ -165,6 +163,7 @@ function RequirementsTrace() {
       }
     };
     app.ontoolinputpartial = () => setLoading(true);
+    app.connect().then(() => { appConnected = true; }).catch(() => {});
   }, []);
 
   const handleSelect = useCallback((trace: TraceEntry) => {

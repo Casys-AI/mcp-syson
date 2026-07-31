@@ -1,45 +1,21 @@
 /**
- * MCP Server Bootstrap for SysON (MBSE) Tools
+ * MCP Server Bootstrap for SysON (MBSE) Tools.
  *
- * Bootstraps SysON tools as a proper MCP server
- * that can be loaded via mcp-servers.json or run as HTTP server.
- *
- * Usage in mcp-servers.json (stdio mode):
- * {
- *   "mcpServers": {
- *     "syson": {
- *       "command": "deno",
- *       "args": ["run", "--allow-all", "lib/syson/server.ts"]
- *     }
- *   }
- * }
- *
- * HTTP mode (default port: 3009):
- *   deno run --allow-all lib/syson/server.ts --http
- *   deno run --allow-all lib/syson/server.ts --http --port=3009
- *
- * Environment:
- *   SYSON_URL=http://localhost:8180  (SysON instance URL — required, no default)
- *
- * @module lib/syson/server
+ * SysON exposes stateless HTTP only, on the MCP 2026-07-28 transport.
  */
 
-import { ConcurrentMCPServer, MCP_APP_MIME_TYPE } from "@casys/mcp-server";
+import { MCP_APP_MIME_TYPE, McpApp } from "@casys/mcp-server";
 import { SysonToolsClient } from "./src/client.ts";
 import { loadUiHtml, UI_RESOURCES } from "./src/ui/mod.ts";
 
 const DEFAULT_HTTP_PORT = 3009;
+const PACKAGE_VERSION = "0.4.0";
 
-/**
- * Register every shipped viewer, including viewers not yet attached to a
- * tool. Registering only tool-referenced viewers made model-explorer
- * undiscoverable and made a missing bundle look like a valid resource URI.
- */
+/** Register every shipped viewer, including the currently standalone explorer. */
 export function registerUiResources(
-  server: Pick<ConcurrentMCPServer, "registerResource">,
+  server: Pick<McpApp, "registerResource">,
 ): ReadonlySet<string> {
   const registeredUris = new Set<string>();
-
   for (const [uri, resourceMeta] of Object.entries(UI_RESOURCES)) {
     server.registerResource(
       {
@@ -57,57 +33,41 @@ export function registerUiResources(
     registeredUris.add(uri);
     console.error(`[mcp-syson] Registered UI resource: ${uri}`);
   }
-
   return registeredUris;
 }
 
-async function main() {
-  const args = Deno.args;
+export interface CreateSysonServerOptions {
+  categories?: string[];
+  logger?: (message: string) => void;
+}
 
-  // Category filtering
-  const categoriesArg = args.find((arg) => arg.startsWith("--categories="));
-  const categories = categoriesArg
-    ? categoriesArg.split("=")[1].split(",")
-    : undefined;
+export interface SysonServer {
+  server: McpApp;
+  toolsClient: SysonToolsClient;
+}
 
-  // HTTP mode
-  const httpFlag = args.includes("--http");
-  const portArg = args.find((arg) => arg.startsWith("--port="));
-  const httpPort = portArg
-    ? parseInt(portArg.split("=")[1], 10)
-    : DEFAULT_HTTP_PORT;
-  const hostnameArg = args.find((arg) => arg.startsWith("--hostname="));
-  const hostname = hostnameArg ? hostnameArg.split("=")[1] : "0.0.0.0";
-
-  // Initialize tools client
+export function createSysonServer(
+  options: CreateSysonServerOptions = {},
+): SysonServer {
   const toolsClient = new SysonToolsClient(
-    categories ? { categories } : undefined,
+    options.categories ? { categories: options.categories } : undefined,
   );
-
-  const server = new ConcurrentMCPServer({
+  const server = new McpApp({
     name: "mcp-syson",
-    version: "0.3.1",
+    version: PACKAGE_VERSION,
     maxConcurrent: 10,
     backpressureStrategy: "queue",
+    transport: "stateless",
     validateSchema: true,
-    logger: (msg) => console.error(`[mcp-syson] ${msg}`),
+    logger: options.logger ??
+      ((message) => console.error(`[mcp-syson] ${message}`)),
   });
-
-  // Register all tools
-  const mcpTools = toolsClient.toMCPFormat();
-  const handlers = new Map();
-
-  for (const tool of toolsClient.listTools()) {
-    handlers.set(tool.name, tool.handler);
-  }
-
-  server.registerTools(mcpTools, handlers);
+  server.registerTools(
+    toolsClient.toMCPFormat(),
+    toolsClient.buildHandlersMap(),
+  );
 
   const registeredUris = registerUiResources(server);
-
-  // A tool may only advertise a resource that this server can actually read.
-  // Treat a mismatch as a startup error rather than sending clients an
-  // unreadable resourceUri.
   for (const tool of toolsClient.listTools()) {
     const ui = tool._meta?.ui;
     if (ui?.resourceUri && !registeredUris.has(ui.resourceUri)) {
@@ -116,44 +76,88 @@ async function main() {
       );
     }
   }
+  return { server, toolsClient };
+}
 
-  // Start server
-  if (httpFlag) {
-    await server.startHttp({
-      port: httpPort,
-      hostname,
-      cors: true,
-      onListen: (info) => {
-        console.error(
-          `[mcp-syson] HTTP server listening on http://${info.hostname}:${info.port}`,
-        );
-      },
-    });
+export interface CliOptions {
+  port: number;
+  hostname: string;
+  categories?: string[];
+}
 
-    console.error(
-      `[mcp-syson] Server ready (${toolsClient.count} tools) - HTTP mode${
-        categories ? ` - categories: ${categories.join(", ")}` : ""
-      }`,
-    );
-
-    Deno.addSignalListener("SIGINT", () => {
-      console.error("[mcp-syson] Shutting down...");
-      Deno.exit(0);
-    });
-  } else {
-    await server.start();
-
-    console.error(
-      `[mcp-syson] Server ready (${toolsClient.count} tools) - stdio mode${
-        categories ? ` - categories: ${categories.join(", ")}` : ""
-      }`,
-    );
-
-    Deno.addSignalListener("SIGINT", () => {
-      console.error("[mcp-syson] SIGINT received, exiting...");
-      Deno.exit(0);
-    });
+export function parseCli(args: readonly string[]): CliOptions {
+  let port = DEFAULT_HTTP_PORT;
+  let hostname = "127.0.0.1";
+  let categories: string[] | undefined;
+  for (let index = 0; index < args.length; index++) {
+    const argument = args[index];
+    if (argument.startsWith("--port=")) {
+      port = positivePort(argument.slice("--port=".length));
+    } else if (argument === "--port") {
+      port = positivePort(args[++index]);
+    } else if (argument.startsWith("--hostname=")) {
+      hostname = nonEmpty(argument.slice("--hostname=".length), "--hostname");
+    } else if (argument === "--hostname") {
+      hostname = nonEmpty(args[++index], "--hostname");
+    } else if (argument.startsWith("--categories=")) {
+      categories = commaSeparated(argument.slice("--categories=".length));
+    } else if (argument === "--categories") {
+      categories = commaSeparated(args[++index]);
+    } else {
+      throw new TypeError(`Unknown argument '${argument}'.`);
+    }
   }
+  return { port, hostname, ...(categories ? { categories } : {}) };
+}
+
+export async function main(args = Deno.args): Promise<void> {
+  const cli = parseCli(args);
+  const { server, toolsClient } = createSysonServer({
+    categories: cli.categories,
+  });
+  await server.startHttp({
+    port: cli.port,
+    hostname: cli.hostname,
+    cors: true,
+    onListen: (info) => {
+      console.error(
+        `[mcp-syson] HTTP server listening on http://${info.hostname}:${info.port}`,
+      );
+    },
+  });
+  console.error(
+    `[mcp-syson] Server ready (${toolsClient.count} tools)${
+      cli.categories ? ` - categories: ${cli.categories.join(", ")}` : ""
+    }.`,
+  );
+}
+
+function positivePort(value: string | undefined): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 65_535) {
+    throw new TypeError("--port must be an integer between 1 and 65535.");
+  }
+  return parsed;
+}
+
+function nonEmpty(value: string | undefined, label: string): string {
+  if (!value || value.trim().length === 0) {
+    throw new TypeError(`${label} must not be empty.`);
+  }
+  return value;
+}
+
+function commaSeparated(value: string | undefined): string[] {
+  if (!value) {
+    throw new TypeError("--categories must name at least one category.");
+  }
+  const categories = value.split(",").map((category) => category.trim()).filter(
+    Boolean,
+  );
+  if (categories.length === 0) {
+    throw new TypeError("--categories must name at least one category.");
+  }
+  return categories;
 }
 
 if (import.meta.main) {

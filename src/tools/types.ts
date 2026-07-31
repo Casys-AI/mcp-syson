@@ -11,6 +11,7 @@ export interface MCPTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
   _meta?: MCPToolMeta;
 }
 
@@ -29,6 +30,7 @@ export interface MCPToolWireFormat {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
   _meta?: {
     ui?: {
       resourceUri: string;
@@ -52,7 +54,9 @@ export type SysonToolCategory =
   | "value";
 
 /** SysON tool handler function type */
-export type SysonToolHandler = (args: Record<string, unknown>) => Promise<unknown> | unknown;
+export type SysonToolHandler = (
+  args: Record<string, unknown>,
+) => Promise<unknown> | unknown;
 
 /** SysON tool definition with handler */
 export interface SysonTool {
@@ -60,6 +64,7 @@ export interface SysonTool {
   description: string;
   category: SysonToolCategory;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
   handler: SysonToolHandler;
   _meta?: MCPToolMeta;
 }
