@@ -53,33 +53,17 @@ Example host context:
 Unknown component keys are rejected by the shared runtime. A missing or
 non-ready surface context safely falls back to the standalone default.
 
-## Local package prerequisite
+## Package prerequisite
 
-The component API is implemented by `@casys/mcp-view` 0.5.0 in the sibling
-`mcp-server` repository. As of 2026-08-01, npm and JSR still expose 0.4.1, so
-`src/ui/package.json` temporarily uses this local package reference:
-
-```json
-"@casys/mcp-view": "file:../../../mcp-server/packages/view/dist-node"
-```
-
-Before the first install or after changing mcp-view, build that package, then
-install and build SysON:
+The component API is implemented by the published `@casys/mcp-view` 0.5 line.
+Install and build SysON normally:
 
 ```sh
-cd ../mcp-server/packages/view
-deno task build:npm
-cd ../../../mcp-syson/src/ui
+cd src/ui
 npm install
 cd ../..
 deno task ui:build
 ```
-
-This is an explicit publication blocker for a source checkout that does not have
-the sibling repository. Once 0.5.0 is published, replace the `file:` dependency
-with `^0.5.0` and regenerate `package-lock.json`. Runtime consumers of the
-published SysON package are unaffected because its six self-contained HTML
-bundles are checked in and shipped.
 
 ## Verification
 

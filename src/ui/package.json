@@ -9,7 +9,7 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@casys/mcp-view": "file:../../../mcp-server/packages/view/dist-node",
+    "@casys/mcp-view": "^0.5.0",
     "preact": "^10.28.2"
   },
   "devDependencies": {
