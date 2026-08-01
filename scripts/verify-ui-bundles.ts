@@ -6,6 +6,7 @@
  */
 
 import { UI_HTML_BY_NAME } from "../src/ui/bundles.ts";
+import { VIEWER_COMPONENT_KEYS } from "../src/ui/shared/component-catalog.ts";
 
 const EXPECTED_VIEWERS = [
   "diagram-viewer",
@@ -19,6 +20,15 @@ const EXPECTED_VIEWERS = [
 const VIEWER_SOURCE_PATHS = EXPECTED_VIEWERS.map((viewer) =>
   new URL(`../src/ui/${viewer}/src/main.tsx`, import.meta.url)
 );
+
+const COMPONENTS_BY_VIEWER = {
+  "diagram-viewer": VIEWER_COMPONENT_KEYS.diagram,
+  "model-explorer-viewer": VIEWER_COMPONENT_KEYS.modelExplorer,
+  "query-results-viewer": VIEWER_COMPONENT_KEYS.queryResults,
+  "requirements-trace-viewer": VIEWER_COMPONENT_KEYS.requirementsTrace,
+  "validation-viewer": VIEWER_COMPONENT_KEYS.validation,
+  "value-change-viewer": VIEWER_COMPONENT_KEYS.value,
+} as const;
 
 const bundledViewers = Object.keys(UI_HTML_BY_NAME).sort();
 const expectedViewers = [...EXPECTED_VIEWERS].sort();
@@ -44,17 +54,52 @@ for (const viewer of EXPECTED_VIEWERS) {
   if (!bundledHtml.includes("<html") || !bundledHtml.includes('id="app"')) {
     throw new Error(`${viewer}: bundle is not a rendered MCP App document`);
   }
+  if (
+    !bundledHtml.includes("io.casys.mcp.view-components/v1") ||
+    !bundledHtml.includes("io.casys.mcp.surface/v1")
+  ) {
+    throw new Error(
+      `${viewer}: bundle does not contain both component surface contracts`,
+    );
+  }
+  for (const component of COMPONENTS_BY_VIEWER[viewer]) {
+    if (!bundledHtml.includes(component)) {
+      throw new Error(`${viewer}: bundle is missing component ${component}`);
+    }
+  }
+  if (bundledHtml.includes("io.casys.mcp.composable-view/v1")) {
+    throw new Error(
+      `${viewer}: bundle still contains the retired projection contract`,
+    );
+  }
 }
 
 for (const sourceUrl of VIEWER_SOURCE_PATHS) {
   const source = await Deno.readTextFile(sourceUrl);
-  const handler = source.indexOf(".ontoolresult");
-  const connection = source.indexOf(".connect(");
-  if (handler === -1 || connection === -1 || handler > connection) {
+  if (
+    !source.includes("defineComponentRegistry") ||
+    !source.includes("startPreactSurfaceApp")
+  ) {
     throw new Error(
-      `${sourceUrl.pathname}: register the one-shot tool result handler before app.connect().`,
+      `${sourceUrl.pathname}: viewer must declare a component registry and start the shared surface app.`,
     );
   }
+}
+
+const adapterSource = await Deno.readTextFile(
+  new URL("../src/ui/shared/preact-surface.tsx", import.meta.url),
+);
+if (
+  !adapterSource.includes("createMcpApp") ||
+  !adapterSource.includes("onToolResult:") ||
+  !adapterSource.includes("onToolInputPartial:") ||
+  !adapterSource.includes("onTeardown:") ||
+  !adapterSource.includes("mountComponentSurface") ||
+  !adapterSource.includes("advertisedComponentCatalog")
+) {
+  throw new Error(
+    "Preact adapter must delegate handshake lifecycle and component surfaces to @casys/mcp-view.",
+  );
 }
 
 console.log(`Verified ${EXPECTED_VIEWERS.length} fresh UI bundles.`);

@@ -200,6 +200,12 @@ export const elementTools: SysonTool[] = [
       "Returns ID, kind, and label for each child. " +
       "Start from the root package ID (from syson_model_create) and drill down.",
     category: "element",
+    _meta: {
+      ui: {
+        resourceUri: "ui://mcp-syson/model-explorer-viewer",
+        emits: ["syson.element.selected"],
+      },
+    },
     inputSchema: {
       type: "object",
       properties: {

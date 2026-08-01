@@ -401,6 +401,7 @@ export const constraintTools: SysonTool[] = [
     _meta: {
       ui: {
         resourceUri: "ui://mcp-syson/validation-viewer",
+        emits: ["syson.constraint.selected"],
       },
     },
     handler: async (args) => {

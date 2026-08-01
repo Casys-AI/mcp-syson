@@ -1,260 +1,222 @@
-/**
- * Query Results Viewer — MCP App for SysON AQL/search results
- *
- * Renders query results as a sortable table or single-value display.
- * Used by syson_query_aql, syson_search, syson_query_eval.
- *
- * Data shapes (all have `type` discriminant):
- *
- * type: "objects" → { results: [{id, kind, label}], count, expression }
- * type: "object"  → { result: {id, kind, label}, expression }
- * type: "string"  → { result: string }
- * type: "boolean" → { result: boolean }
- * type: "int"     → { result: number }
- *
- * @module lib/syson/src/ui/query-results-viewer
- */
+/** Composable AQL/search result components. */
 
-import { render } from "preact";
-import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
-import { App } from "@modelcontextprotocol/ext-apps";
+import { defineComponentRegistry } from "@casys/mcp-view";
+import { useMemo, useState } from "preact/hooks";
 import { cx } from "../../components/utils";
-import { ContentSkeleton } from "../../shared";
+import {
+  defaultComponentSurface,
+  VIEWER_COMPONENT_KEYS,
+} from "../../shared/component-catalog";
+import {
+  definePreactComponent,
+  publishSelection,
+  startPreactSurfaceApp,
+  type SurfaceAppContext,
+} from "../../shared/preact-surface";
 import "../../global.css";
 
-// ============================================================================
-// Types
-// ============================================================================
+interface ObjectResult {
+  id: string;
+  kind: string;
+  label: string;
+}
 
-interface ObjectResult { id: string; kind: string; label: string }
-
-type QueryData =
-  | { type: "objects"; results: ObjectResult[]; count: number; expression?: string; objectId?: string }
+type QueryShape =
+  | {
+    type: "objects";
+    results: ObjectResult[];
+    count: number;
+    expression?: string;
+    objectId?: string;
+  }
   | { type: "object"; result: ObjectResult; expression?: string }
   | { type: "string"; result: string; expression?: string }
   | { type: "boolean"; result: boolean; expression?: string }
   | { type: "int"; result: number; expression?: string }
   | { type: "void"; result: null; expression?: string }
-  // syson_search returns this shape
-  | { type?: undefined; results: ObjectResult[]; query?: string; count: number };
+  | {
+    type?: undefined;
+    results: ObjectResult[];
+    query?: string;
+    count: number;
+  };
+type QueryData = QueryShape & Record<string, unknown>;
 
-// ============================================================================
-// MCP App
-// ============================================================================
-
-const app = new App({ name: "Query Results", version: "1.0.0" });
-let appConnected = false;
-
-function notifyModel(event: string, data: Record<string, unknown>) {
-  if (!appConnected) return;
-  app.updateModelContext({
-    content: [{ type: "text", text: `User ${event}: ${JSON.stringify(data)}` }],
-    structuredContent: { event, ...data },
-  });
+function objectsOf(data: QueryData): ObjectResult[] | undefined {
+  if (data.type === "objects" || data.type === undefined) {
+    return data.results ?? [];
+  }
+  return data.type === "object" ? [data.result] : undefined;
 }
 
-// ============================================================================
-// Scalar result
-// ============================================================================
-
-function ScalarResult({ type, value, expression }: { type: string; value: unknown; expression?: string }) {
+function Summary({ data }: { data: QueryData }) {
+  const objects = objectsOf(data);
   return (
-    <div className="p-4 font-sans text-sm bg-bg-canvas">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-[#6366f1]/15 text-[#818cf8]">
-          SysON
-        </span>
-        <span className="text-fg-muted text-xs">Query Result</span>
-      </div>
-      {expression && (
-        <div className="mb-2 px-2.5 py-1.5 bg-bg-muted rounded text-[11px] font-mono text-fg-muted truncate">
-          {expression}
-        </div>
-      )}
-      <div className="flex items-center gap-2">
-        <span className="px-2 py-0.5 text-[10px] font-mono bg-bg-muted text-fg-dim rounded">{type}</span>
-        <span className="text-fg-default font-mono">
-          {value === null ? "null" : String(value)}
-        </span>
-      </div>
+    <div className="syson-component-card flex items-center gap-2">
+      <span className="syson-badge">SysON</span>
+      <span className="font-semibold">Query result</span>
+      <span className="syson-chip ml-auto">
+        {objects
+          ? `${objects.length} object${objects.length === 1 ? "" : "s"}`
+          : data.type ?? "unknown"}
+      </span>
     </div>
   );
 }
 
-// ============================================================================
-// Object table
-// ============================================================================
-
-type SortKey = "label" | "kind";
-type SortDir = "asc" | "desc";
-
-function ObjectTable({
-  objects,
-  expression,
-  queryText,
-}: {
-  objects: ObjectResult[];
-  expression?: string;
-  queryText?: string;
-}) {
-  const [sortKey, setSortKey] = useState<SortKey>("label");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [filter, setFilter] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const toggleSort = useCallback((key: SortKey) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("asc"); }
-  }, [sortKey]);
-
-  const sorted = useMemo(() => {
-    let items = [...objects];
-    if (filter) {
-      const lf = filter.toLowerCase();
-      items = items.filter((o) => o.label.toLowerCase().includes(lf) || o.kind.toLowerCase().includes(lf));
-    }
-    items.sort((a, b) => {
-      const va = sortKey === "label" ? a.label : a.kind;
-      const vb = sortKey === "label" ? b.label : b.kind;
-      const cmp = va.localeCompare(vb);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return items;
-  }, [objects, sortKey, sortDir, filter]);
-
-  const handleSelect = useCallback((obj: ObjectResult) => {
-    setSelectedId(obj.id);
-    notifyModel("select-result", { id: obj.id, label: obj.label, kind: obj.kind });
-  }, []);
-
-  const shortKind = (kind: string) => kind.includes("::") ? kind.split("::").pop()! : kind;
-  const sortIcon = (key: SortKey) => sortKey === key ? (sortDir === "asc" ? " \u2191" : " \u2193") : "";
-
+function Expression({ data }: { data: QueryData }) {
+  const text = "expression" in data
+    ? data.expression
+    : "query" in data
+    ? data.query
+    : undefined;
   return (
-    <div className="font-sans text-sm bg-bg-canvas">
-      {/* Header */}
-      <div className="px-4 pt-3 pb-2 border-b border-border-subtle">
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-[#6366f1]/15 text-[#818cf8]">
-            SysON
-          </span>
-          <span className="text-fg-default font-semibold">Query Results</span>
-          <span className="text-[10px] font-mono text-fg-dim ml-auto">
-            {objects.length} result{objects.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-        {(expression || queryText) && (
-          <div className="mb-2 px-2.5 py-1.5 bg-bg-muted rounded text-[11px] font-mono text-fg-muted truncate">
-            {expression || queryText}
-          </div>
-        )}
-        {objects.length > 5 && (
-          <input
-            type="text"
-            placeholder="Filter results..."
-            value={filter}
-            onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
-            className="w-full px-2.5 py-1.5 text-xs bg-bg-muted border border-border-default rounded text-fg-default placeholder:text-fg-dim focus:outline-none focus:border-[#6366f1]/40"
-          />
-        )}
-      </div>
+    <div className="syson-component-card">
+      <div className="syson-component-title">Expression</div>
+      <code className="block text-xs whitespace-pre-wrap break-words text-fg-muted">
+        {text || "No expression supplied"}
+      </code>
+    </div>
+  );
+}
 
-      {/* Table */}
-      <table className="w-full text-left">
+function Values(
+  { data, context }: { data: QueryData; context: SurfaceAppContext<QueryData> },
+) {
+  const objects = objectsOf(data);
+  const [filter, setFilter] = useState("");
+  const [sortKey, setSortKey] = useState<"label" | "kind">("label");
+  const [descending, setDescending] = useState(false);
+  const [selected, setSelected] = useState<string>();
+  const rows = useMemo(() => {
+    if (!objects) return [];
+    const needle = filter.toLowerCase();
+    return objects
+      .filter((item) =>
+        !needle || `${item.label} ${item.kind}`.toLowerCase().includes(needle)
+      )
+      .sort((left, right) => {
+        const compared = left[sortKey].localeCompare(right[sortKey]);
+        return descending ? -compared : compared;
+      });
+  }, [objects, filter, sortKey, descending]);
+
+  if (!objects) {
+    const value = "result" in data ? data.result : null;
+    return (
+      <div className="syson-component-card flex items-center gap-2">
+        <span className="syson-chip">{data.type ?? "unknown"}</span>
+        <span className="font-mono break-all">
+          {value === null ? "null" : String(value)}
+        </span>
+      </div>
+    );
+  }
+  const toggleSort = (key: "label" | "kind") => {
+    if (sortKey === key) setDescending((value) => !value);
+    else {
+      setSortKey(key);
+      setDescending(false);
+    }
+  };
+  return (
+    <div className="syson-component-card p-0 overflow-hidden">
+      <div className="p-3 border-b border-border-subtle">
+        <input
+          className="syson-input"
+          placeholder="Filter query results…"
+          value={filter}
+          onInput={(event) =>
+            setFilter((event.target as HTMLInputElement).value)}
+        />
+      </div>
+      <table className="syson-responsive-table w-full text-left">
         <thead>
           <tr className="border-b border-border-subtle">
             <th
+              className="syson-table-heading cursor-pointer"
               onClick={() => toggleSort("label")}
-              className="px-4 py-2 text-[11px] font-semibold text-fg-muted cursor-pointer hover:text-fg-default select-none"
             >
-              Label{sortIcon("label")}
+              Label {sortKey === "label" ? (descending ? "↓" : "↑") : ""}
             </th>
             <th
+              className="syson-table-heading text-right cursor-pointer"
               onClick={() => toggleSort("kind")}
-              className="px-4 py-2 text-[11px] font-semibold text-fg-muted cursor-pointer hover:text-fg-default select-none text-right"
             >
-              Kind{sortIcon("kind")}
+              Kind {sortKey === "kind" ? (descending ? "↓" : "↑") : ""}
             </th>
           </tr>
         </thead>
         <tbody>
-          {sorted.length === 0 ? (
-            <tr>
-              <td colSpan={2} className="px-4 py-6 text-center text-fg-dim text-xs">
-                {filter ? `No matches for "${filter}"` : "No results"}
-              </td>
-            </tr>
-          ) : sorted.map((obj) => (
+          {rows.map((item) => (
             <tr
-              key={obj.id}
-              onClick={() => handleSelect(obj)}
+              key={item.id}
               className={cx(
-                "cursor-pointer transition-colors duration-100",
-                selectedId === obj.id
-                  ? "bg-[#6366f1]/10"
-                  : "hover:bg-bg-muted"
+                "cursor-pointer hover:bg-bg-muted",
+                selected === item.id && "bg-accent-dim",
               )}
+              onClick={() => {
+                setSelected(item.id);
+                publishSelection(
+                  context,
+                  "select-result",
+                  "syson.element.selected",
+                  {
+                    id: item.id,
+                    label: item.label,
+                    kind: item.kind,
+                  },
+                );
+              }}
             >
-              <td className="px-4 py-1.5 text-sm text-fg-default truncate max-w-[300px]">
-                {obj.label || "(unnamed)"}
+              <td className="px-3 py-2 truncate">
+                {item.label || "(unnamed)"}
               </td>
-              <td className="px-4 py-1.5 text-right">
-                <span className="text-[10px] font-mono text-fg-dim bg-bg-muted px-1.5 py-0.5 rounded">
-                  {shortKind(obj.kind)}
+              <td className="px-3 py-2 text-right">
+                <span className="syson-chip">
+                  {item.kind.split("::").pop()}
                 </span>
               </td>
             </tr>
           ))}
+          {!rows.length && (
+            <tr>
+              <td className="p-5 text-center text-fg-muted" colSpan={2}>
+                No results
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
   );
 }
 
-// ============================================================================
-// Main
-// ============================================================================
+const keys = VIEWER_COMPONENT_KEYS.queryResults;
+const registry = defineComponentRegistry<
+  QueryData,
+  SurfaceAppContext<QueryData>
+>({
+  components: {
+    [keys[0]]: definePreactComponent({
+      title: "Query summary",
+      description: "Result type and count",
+    }, ({ data }) => <Summary data={data} />),
+    [keys[1]]: definePreactComponent({
+      title: "Query expression",
+      description: "AQL expression or search text",
+    }, ({ data }) => <Expression data={data} />),
+    [keys[2]]: definePreactComponent({
+      title: "Query values",
+      description: "Scalar value or selectable object results",
+    }, ({ data, context }) => <Values data={data} context={context} />),
+  },
+  defaultSurface: defaultComponentSurface(keys),
+});
 
-function QueryResults() {
-  const [data, setData] = useState<QueryData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    app.ontoolresult = (result: { content?: { type: string; text?: string }[] }) => {
-      setLoading(false);
-      setError(null);
-      try {
-        const text = result.content?.find((c) => c.type === "text")?.text;
-        if (!text) { setData(null); return; }
-        setData(JSON.parse(text) as QueryData);
-      } catch (e) {
-        setError(`Parse error: ${e instanceof Error ? e.message : "Unknown"}`);
-      }
-    };
-    app.ontoolinputpartial = () => setLoading(true);
-    app.connect().then(() => { appConnected = true; }).catch(() => {});
-  }, []);
-
-  if (loading) return <ContentSkeleton />;
-  if (error) return <div className="p-4 text-error text-sm">{error}</div>;
-  if (!data) return <div className="p-6 text-center text-fg-muted text-sm">No data</div>;
-
-  // Multi-object results (table)
-  if (data.type === "objects" || (!data.type && "results" in data)) {
-    const objects = "results" in data ? (data.results ?? []) : [];
-    const expr = "expression" in data ? data.expression : undefined;
-    const query = "query" in data ? (data as { query?: string }).query : undefined;
-    return <ObjectTable objects={objects} expression={expr} queryText={query} />;
-  }
-
-  // Single object
-  if (data.type === "object") {
-    return <ObjectTable objects={[data.result]} expression={data.expression} />;
-  }
-
-  // Scalar
-  return <ScalarResult type={data.type ?? "unknown"} value={data.result} expression={data.expression} />;
-}
-
-render(<QueryResults />, document.getElementById("app")!);
+void startPreactSurfaceApp({
+  root: document.getElementById("app")!,
+  info: { name: "Query Results", version: "2.0.0" },
+  registry,
+  loadingLabel: "Waiting for query results…",
+}).catch((error) => console.error("[query-results] Failed to start", error));

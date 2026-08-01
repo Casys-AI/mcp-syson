@@ -12,11 +12,17 @@ function getHandler(name: string) {
   return tool.handler;
 }
 
-function mockFetch(responses: Record<string, unknown>[]) {
+function mockFetch(
+  responses: Record<string, unknown>[],
+  requests: Array<Record<string, unknown>> = [],
+) {
   let callIndex = 0;
   const originalFetch = globalThis.fetch;
 
-  globalThis.fetch = () => {
+  globalThis.fetch = (_input, init) => {
+    if (typeof init?.body === "string") {
+      requests.push(JSON.parse(init.body) as Record<string, unknown>);
+    }
     const data = responses[callIndex] ?? responses[responses.length - 1];
     callIndex++;
     return Promise.resolve(
@@ -90,6 +96,7 @@ Deno.test("syson_query_aql - derives string type from the AQL result", async () 
 });
 
 Deno.test("syson_search - returns matches", async () => {
+  const requests: Array<Record<string, unknown>> = [];
   const restore = mockFetch([{
     viewer: {
       editingContext: {
@@ -102,7 +109,7 @@ Deno.test("syson_search - returns matches", async () => {
         },
       },
     },
-  }]);
+  }], requests);
 
   try {
     const result = await getHandler("syson_search")({
@@ -112,6 +119,9 @@ Deno.test("syson_search - returns matches", async () => {
     assertEquals(result.count, 1);
     const results = result.results as Array<Record<string, unknown>>;
     assertEquals(results[0].label, "Propulsion");
+    const variables = requests[0].variables as Record<string, unknown>;
+    const query = variables.query as Record<string, unknown>;
+    assertEquals(query.searchInLibraries, false);
   } finally {
     restore();
   }

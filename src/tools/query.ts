@@ -301,6 +301,7 @@ export const queryTools: SysonTool[] = [
     _meta: {
       ui: {
         resourceUri: "ui://mcp-syson/query-results-viewer",
+        emits: ["syson.element.selected"],
       },
     },
     handler: async ({ editing_context_id, text, match_case, whole_word, use_regex }) => {
@@ -314,6 +315,7 @@ export const queryTools: SysonTool[] = [
           matchWholeWord: (whole_word as boolean) ?? false,
           useRegularExpression: (use_regex as boolean) ?? false,
           searchInAttributes: true,
+          searchInLibraries: false,
         },
       });
 
@@ -368,6 +370,7 @@ export const queryTools: SysonTool[] = [
     _meta: {
       ui: {
         resourceUri: "ui://mcp-syson/query-results-viewer",
+        emits: ["syson.element.selected"],
       },
     },
     handler: async ({ editing_context_id, expression, selected_object_ids }) => {
@@ -437,6 +440,7 @@ export const queryTools: SysonTool[] = [
     _meta: {
       ui: {
         resourceUri: "ui://mcp-syson/requirements-trace-viewer",
+        emits: ["syson.requirement.selected"],
       },
     },
     handler: async ({ editing_context_id, root_id }) => {

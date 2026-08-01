@@ -1,25 +1,19 @@
-/**
- * Validation Viewer — MCP App for constraint validation results
- *
- * Displays ValidationReport from sim_validate:
- * - Global pass/fail badge
- * - Summary counters (pass, fail, error, unresolved)
- * - Resolved parameters from the model
- * - Constraint table with expressions and margin bars
- * - Click-to-select for agent interaction
- *
- * @module lib/sim/src/ui/validation-viewer
- */
+/** Composable constraint-validation components. */
 
-import { render } from "preact";
-import { useState, useEffect } from "preact/hooks";
-import { App } from "@modelcontextprotocol/ext-apps";
-import { cx, containers, statusStyles, typography, interactive } from "../../shared/interactions";
+import { defineComponentRegistry } from "@casys/mcp-view";
+import { useState } from "preact/hooks";
+import { cx, statusStyles } from "../../shared/interactions";
+import {
+  defaultComponentSurface,
+  VIEWER_COMPONENT_KEYS,
+} from "../../shared/component-catalog";
+import {
+  definePreactComponent,
+  publishSelection,
+  startPreactSurfaceApp,
+  type SurfaceAppContext,
+} from "../../shared/preact-surface";
 import "../../global.css";
-
-// ============================================================================
-// Types (mirror constraint-types.ts for UI)
-// ============================================================================
 
 interface ConstraintResult {
   constraintId: string;
@@ -33,7 +27,6 @@ interface ConstraintResult {
   error?: string;
   unresolvedRefs?: string[];
 }
-
 interface ValidationSummary {
   total: number;
   pass: number;
@@ -41,281 +34,238 @@ interface ValidationSummary {
   error: number;
   unresolved: number;
 }
-
-interface ValidationReport {
+interface ValidationReport extends Record<string, unknown> {
   editingContextId: string;
   elementId: string;
   elementName: string;
   constraints: ConstraintResult[];
   summary: ValidationSummary;
-  resolvedValues?: Record<string, number>;
+  resolvedValues?: Record<string, number | { value: number; unit?: string }>;
   validatedAt: string;
 }
 
-// ============================================================================
-// MCP App Connection
-// ============================================================================
-
-const app = new App({ name: "Validation Viewer", version: "1.1.0" });
-let appConnected = false;
-
-function notifyModel(event: string, data: Record<string, unknown>) {
-  if (!appConnected) return;
-  app.updateModelContext({
-    content: [{ type: "text", text: `User ${event}: ${JSON.stringify(data)}` }],
-    structuredContent: { event, ...data },
-  });
+function globalStatus(report: ValidationReport): ConstraintResult["status"] {
+  return report.summary.fail > 0 || report.summary.error > 0
+    ? "fail"
+    : report.summary.unresolved > 0
+    ? "unresolved"
+    : "pass";
 }
 
-// ============================================================================
-// Sub-components
-// ============================================================================
-
 function StatusBadge({ status }: { status: ConstraintResult["status"] }) {
-  const labels: Record<string, string> = {
-    pass: "PASS",
-    fail: "FAIL",
-    error: "ERR",
-    unresolved: "N/A",
-  };
   return (
     <span
-      class={cx(
-        "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide",
+      className={cx(
+        "px-2 py-0.5 rounded-full text-xs font-semibold uppercase",
         statusStyles[status],
       )}
     >
-      {labels[status]}
+      {status === "unresolved" ? "N/A" : status}
     </span>
   );
 }
 
-function SummaryCounter({ label, count, color }: { label: string; count: number; color: string }) {
+function Status({ data }: { data: ValidationReport }) {
   return (
-    <div class={cx(containers.card, "text-center min-w-[80px]")}>
-      <div class={cx(typography.value, color)}>{count}</div>
-      <div class={typography.muted}>{label}</div>
-    </div>
-  );
-}
-
-function MarginBar({ margin, marginPercent }: { margin?: number; marginPercent?: number }) {
-  if (margin === undefined) return <span class={typography.muted}>-</span>;
-
-  const pct = marginPercent ?? 0;
-  const barWidth = Math.min(Math.abs(pct), 100);
-  const isPositive = margin >= 0;
-
-  let barColor: string;
-  if (!isPositive) {
-    barColor = "bg-red-500";
-  } else if (pct > 20) {
-    barColor = "bg-green-500";
-  } else {
-    barColor = "bg-yellow-500";
-  }
-
-  return (
-    <div class="flex items-center gap-2">
-      <div class="flex-1 h-2 bg-bg-muted rounded-full overflow-hidden min-w-[60px]">
-        <div
-          class={cx("h-full rounded-full transition-all duration-500", barColor)}
-          style={{ width: `${barWidth}%` }}
-        />
+    <div className="syson-component-card flex items-center gap-3">
+      <div>
+        <div className="font-semibold">{data.elementName || "Validation"}</div>
+        <div className="text-xs text-fg-muted">
+          Validated {new Date(data.validatedAt).toLocaleString()}
+        </div>
       </div>
-      <span class={cx("text-xs font-mono tabular-nums min-w-[50px] text-right", isPositive ? "text-fg-default" : "text-red-400")}>
-        {isPositive ? "+" : ""}{margin.toFixed(1)}
-        {marginPercent !== undefined ? ` (${marginPercent.toFixed(0)}%)` : ""}
-      </span>
+      <div className="ml-auto">
+        <StatusBadge status={globalStatus(data)} />
+      </div>
     </div>
   );
 }
 
-function ParametersGrid({ values }: { values: Record<string, number> }) {
-  const entries = Object.entries(values);
-  if (entries.length === 0) return null;
-
+function Summary({ data }: { data: ValidationReport }) {
   return (
-    <div class="mb-4">
-      <h3 class={cx(typography.muted, "text-xs uppercase tracking-wider mb-2 font-semibold")}>
-        Model Parameters
-      </h3>
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-1">
-        {entries.map(([name, value]) => (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {([
+        ["Pass", data.summary.pass, "text-success"],
+        ["Fail", data.summary.fail, "text-error"],
+        ["Error", data.summary.error, "text-warning"],
+        ["N/A", data.summary.unresolved, "text-fg-muted"],
+      ] as const).map(([label, count, tone]) => (
+        <div key={label} className="syson-component-card text-center">
+          <div className={cx("text-xl font-bold font-mono", tone)}>{count}</div>
+          <div className="text-xs text-fg-muted">{label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatResolved(
+  value: number | { value: number; unit?: string },
+): string {
+  const quantity = typeof value === "number" ? { value } : value;
+  const number = quantity.value.toLocaleString(undefined, {
+    maximumFractionDigits: 4,
+  });
+  return quantity.unit ? `${number} ${quantity.unit}` : number;
+}
+
+function ResolvedValues({ data }: { data: ValidationReport }) {
+  const values = Object.entries(data.resolvedValues ?? {});
+  return (
+    <div className="syson-component-card">
+      <div className="syson-component-title">Resolved model values</div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1">
+        {values.map(([name, value]) => (
           <div
             key={name}
-            class="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-bg-subtle rounded border border-border-subtle"
+            className="flex justify-between gap-2 px-2.5 py-1.5 bg-bg-subtle rounded"
           >
-            <span class="text-xs text-fg-muted truncate">{name}</span>
-            <span class="text-xs font-mono font-semibold text-fg-default tabular-nums">
-              {typeof value === "number" ? value.toLocaleString(undefined, { maximumFractionDigits: 4 }) : String(value)}
+            <span className="text-xs text-fg-muted truncate">{name}</span>
+            <span className="text-xs font-mono font-semibold">
+              {formatResolved(value)}
             </span>
           </div>
         ))}
+        {!values.length && (
+          <span className="text-fg-muted">No resolved model values</span>
+        )}
       </div>
     </div>
   );
 }
 
-// ============================================================================
-// Main Component
-// ============================================================================
-
-function ValidationViewer() {
-  const [report, setReport] = useState<ValidationReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<string | null>(null);
-
-  useEffect(() => {
-    app.ontoolresult = (result: { content?: Array<{ type: string; text?: string }> }) => {
-      setLoading(false);
-      const textContent = result.content?.find((c) => c.type === "text");
-      if (textContent?.text) {
-        try {
-          const parsed = JSON.parse(textContent.text) as ValidationReport;
-          setReport(parsed);
-        } catch (e) {
-          console.error("[validation-viewer] Failed to parse result:", e);
-        }
-      }
-    };
-
-    (app as any).ontoolinputpartial = () => setLoading(true);
-    app.connect()
-      .then(() => {
-        appConnected = true;
-        console.log("[validation-viewer] Connected to MCP host");
-      })
-      .catch(() => {
-        console.log("[validation-viewer] No MCP host (standalone mode)");
-      });
-  }, []);
-
-  // Loading
-  if (loading) {
-    return (
-      <div class={cx(containers.root, "min-h-[200px]")}>
-        <div class={containers.centered}>Validating constraints...</div>
-      </div>
-    );
-  }
-
-  // No data
-  if (!report) {
-    return (
-      <div class={cx(containers.root, "min-h-[200px]")}>
-        <div class={containers.centered}>No validation data received</div>
-      </div>
-    );
-  }
-
-  const { summary, constraints, resolvedValues } = report;
-  const globalStatus = summary.fail > 0 || summary.error > 0 ? "fail" : summary.unresolved > 0 ? "unresolved" : "pass";
-
-  function handleSelect(c: ConstraintResult) {
-    setSelected(c.constraintId);
-    notifyModel("select_constraint", {
-      constraintId: c.constraintId,
-      constraintName: c.constraintName,
-      status: c.status,
-    });
-  }
-
+function Constraints(
+  { data, context }: {
+    data: ValidationReport;
+    context: SurfaceAppContext<ValidationReport>;
+  },
+) {
+  const [selected, setSelected] = useState<string>();
   return (
-    <div class={cx(containers.root, "min-h-[200px] max-w-full overflow-x-auto")}>
-      {/* Header */}
-      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div>
-          <h2 class={typography.sectionTitle}>{report.elementName}</h2>
-          <p class={typography.muted}>
-            Validated {new Date(report.validatedAt).toLocaleString()}
-          </p>
-        </div>
-        <StatusBadge status={globalStatus} />
-      </div>
-
-      {/* Summary counters */}
-      <div class="flex gap-3 mb-4 flex-wrap">
-        <SummaryCounter label="Pass" count={summary.pass} color="text-green-400" />
-        <SummaryCounter label="Fail" count={summary.fail} color="text-red-400" />
-        <SummaryCounter label="Error" count={summary.error} color="text-yellow-400" />
-        <SummaryCounter label="N/A" count={summary.unresolved} color="text-gray-400" />
-      </div>
-
-      {/* Resolved parameters from model */}
-      {resolvedValues && Object.keys(resolvedValues).length > 0 && (
-        <ParametersGrid values={resolvedValues} />
-      )}
-
-      {/* Empty state */}
-      {constraints.length === 0 && (
-        <div class={cx(containers.card, "text-center")}>
-          <p class={typography.muted}>No constraints found on this element</p>
-        </div>
-      )}
-
-      {/* Constraint table */}
-      {constraints.length > 0 && (
-        <div class="border border-border-default rounded-lg overflow-hidden">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="bg-bg-subtle border-b border-border-default">
-                <th class="px-3 py-2 text-left text-xs font-medium text-fg-muted uppercase tracking-wider">Status</th>
-                <th class="px-3 py-2 text-left text-xs font-medium text-fg-muted uppercase tracking-wider">Constraint</th>
-                <th class="px-3 py-2 text-right text-xs font-medium text-fg-muted uppercase tracking-wider">Value</th>
-                <th class="px-3 py-2 text-right text-xs font-medium text-fg-muted uppercase tracking-wider">Threshold</th>
-                <th class="px-3 py-2 text-left text-xs font-medium text-fg-muted uppercase tracking-wider min-w-[180px]">Margin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {constraints.map((c) => (
-                <tr
-                  key={c.constraintId}
-                  class={cx(
-                    interactive.rowHover,
-                    "border-b border-border-subtle last:border-b-0",
-                    selected === c.constraintId && "bg-accent-dim",
-                  )}
-                  onClick={() => handleSelect(c)}
-                >
-                  <td class="px-3 py-2">
-                    <StatusBadge status={c.status} />
-                  </td>
-                  <td class="px-3 py-2">
-                    <span class="font-medium text-fg-default">{c.constraintName}</span>
-                    {c.expression && (
-                      <p class="text-xs font-mono text-fg-muted mt-0.5">{c.expression}</p>
-                    )}
-                    {c.error && (
-                      <p class="text-xs text-red-400 mt-0.5">{c.error}</p>
-                    )}
-                    {c.unresolvedRefs && c.unresolvedRefs.length > 0 && (
-                      <p class="text-xs text-gray-400 mt-0.5">
-                        Missing: {c.unresolvedRefs.join(", ")}
-                      </p>
-                    )}
-                  </td>
-                  <td class="px-3 py-2 text-right font-mono tabular-nums">
-                    {c.computedValue !== undefined ? c.computedValue.toFixed(2) : "-"}
-                  </td>
-                  <td class="px-3 py-2 text-right font-mono tabular-nums text-fg-muted">
-                    {c.threshold !== undefined ? c.threshold.toFixed(2) : "-"}
-                  </td>
-                  <td class="px-3 py-2">
-                    <MarginBar margin={c.margin} marginPercent={c.marginPercent} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+    <div className="syson-component-card p-0 overflow-hidden">
+      <table className="syson-responsive-table w-full text-sm">
+        <thead>
+          <tr className="border-b border-border-default bg-bg-subtle">
+            <th className="syson-table-heading">Status</th>
+            <th className="syson-table-heading">Constraint</th>
+            <th className="syson-table-heading text-right">Value</th>
+            <th className="syson-table-heading text-right">Threshold</th>
+            <th className="syson-table-heading text-right">Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.constraints.map((constraint) => (
+            <tr
+              key={constraint.constraintId}
+              className={cx(
+                "border-b border-border-subtle cursor-pointer hover:bg-bg-muted",
+                selected === constraint.constraintId && "bg-accent-dim",
+              )}
+              onClick={() => {
+                setSelected(constraint.constraintId);
+                publishSelection(
+                  context,
+                  "select_constraint",
+                  "syson.constraint.selected",
+                  {
+                    constraintId: constraint.constraintId,
+                    constraintName: constraint.constraintName,
+                    status: constraint.status,
+                  },
+                );
+              }}
+            >
+              <td className="px-3 py-2">
+                <StatusBadge status={constraint.status} />
+              </td>
+              <td className="px-3 py-2">
+                <span className="font-medium">{constraint.constraintName}</span>
+                {constraint.expression && (
+                  <code className="block text-xs text-fg-muted mt-0.5">
+                    {constraint.expression}
+                  </code>
+                )}
+                {constraint.error && (
+                  <span className="block text-xs text-error">
+                    {constraint.error}
+                  </span>
+                )}
+                {!!constraint.unresolvedRefs?.length && (
+                  <span className="block text-xs text-fg-muted">
+                    Missing: {constraint.unresolvedRefs.join(", ")}
+                  </span>
+                )}
+              </td>
+              <td className="px-3 py-2 text-right font-mono">
+                {constraint.computedValue?.toFixed(2) ?? "−"}
+              </td>
+              <td className="px-3 py-2 text-right font-mono text-fg-muted">
+                {constraint.threshold?.toFixed(2) ?? "−"}
+              </td>
+              <td
+                className={cx(
+                  "px-3 py-2 text-right font-mono",
+                  constraint.margin !== undefined && constraint.margin < 0
+                    ? "text-error"
+                    : "text-fg-default",
+                )}
+              >
+                {constraint.margin === undefined
+                  ? "−"
+                  : `${constraint.margin >= 0 ? "+" : ""}${
+                    constraint.margin.toFixed(1)
+                  }${
+                    constraint.marginPercent === undefined
+                      ? ""
+                      : ` (${constraint.marginPercent.toFixed(0)}%)`
+                  }`}
+              </td>
+            </tr>
+          ))}
+          {!data.constraints.length && (
+            <tr>
+              <td colSpan={5} className="p-5 text-center text-fg-muted">
+                No constraints found on this element
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-// ============================================================================
-// Mount
-// ============================================================================
+const keys = VIEWER_COMPONENT_KEYS.validation;
+const registry = defineComponentRegistry<
+  ValidationReport,
+  SurfaceAppContext<ValidationReport>
+>({
+  components: {
+    [keys[0]]: definePreactComponent({
+      title: "Validation status",
+      description: "Element and global result",
+    }, ({ data }) => <Status data={data} />),
+    [keys[1]]: definePreactComponent({
+      title: "Validation summary",
+      description: "Pass, fail, error and unresolved counts",
+    }, ({ data }) => <Summary data={data} />),
+    [keys[2]]: definePreactComponent({
+      title: "Resolved values",
+      description: "Model parameters used by validation",
+    }, ({ data }) => <ResolvedValues data={data} />),
+    [keys[3]]: definePreactComponent({
+      title: "Constraints",
+      description: "Detailed selectable constraint results",
+    }, ({ data, context }) => <Constraints data={data} context={context} />),
+  },
+  defaultSurface: defaultComponentSurface(keys),
+});
 
-render(<ValidationViewer />, document.getElementById("app")!);
+void startPreactSurfaceApp({
+  root: document.getElementById("app")!,
+  info: { name: "Validation Viewer", version: "2.0.0" },
+  registry,
+  loadingLabel: "Validating constraints…",
+}).catch((error) =>
+  console.error("[validation-viewer] Failed to start", error)
+);

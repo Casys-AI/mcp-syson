@@ -1,29 +1,19 @@
-/**
- * Model Explorer Viewer — MCP App for SysON model tree
- *
- * Renders the children of a model element as an interactive tree.
- * Used by syson_element_children.
- *
- * Data shape:
- * {
- *   parentId: string,
- *   children: Array<{ id: string, kind: string, label: string }>,
- *   count: number
- * }
- *
- * @module lib/syson/src/ui/model-explorer-viewer
- */
+/** Composable model-explorer components for SysON element children. */
 
-import { render } from "preact";
-import { useState, useEffect, useCallback } from "preact/hooks";
-import { App } from "@modelcontextprotocol/ext-apps";
+import { defineComponentRegistry } from "@casys/mcp-view";
+import { useMemo, useState } from "preact/hooks";
 import { cx } from "../../components/utils";
-import { ContentSkeleton } from "../../shared";
+import {
+  defaultComponentSurface,
+  VIEWER_COMPONENT_KEYS,
+} from "../../shared/component-catalog";
+import {
+  definePreactComponent,
+  publishSelection,
+  startPreactSurfaceApp,
+  type SurfaceAppContext,
+} from "../../shared/preact-surface";
 import "../../global.css";
-
-// ============================================================================
-// Types
-// ============================================================================
 
 interface ModelElement {
   id: string;
@@ -31,209 +21,172 @@ interface ModelElement {
   label: string;
 }
 
-interface ChildrenData {
+interface ChildrenData extends Record<string, unknown> {
   parentId: string;
   children: ModelElement[];
   count: number;
 }
 
-// ============================================================================
-// SysML kind → icon + color
-// ============================================================================
-
-// Supports both "sysml::PartUsage" and "siriusComponents://semantic?domain=sysml&entity=PartUsage"
 const KIND_MAP: Record<string, { icon: string; color: string }> = {
-  "PartUsage":            { icon: "\u25A0", color: "text-blue-400" },
-  "PartDefinition":       { icon: "\u25A1", color: "text-blue-300" },
-  "AttributeUsage":       { icon: "\u25C6", color: "text-emerald-400" },
-  "AttributeDefinition":  { icon: "\u25C7", color: "text-emerald-300" },
-  "RequirementUsage":     { icon: "\u2605", color: "text-amber-400" },
-  "RequirementDefinition":{ icon: "\u2606", color: "text-amber-300" },
-  "Package":              { icon: "\u25B6", color: "text-purple-400" },
-  "ItemUsage":            { icon: "\u25CF", color: "text-cyan-400" },
-  "PortUsage":            { icon: "\u25D0", color: "text-orange-400" },
-  "ConnectionUsage":      { icon: "\u2194", color: "text-pink-400" },
-  "InterfaceUsage":       { icon: "\u27A1", color: "text-pink-400" },
-  "AllocationUsage":      { icon: "\u21D2", color: "text-violet-400" },
-  "ConstraintUsage":      { icon: "\u26A0", color: "text-yellow-400" },
-  "ActionUsage":          { icon: "\u25B7", color: "text-teal-400" },
-  "ViewUsage":            { icon: "\u25AD", color: "text-indigo-400" },
-  "FeatureMembership":    { icon: "\u2022", color: "text-fg-dim" },
-  "LiteralString":        { icon: "\u201C", color: "text-green-400" },
-  "LiteralRational":      { icon: "\u0023", color: "text-green-400" },
-  "LiteralInteger":       { icon: "\u0023", color: "text-green-400" },
+  PartUsage: { icon: "■", color: "text-blue-400" },
+  PartDefinition: { icon: "□", color: "text-blue-300" },
+  AttributeUsage: { icon: "◆", color: "text-emerald-400" },
+  RequirementUsage: { icon: "★", color: "text-amber-400" },
+  Package: { icon: "▶", color: "text-purple-400" },
+  ItemUsage: { icon: "●", color: "text-cyan-400" },
+  PortUsage: { icon: "◐", color: "text-orange-400" },
+  ConnectionUsage: { icon: "↔", color: "text-pink-400" },
+  ConstraintUsage: { icon: "⚠", color: "text-yellow-400" },
+  ActionUsage: { icon: "▷", color: "text-teal-400" },
 };
 
-/** Extract the short entity name from any kind format */
-function extractEntityName(kind: string): string {
-  // "siriusComponents://semantic?domain=sysml&entity=PartUsage"
-  const entityMatch = kind.match(/[?&]entity=([^&]+)/);
-  if (entityMatch) return entityMatch[1];
-  // "sysml::PartUsage"
-  if (kind.includes("::")) return kind.split("::").pop()!;
-  return kind;
+function shortKind(kind: string): string {
+  const entity = kind.match(/[?&]entity=([^&]+)/)?.[1];
+  return entity ?? (kind.includes("::") ? kind.split("::").pop()! : kind);
 }
 
-function kindInfo(kind: string): { icon: string; color: string; shortKind: string } {
-  const shortKind = extractEntityName(kind);
-  const match = KIND_MAP[shortKind];
-  return match
-    ? { ...match, shortKind }
-    : { icon: "\u25CB", color: "text-fg-muted", shortKind };
-}
-
-// ============================================================================
-// MCP App
-// ============================================================================
-
-const app = new App({ name: "Model Explorer", version: "1.0.0" });
-let appConnected = false;
-
-function notifyModel(event: string, data: Record<string, unknown>) {
-  if (!appConnected) return;
-  app.updateModelContext({
-    content: [{ type: "text", text: `User ${event}: ${JSON.stringify(data)}` }],
-    structuredContent: { event, ...data },
-  });
-}
-
-// ============================================================================
-// Element Row
-// ============================================================================
-
-function ElementRow({
-  element,
-  selected,
-  onSelect,
-}: {
-  element: ModelElement;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const { icon, color, shortKind } = kindInfo(element.kind);
-
+function Summary({ data }: { data: ChildrenData }) {
   return (
-    <div
-      onClick={onSelect}
-      className={cx(
-        "flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors duration-150",
-        selected ? "bg-[#6366f1]/10" : "hover:bg-bg-muted"
-      )}
-    >
-      <span className={cx("text-sm", color)}>{icon}</span>
-      <span className="text-sm text-fg-default flex-1 truncate">{element.label || "(unnamed)"}</span>
-      <span className="text-[10px] font-mono text-fg-dim bg-bg-muted px-1.5 py-0.5 rounded">
-        {shortKind}
+    <div className="syson-component-card flex items-center gap-2">
+      <span className="syson-badge">SysON</span>
+      <span className="font-semibold">Model elements</span>
+      <span className="syson-chip ml-auto">
+        {data.count} element{data.count === 1 ? "" : "s"}
       </span>
     </div>
   );
 }
 
-// ============================================================================
-// Main
-// ============================================================================
-
-function ModelExplorer() {
-  const [data, setData] = useState<ChildrenData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+function Elements(
+  { data, context }: {
+    data: ChildrenData;
+    context: SurfaceAppContext<ChildrenData>;
+  },
+) {
   const [filter, setFilter] = useState("");
-
-  useEffect(() => {
-    app.ontoolresult = (result: { content?: { type: string; text?: string }[] }) => {
-      setLoading(false);
-      setError(null);
-      try {
-        const text = result.content?.find((c) => c.type === "text")?.text;
-        if (!text) { setData(null); return; }
-        setData(JSON.parse(text) as ChildrenData);
-      } catch (e) {
-        setError(`Parse error: ${e instanceof Error ? e.message : "Unknown"}`);
-      }
-    };
-    app.ontoolinputpartial = () => setLoading(true);
-    app.connect().then(() => { appConnected = true; }).catch(() => {});
-  }, []);
-
-  const handleSelect = useCallback((el: ModelElement) => {
-    setSelectedId(el.id);
-    notifyModel("select-element", { id: el.id, label: el.label, kind: el.kind });
-  }, []);
-
-  if (loading) return <ContentSkeleton />;
-  if (error) return <div className="p-4 text-error text-sm">{error}</div>;
-  if (!data) return <div className="p-6 text-center text-fg-muted text-sm">No data</div>;
-
-  const filtered = filter
-    ? data.children.filter((c) =>
-        c.label.toLowerCase().includes(filter.toLowerCase()) ||
-        c.kind.toLowerCase().includes(filter.toLowerCase())
+  const [selected, setSelected] = useState<string>();
+  const elements = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    return needle
+      ? data.children.filter((item) =>
+        `${item.label} ${item.kind}`.toLowerCase().includes(needle)
       )
-    : data.children;
-
-  // Group by kind
-  const grouped = new Map<string, ModelElement[]>();
-  for (const el of filtered) {
-    const short = kindInfo(el.kind).shortKind;
-    if (!grouped.has(short)) grouped.set(short, []);
-    grouped.get(short)!.push(el);
-  }
-
+      : data.children;
+  }, [data.children, filter]);
   return (
-    <div className="font-sans text-sm bg-bg-canvas min-h-[100px]">
-      {/* Header */}
-      <div className="px-4 pt-3 pb-2 border-b border-border-subtle">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-[#6366f1]/15 text-[#818cf8]">
-            SysON
-          </span>
-          <span className="text-fg-default font-semibold">Model Elements</span>
-          <span className="text-[10px] font-mono text-fg-dim ml-auto">
-            {data.count} element{data.count !== 1 ? "s" : ""}
-          </span>
-        </div>
-        {data.count > 5 && (
-          <input
-            type="text"
-            placeholder="Filter..."
-            value={filter}
-            onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
-            className="w-full px-2.5 py-1.5 text-xs bg-bg-muted border border-border-default rounded text-fg-default placeholder:text-fg-dim focus:outline-none focus:border-[#6366f1]/40"
-          />
-        )}
+    <div className="syson-component-card p-0 overflow-hidden">
+      <div className="p-3 border-b border-border-subtle">
+        <input
+          className="syson-input"
+          placeholder="Filter model elements…"
+          value={filter}
+          onInput={(event) =>
+            setFilter((event.target as HTMLInputElement).value)}
+        />
       </div>
-
-      {/* List */}
-      {data.children.length === 0 ? (
-        <div className="px-4 py-6 text-center text-fg-dim text-xs">No children</div>
-      ) : filtered.length === 0 ? (
-        <div className="px-4 py-6 text-center text-fg-dim text-xs">No matches for "{filter}"</div>
-      ) : (
-        <div className="divide-y divide-border-subtle">
-          {filtered.map((el) => (
-            <ElementRow
-              key={el.id}
-              element={el}
-              selected={selectedId === el.id}
-              onSelect={() => handleSelect(el)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Kind summary */}
-      {grouped.size > 1 && (
-        <div className="px-4 py-2 border-t border-border-subtle flex flex-wrap gap-2">
-          {Array.from(grouped.entries()).map(([kind, els]) => (
-            <span key={kind} className="text-[10px] text-fg-dim">
-              {kind}: {els.length}
-            </span>
-          ))}
-        </div>
-      )}
+      {!elements.length
+        ? (
+          <div className="p-5 text-center text-fg-muted">
+            No matching children
+          </div>
+        )
+        : (
+          <div className="max-h-[360px] overflow-y-auto divide-y divide-border-subtle">
+            {elements.map((element) => {
+              const kind = shortKind(element.kind);
+              const visual = KIND_MAP[kind] ??
+                { icon: "○", color: "text-fg-muted" };
+              return (
+                <button
+                  key={element.id}
+                  className={cx(
+                    "w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-bg-muted",
+                    selected === element.id && "bg-accent-dim",
+                  )}
+                  onClick={() => {
+                    setSelected(element.id);
+                    publishSelection(
+                      context,
+                      "select-element",
+                      "syson.element.selected",
+                      {
+                        id: element.id,
+                        label: element.label,
+                        kind: element.kind,
+                      },
+                    );
+                  }}
+                >
+                  <span className={visual.color}>{visual.icon}</span>
+                  <span className="flex-1 truncate">
+                    {element.label || "(unnamed)"}
+                  </span>
+                  <span className="syson-chip">{kind}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
     </div>
   );
 }
 
-render(<ModelExplorer />, document.getElementById("app")!);
+function KindBreakdown({ data }: { data: ChildrenData }) {
+  const counts = new Map<string, number>();
+  data.children.forEach((element) => {
+    const kind = shortKind(element.kind);
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  });
+  return (
+    <div className="syson-component-card">
+      <div className="syson-component-title">Kinds</div>
+      <div className="flex flex-wrap gap-2">
+        {[...counts.entries()].map(([kind, count]) => (
+          <span className="syson-chip" key={kind}>{kind}: {count}</span>
+        ))}
+        {!counts.size && <span className="text-fg-muted">No kinds</span>}
+      </div>
+    </div>
+  );
+}
+
+function ParentContext({ data }: { data: ChildrenData }) {
+  return (
+    <div className="syson-component-card text-xs font-mono text-fg-dim break-all">
+      Parent: {data.parentId || "root"}
+    </div>
+  );
+}
+
+const keys = VIEWER_COMPONENT_KEYS.modelExplorer;
+const registry = defineComponentRegistry<
+  ChildrenData,
+  SurfaceAppContext<ChildrenData>
+>({
+  components: {
+    [keys[0]]: definePreactComponent({
+      title: "Model summary",
+      description: "Child count for one parent",
+    }, ({ data }) => <Summary data={data} />),
+    [keys[1]]: definePreactComponent({
+      title: "Model elements",
+      description: "Filterable, selectable element list",
+    }, ({ data, context }) => <Elements data={data} context={context} />),
+    [keys[2]]: definePreactComponent({
+      title: "Kind breakdown",
+      description: "Counts grouped by SysML kind",
+    }, ({ data }) => <KindBreakdown data={data} />),
+    [keys[3]]: definePreactComponent({
+      title: "Parent context",
+      description: "Stable parent element identifier",
+    }, ({ data }) => <ParentContext data={data} />),
+  },
+  defaultSurface: defaultComponentSurface(keys),
+});
+
+void startPreactSurfaceApp({
+  root: document.getElementById("app")!,
+  info: { name: "Model Explorer", version: "2.0.0" },
+  registry,
+  loadingLabel: "Waiting for model elements…",
+}).catch((error) => console.error("[model-explorer] Failed to start", error));

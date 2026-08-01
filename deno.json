@@ -7,9 +7,10 @@
     "compile": "deno compile -A --output mcp-syson server.ts",
     "test": "deno test --allow-all tests/",
     "check": "deno check mod.ts server.ts",
-    "fmt": "deno fmt --check deno.json server.ts src/client.ts src/tools/constraint.ts src/tools/types.ts tests/server_test.ts scripts/verify-ui-bundles.ts",
-    "lint": "deno lint mod.ts server.ts src/client.ts src/tools/constraint.ts src/tools/types.ts tests/server_test.ts scripts/verify-ui-bundles.ts",
+    "fmt": "deno fmt --check deno.json server.ts src/client.ts src/tools/constraint.ts src/tools/types.ts src/ui/shared/component-catalog.ts src/ui/shared/preact-surface.tsx tests/client_test.ts tests/server_test.ts tests/ui_components_test.ts tests/ui_resources_test.ts scripts/verify-ui-bundles.ts",
+    "lint": "deno lint mod.ts server.ts src/client.ts src/tools/constraint.ts src/tools/types.ts src/ui/shared/component-catalog.ts src/ui/shared/preact-surface.tsx tests/client_test.ts tests/server_test.ts tests/ui_components_test.ts tests/ui_resources_test.ts scripts/verify-ui-bundles.ts",
     "ui:build": "cd src/ui && node build-all.mjs",
+    "ui:check": "cd src/ui && npx tsc --noEmit -p tsconfig.json --allowImportingTsExtensions",
     "ui:verify": "deno run --allow-read scripts/verify-ui-bundles.ts"
   },
   "exports": {

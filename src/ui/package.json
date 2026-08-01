@@ -9,7 +9,7 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "@casys/mcp-view": "file:../../../mcp-server/packages/view/dist-node",
     "preact": "^10.28.2"
   },
   "devDependencies": {

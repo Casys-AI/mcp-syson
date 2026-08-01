@@ -28,7 +28,7 @@ const UI_BUNDLES = {
     html: UI_HTML_BY_NAME["model-explorer-viewer"],
     name: "Model Explorer Viewer",
     description: "SysON UI: model-explorer-viewer",
-    tools: [],
+    tools: ["syson_element_children"],
   },
   "ui://mcp-syson/query-results-viewer": {
     html: UI_HTML_BY_NAME["query-results-viewer"],

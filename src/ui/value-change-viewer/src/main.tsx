@@ -1,19 +1,19 @@
-/**
- * Value Change Viewer — compact display for sim_set_value / sim_read_value
- *
- * Shows: element_id (truncated), old → new value with success indicator.
- * Compact single-row display for the PML Live Feed.
- */
+/** Composable value read/change components. */
 
-import { render } from "preact";
-import { useState, useEffect } from "preact/hooks";
-import { App } from "@modelcontextprotocol/ext-apps";
-import { cx, containers, typography } from "../../shared/interactions";
+import { defineComponentRegistry } from "@casys/mcp-view";
+import { cx } from "../../shared/interactions";
+import {
+  defaultComponentSurface,
+  VIEWER_COMPONENT_KEYS,
+} from "../../shared/component-catalog";
+import {
+  definePreactComponent,
+  startPreactSurfaceApp,
+  type SurfaceAppContext,
+} from "../../shared/preact-surface";
 import "../../global.css";
 
-const app = new App({ name: "Value Change Viewer", version: "1.0.0" });
-
-interface SetValueResult {
+interface SetValueResult extends Record<string, unknown> {
   element_id: string;
   old_value: number;
   new_value: number;
@@ -22,138 +22,133 @@ interface SetValueResult {
   success: boolean;
   warning?: string;
 }
-
-interface ReadValueResult {
+interface ReadValueResult extends Record<string, unknown> {
   element_id: string;
   value: number;
   literal_kind?: string;
   negated?: boolean;
 }
-
 type ValueResult = SetValueResult | ReadValueResult;
 
 function isSetValue(data: ValueResult): data is SetValueResult {
   return "old_value" in data;
 }
-
-function shortId(id: string): string {
-  return id.length > 12 ? id.substring(0, 8) + "..." : id;
+function formatNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatNum(n: number): string {
-  return Number.isInteger(n) ? n.toString() : n.toFixed(2);
-}
-
-function ValueChangeCard({ data }: { data: SetValueResult }) {
+function Readout({ data }: { data: ValueResult }) {
+  if (!isSetValue(data)) {
+    return (
+      <div className="syson-component-card flex items-center gap-3">
+        <span className="w-10 h-10 rounded-lg grid place-items-center bg-blue-500/20 text-blue-400">
+          ◉
+        </span>
+        <span className="text-2xl font-mono font-bold">
+          {formatNumber(data.value)}
+        </span>
+        {data.negated && <span className="syson-chip">negated</span>}
+      </div>
+    );
+  }
   const delta = data.new_value - data.old_value;
-  const deltaSign = delta >= 0 ? "+" : "";
-  const isUp = delta > 0;
-
   return (
-    <div class={cx(containers.root, "space-y-2")}>
-      <div class="flex items-center gap-3">
-        {/* Success/fail indicator */}
-        <div class={cx(
-          "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shrink-0",
+    <div className="syson-component-card flex items-center gap-3 flex-wrap">
+      <span
+        className={cx(
+          "w-10 h-10 rounded-lg grid place-items-center text-lg font-bold",
           data.success
             ? "bg-green-500/20 text-green-400"
-            : "bg-red-500/20 text-red-400"
-        )}>
-          {data.success ? "✓" : "✗"}
-        </div>
+            : "bg-red-500/20 text-red-400",
+        )}
+      >
+        {data.success ? "✓" : "✗"}
+      </span>
+      <span className="text-xl font-mono line-through text-fg-muted">
+        {formatNumber(data.old_value)}
+      </span>
+      <span>→</span>
+      <span className="text-2xl font-mono font-bold">
+        {formatNumber(data.new_value)}
+      </span>
+      <span className="syson-chip">
+        {delta >= 0 ? "+" : ""}
+        {formatNumber(delta)}
+      </span>
+    </div>
+  );
+}
 
-        {/* Value transition */}
-        <div class="flex-1 min-w-0">
-          <div class="flex items-baseline gap-2 flex-wrap">
-            <span class="text-xl font-mono font-bold text-fg-muted line-through opacity-60">
-              {formatNum(data.old_value)}
-            </span>
-            <span class="text-fg-muted">→</span>
-            <span class={cx("text-2xl font-mono font-bold", data.success ? "text-fg-default" : "text-red-400")}>
-              {formatNum(data.new_value)}
-            </span>
-            <span class={cx(
-              "text-sm font-mono px-1.5 py-0.5 rounded",
-              isUp ? "bg-amber-500/15 text-amber-400" : "bg-blue-500/15 text-blue-400"
-            )}>
-              {deltaSign}{formatNum(delta)}
-            </span>
-          </div>
-          {data.verified_value !== undefined && data.verified_value !== data.new_value && (
-            <div class="text-xs text-yellow-400 mt-0.5">
-              Verified: {formatNum(data.verified_value)} (mismatch)
-            </div>
-          )}
-        </div>
+function Identity({ data }: { data: ValueResult }) {
+  return (
+    <div className="syson-component-card">
+      <div className="syson-component-title">Element identity</div>
+      <code className="text-xs text-fg-muted break-all">{data.element_id}</code>
+    </div>
+  );
+}
 
-        {/* Element ID */}
-        <div class="text-xs text-fg-muted font-mono shrink-0">
-          {shortId(data.element_id)}
-        </div>
+function Verification({ data }: { data: ValueResult }) {
+  const mismatch = isSetValue(data) && data.verified_value !== undefined &&
+    data.verified_value !== data.new_value;
+  return (
+    <div className="syson-component-card space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <span className="syson-chip">
+          {data.literal_kind ?? "numeric literal"}
+        </span>
+        {isSetValue(data) && (
+          <span
+            className={cx(
+              "syson-chip",
+              data.success ? "text-success" : "text-error",
+            )}
+          >
+            {data.success ? "write verified" : "write failed"}
+          </span>
+        )}
       </div>
-
-      {data.warning && (
-        <div class="text-xs text-yellow-400 bg-yellow-500/10 rounded px-2 py-1">
-          {data.warning}
+      {mismatch && (
+        <div className="text-xs text-warning">
+          Verified value {formatNumber(data.verified_value!)}{" "}
+          does not match requested value.
         </div>
+      )}
+      {isSetValue(data) && data.warning && (
+        <div className="text-xs text-warning">{data.warning}</div>
+      )}
+      {!mismatch && !(isSetValue(data) && data.warning) && (
+        <div className="text-xs text-fg-muted">No verification warning</div>
       )}
     </div>
   );
 }
 
-function ValueReadCard({ data }: { data: ReadValueResult }) {
-  return (
-    <div class={cx(containers.root, "flex items-center gap-3")}>
-      <div class="w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-blue-500/20 text-blue-400 shrink-0">
-        ◉
-      </div>
-      <div class="flex-1">
-        <span class="text-2xl font-mono font-bold text-fg-default">
-          {formatNum(data.value)}
-        </span>
-        {data.negated && (
-          <span class="text-xs text-fg-muted ml-2">(negated)</span>
-        )}
-      </div>
-      <div class="text-xs text-fg-muted font-mono">
-        {shortId(data.element_id)}
-      </div>
-    </div>
-  );
-}
+const keys = VIEWER_COMPONENT_KEYS.value;
+const registry = defineComponentRegistry<
+  ValueResult,
+  SurfaceAppContext<ValueResult>
+>({
+  components: {
+    [keys[0]]: definePreactComponent({
+      title: "Value readout",
+      description: "Current value or write transition",
+    }, ({ data }) => <Readout data={data} />),
+    [keys[1]]: definePreactComponent({
+      title: "Value identity",
+      description: "Stable SysON element identifier",
+    }, ({ data }) => <Identity data={data} />),
+    [keys[2]]: definePreactComponent({
+      title: "Value verification",
+      description: "Literal kind and write verification",
+    }, ({ data }) => <Verification data={data} />),
+  },
+  defaultSurface: defaultComponentSurface(keys),
+});
 
-function ValueViewer() {
-  const [data, setData] = useState<ValueResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    app.ontoolresult = (result: {
-      content?: Array<{ type: string; text?: string }>;
-      structuredContent?: unknown;
-    }) => {
-      try {
-        const text = result.content?.find((content) => content.type === "text")?.text;
-        const d = (result.structuredContent ?? (text ? JSON.parse(text) : null)) as ValueResult | null;
-        if (!d) {
-          setData(null);
-          return;
-        }
-        setData(d);
-        setError(null);
-      } catch (e) {
-        setError(`Invalid data: ${(e as Error).message}`);
-      }
-    };
-    app.ontoolinputpartial = () => setError(null);
-    app.connect().catch(() => {});
-  }, []);
-
-  if (error) return <div class={containers.centered}>{error}</div>;
-  if (!data) return <div class={containers.centered}>Waiting for value data...</div>;
-
-  return isSetValue(data)
-    ? <ValueChangeCard data={data} />
-    : <ValueReadCard data={data} />;
-}
-
-render(<ValueViewer />, document.getElementById("app")!);
+void startPreactSurfaceApp({
+  root: document.getElementById("app")!,
+  info: { name: "Value Change Viewer", version: "2.0.0" },
+  registry,
+  loadingLabel: "Waiting for value data…",
+}).catch((error) => console.error("[value-change] Failed to start", error));

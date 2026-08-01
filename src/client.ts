@@ -14,6 +14,7 @@ import {
   toolsByCategory,
 } from "./tools/mod.ts";
 import { toConstraintEvaluateResult } from "./tools/constraint.ts";
+import type { StructuredToolResult } from "@casys/mcp-server";
 import type {
   MCPClientBase,
   MCPTool,
@@ -109,12 +110,101 @@ export class SysonToolsClient {
       tool.name,
       async (args: Record<string, unknown>) => {
         const result = await tool.handler(args);
-        return tool.name === "syson_constraint_evaluate"
-          ? toConstraintEvaluateResult(result)
+        if (tool.name === "syson_constraint_evaluate") {
+          return toConstraintEvaluateResult(result);
+        }
+        return tool._meta?.ui && isRecord(result)
+          ? toUiToolResult(tool.name, result)
           : result;
       },
     ]));
   }
+}
+
+/**
+ * Keep full viewer data out of model-facing text while preserving it for the
+ * MCP App through structuredContent. Direct library execution remains raw.
+ */
+export function toUiToolResult(
+  toolName: string,
+  structuredContent: Record<string, unknown>,
+): StructuredToolResult {
+  return {
+    content: summariseUiResult(toolName, structuredContent),
+    structuredContent,
+  };
+}
+
+function summariseUiResult(
+  toolName: string,
+  result: Record<string, unknown>,
+): string {
+  const count = finiteNumber(result.count);
+  switch (toolName) {
+    case "syson_element_children":
+      return `Listed ${count ?? 0} direct model element${
+        count === 1 ? "" : "s"
+      }.`;
+    case "syson_search":
+      return `Found ${count ?? 0} SysON model element${
+        count === 1 ? "" : "s"
+      } for ${JSON.stringify(String(result.query ?? ""))}.`;
+    case "syson_query_eval": {
+      const type = String(result.type ?? "unknown");
+      return type === "objects"
+        ? `Evaluated SysON query: ${count ?? 0} object result${
+          count === 1 ? "" : "s"
+        }.`
+        : `Evaluated SysON query: ${type} result.`;
+    }
+    case "syson_query_requirements_trace": {
+      const coverage = isRecord(result.coverage) ? result.coverage : {};
+      const total = finiteNumber(coverage.total) ?? 0;
+      const satisfied = finiteNumber(coverage.satisfied) ?? 0;
+      const percentage = finiteNumber(coverage.percentage) ?? 0;
+      return `Traced ${total} requirement${
+        total === 1 ? "" : "s"
+      }: ${satisfied} covered (${percentage.toFixed(1)}%).`;
+    }
+    case "syson_diagram_snapshot":
+      return `Rendered diagram ${
+        JSON.stringify(String(result.diagramLabel ?? "Diagram"))
+      } with ${finiteNumber(result.nodeCount) ?? 0} nodes and ${
+        finiteNumber(result.edgeCount) ?? 0
+      } edges.`;
+    case "syson_constraint_validate": {
+      const summary = isRecord(result.summary) ? result.summary : {};
+      return `Validated ${
+        JSON.stringify(String(result.elementName ?? "element"))
+      }: ${finiteNumber(summary.pass) ?? 0} pass, ${
+        finiteNumber(summary.fail) ?? 0
+      } fail, ${finiteNumber(summary.error) ?? 0} error, ${
+        finiteNumber(summary.unresolved) ?? 0
+      } unresolved.`;
+    }
+    case "syson_value_read":
+      return `Read attribute ${String(result.element_id ?? "")}: ${
+        String(result.value ?? "unknown")
+      }.`;
+    case "syson_value_set":
+      return `Set attribute ${String(result.element_id ?? "")} from ${
+        String(result.old_value ?? "unknown")
+      } to ${String(result.new_value ?? "unknown")}; verification ${
+        result.success === true ? "succeeded" : "failed"
+      }.`;
+    default:
+      return `SysON ${toolName} completed.`;
+  }
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** Default client instance with all tools */

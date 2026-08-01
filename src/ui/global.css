@@ -57,8 +57,11 @@
 }
 
 @layer base {
+  html,
   body {
     @apply font-sans text-fg-default bg-bg-canvas;
+    margin: 0;
+    min-width: 0;
   }
 }
 
@@ -66,4 +69,67 @@
 .syson-brand {
   --syson-brand: #818cf8;
   --syson-brand-dim: rgba(99, 102, 241, 0.15);
+}
+
+.syson-view {
+  box-sizing: border-box;
+  container-type: inline-size;
+  min-width: 0;
+  width: 100%;
+}
+
+.syson-component-surface,
+.mcp-view-surface,
+.mcp-view-component {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+}
+
+.syson-component-surface {
+  padding: 0.75rem;
+}
+
+.syson-component-card {
+  @apply rounded-lg border border-border-default bg-bg-canvas p-3 text-sm text-fg-default;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+}
+
+.syson-component-title {
+  @apply mb-2 text-xs font-semibold uppercase tracking-wider text-fg-muted;
+}
+
+.syson-badge {
+  @apply rounded bg-[#6366f1]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#818cf8];
+}
+
+.syson-chip {
+  @apply rounded bg-bg-muted px-1.5 py-0.5 text-[10px] font-mono text-fg-muted;
+}
+
+.syson-button {
+  @apply rounded border border-border-default bg-bg-muted px-2 py-1 text-xs text-fg-muted hover:bg-bg-subtle;
+}
+
+.syson-input {
+  @apply w-full rounded border border-border-default bg-bg-muted px-2.5 py-1.5 text-xs text-fg-default placeholder:text-fg-dim focus:border-[#6366f1]/40 focus:outline-none;
+}
+
+.syson-table-heading {
+  @apply px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-fg-muted;
+}
+
+.syson-responsive-table {
+  min-width: 0;
+}
+
+@container (max-width: 420px) {
+  .syson-responsive-table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
 }

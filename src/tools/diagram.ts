@@ -684,6 +684,7 @@ export const diagramTools: SysonTool[] = [
     _meta: {
       ui: {
         resourceUri: "ui://mcp-syson/diagram-viewer",
+        emits: ["syson.element.selected"],
       },
     },
     handler: async ({ editing_context_id, diagram_id }) => {
