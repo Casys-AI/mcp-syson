@@ -90,15 +90,13 @@ const adapterSource = await Deno.readTextFile(
   new URL("../src/ui/shared/preact-surface.tsx", import.meta.url),
 );
 if (
-  !adapterSource.includes("createMcpApp") ||
-  !adapterSource.includes("onToolResult:") ||
-  !adapterSource.includes("onToolInputPartial:") ||
-  !adapterSource.includes("onTeardown:") ||
-  !adapterSource.includes("mountComponentSurface") ||
-  !adapterSource.includes("advertisedComponentCatalog")
+  !adapterSource.includes('from "@casys/mcp-view/preact"') ||
+  !adapterSource.includes("startSharedPreactSurfaceApp") ||
+  adapterSource.includes("createMcpApp") ||
+  adapterSource.includes("mountComponentSurface")
 ) {
   throw new Error(
-    "Preact adapter must delegate handshake lifecycle and component surfaces to @casys/mcp-view.",
+    "SysON must delegate the Preact handshake and component-surface lifecycle to @casys/mcp-view.",
   );
 }
 

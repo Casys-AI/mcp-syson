@@ -1,8 +1,14 @@
 /** Composable model-explorer components for SysON element children. */
 
 import { defineComponentRegistry } from "@casys/mcp-view";
+import {
+  Badge,
+  Card,
+  DataTable,
+  EmptyState,
+  KeyValueList,
+} from "@casys/mcp-view/preact";
 import { useMemo, useState } from "preact/hooks";
-import { cx } from "../../components/utils";
 import {
   defaultComponentSurface,
   VIEWER_COMPONENT_KEYS,
@@ -47,13 +53,15 @@ function shortKind(kind: string): string {
 
 function Summary({ data }: { data: ChildrenData }) {
   return (
-    <div className="syson-component-card flex items-center gap-2">
-      <span className="syson-badge">SysON</span>
-      <span className="font-semibold">Model elements</span>
-      <span className="syson-chip ml-auto">
-        {data.count} element{data.count === 1 ? "" : "s"}
-      </span>
-    </div>
+    <Card
+      eyebrow="SysON"
+      title="Model elements"
+      actions={
+        <Badge tone="info">
+          {data.count} element{data.count === 1 ? "" : "s"}
+        </Badge>
+      }
+    />
   );
 }
 
@@ -74,60 +82,58 @@ function Elements(
       : data.children;
   }, [data.children, filter]);
   return (
-    <div className="syson-component-card p-0 overflow-hidden">
-      <div className="p-3 border-b border-border-subtle">
+    <Card
+      title="Elements"
+      actions={
         <input
+          aria-label="Filter model elements"
           className="syson-input"
-          placeholder="Filter model elements…"
+          placeholder="Filter elements…"
           value={filter}
           onInput={(event) =>
             setFilter((event.target as HTMLInputElement).value)}
         />
-      </div>
-      {!elements.length
-        ? (
-          <div className="p-5 text-center text-fg-muted">
-            No matching children
-          </div>
-        )
-        : (
-          <div className="max-h-[360px] overflow-y-auto divide-y divide-border-subtle">
-            {elements.map((element) => {
+      }
+    >
+      <DataTable
+        label="Model elements"
+        rows={elements}
+        rowKey={(element) => element.id}
+        selected={(element) => selected === element.id}
+        onSelect={(element) => {
+          setSelected(element.id);
+          publishSelection(
+            context,
+            "select-element",
+            "syson.element.selected",
+            { id: element.id, label: element.label, kind: element.kind },
+          );
+        }}
+        emptyLabel="No matching children"
+        columns={[
+          {
+            id: "label",
+            label: "Element",
+            render: (element) => {
               const kind = shortKind(element.kind);
               const visual = KIND_MAP[kind] ??
                 { icon: "○", color: "text-fg-muted" };
               return (
-                <button
-                  key={element.id}
-                  className={cx(
-                    "w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-bg-muted",
-                    selected === element.id && "bg-accent-dim",
-                  )}
-                  onClick={() => {
-                    setSelected(element.id);
-                    publishSelection(
-                      context,
-                      "select-element",
-                      "syson.element.selected",
-                      {
-                        id: element.id,
-                        label: element.label,
-                        kind: element.kind,
-                      },
-                    );
-                  }}
-                >
+                <span className="syson-element-label">
                   <span className={visual.color}>{visual.icon}</span>
-                  <span className="flex-1 truncate">
-                    {element.label || "(unnamed)"}
-                  </span>
-                  <span className="syson-chip">{kind}</span>
-                </button>
+                  <span>{element.label || "(unnamed)"}</span>
+                </span>
               );
-            })}
-          </div>
-        )}
-    </div>
+            },
+          },
+          {
+            id: "kind",
+            label: "Kind",
+            render: (element) => <Badge>{shortKind(element.kind)}</Badge>,
+          },
+        ]}
+      />
+    </Card>
   );
 }
 
@@ -138,23 +144,28 @@ function KindBreakdown({ data }: { data: ChildrenData }) {
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   });
   return (
-    <div className="syson-component-card">
-      <div className="syson-component-title">Kinds</div>
-      <div className="flex flex-wrap gap-2">
+    <Card title="Kinds">
+      <div className="mcp-view-badges">
         {[...counts.entries()].map(([kind, count]) => (
-          <span className="syson-chip" key={kind}>{kind}: {count}</span>
+          <Badge key={kind}>{kind}: {count}</Badge>
         ))}
-        {!counts.size && <span className="text-fg-muted">No kinds</span>}
+        {!counts.size && <EmptyState>No kinds</EmptyState>}
       </div>
-    </div>
+    </Card>
   );
 }
 
 function ParentContext({ data }: { data: ChildrenData }) {
   return (
-    <div className="syson-component-card text-xs font-mono text-fg-dim break-all">
-      Parent: {data.parentId || "root"}
-    </div>
+    <Card title="Parent context">
+      <KeyValueList
+        items={[{
+          id: "parent-id",
+          label: "Parent",
+          value: <code>{data.parentId || "root"}</code>,
+        }]}
+      />
+    </Card>
   );
 }
 

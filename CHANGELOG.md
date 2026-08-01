@@ -4,6 +4,8 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-01
+
 ### Added
 
 - All six Preact MCP Apps now advertise catalogs of small renderer-neutral
@@ -21,7 +23,7 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
   `SysonToolsClient.execute()` behavior is unchanged.
 - The viewer build now uses `@modelcontextprotocol/ext-apps` 1.7.5; the six
   self-contained bundles are smaller than the former 1.0.1 builds.
-- Preact components are mounted through the shared `@casys/mcp-view` 0.5 surface
+- Preact components are mounted through the shared `@casys/mcp-view` 0.7 surface
   runtime, while notification handlers remain registered before the handshake
   and every component unmounts during surface changes and teardown.
 

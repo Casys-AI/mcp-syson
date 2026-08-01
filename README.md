@@ -210,7 +210,7 @@ default surface. Viewer-backed tool calls put concise text in `content` and the
 full UI payload in `structuredContent`, with explicit JSON-text fallback
 compatibility. Element, requirement, and constraint selections emit named
 Compose events only when the host opens the optional event channel. Exact
-component keys, lifecycle rules, and the published mcp-view 0.5 dependency are
+component keys, lifecycle rules, and the shared mcp-view 0.7 dependency are
 documented in [SysON component surfaces](docs/component-surfaces.md).
 
 The build generates a TypeScript bundle that is statically imported by the

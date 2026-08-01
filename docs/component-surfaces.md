@@ -6,11 +6,11 @@ components under `io.casys.mcp.view-components/v1`. A compatible host selects a
 live layout through `io.casys.mcp.surface/v1`; without that context, the App
 mounts its declared standalone default surface.
 
-The renderer-neutral surface runtime comes from `@casys/mcp-view`. The thin
-adapter in `src/ui/shared/preact-surface.tsx` only mounts and unmounts Preact in
-the component slots. It also keeps full `structuredContent`, explicit JSON-text
-fallback, pre-connect notification registration, deterministic teardown, and the
-existing model-context and Compose selection events.
+The surface runtime and the shared Preact presentation primitives come from
+`@casys/mcp-view`. The thin adapter in `src/ui/shared/preact-surface.tsx` keeps
+SysON event semantics while delegating component mounting, full
+`structuredContent`, explicit JSON-text fallback, pre-connect notification
+registration, and deterministic teardown to the official adapter.
 
 ## Component catalog
 
@@ -55,8 +55,8 @@ non-ready surface context safely falls back to the standalone default.
 
 ## Package prerequisite
 
-The component API is implemented by the published `@casys/mcp-view` 0.5 line.
-Install and build SysON normally:
+The component API is implemented by the `@casys/mcp-view` 0.7 line. Install and
+build SysON normally:
 
 ```sh
 cd src/ui

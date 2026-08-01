@@ -1,8 +1,16 @@
 /** Composable requirement coverage and trace components. */
 
 import { defineComponentRegistry } from "@casys/mcp-view";
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  MetricGrid,
+  StateMessage,
+  Toolbar,
+} from "@casys/mcp-view/preact";
 import { useState } from "preact/hooks";
-import { cx } from "../../components/utils";
 import {
   defaultComponentSurface,
   VIEWER_COMPONENT_KEYS,
@@ -35,35 +43,53 @@ interface TraceData extends Record<string, unknown> {
 
 function Coverage({ data }: { data: TraceData }) {
   const tone = data.coverage.percentage >= 80
-    ? "bg-success"
+    ? "success"
     : data.coverage.percentage >= 50
-    ? "bg-warning"
-    : "bg-error";
+    ? "warning"
+    : "danger";
   return (
-    <div className="syson-component-card">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="syson-badge">SysON</span>
-        <span className="font-semibold">Requirements coverage</span>
-        <span className="ml-auto text-xl font-bold font-mono">
-          {Math.round(data.coverage.percentage)}%
-        </span>
-      </div>
-      <div className="h-2 bg-bg-muted rounded-full overflow-hidden">
+    <Card eyebrow="SysON" title="Requirements coverage">
+      <MetricGrid
+        items={[
+          {
+            id: "coverage",
+            label: "Coverage",
+            value: Math.round(data.coverage.percentage),
+            unit: "%",
+            tone,
+          },
+          { id: "total", label: "Total", value: data.coverage.total },
+          {
+            id: "covered",
+            label: "Covered",
+            value: data.coverage.satisfied,
+            tone: "success",
+          },
+          {
+            id: "uncovered",
+            label: "Uncovered",
+            value: data.coverage.unsatisfied,
+            tone: data.coverage.unsatisfied ? "danger" : "success",
+          },
+        ]}
+      />
+      <div
+        className="syson-progress"
+        aria-label={`${
+          Math.round(data.coverage.percentage)
+        }% requirements coverage`}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(data.coverage.percentage)}
+      >
         <div
-          className={cx("h-full", tone)}
+          className="syson-progress-value"
+          data-tone={tone}
           style={{ width: `${Math.min(100, data.coverage.percentage)}%` }}
         />
       </div>
-      <div className="flex flex-wrap gap-2 mt-3">
-        <span className="syson-chip">Total {data.coverage.total}</span>
-        <span className="syson-chip text-success">
-          Covered {data.coverage.satisfied}
-        </span>
-        <span className="syson-chip text-error">
-          Uncovered {data.coverage.unsatisfied}
-        </span>
-      </div>
-    </div>
+    </Card>
   );
 }
 
@@ -76,72 +102,70 @@ function TraceList(
     mode === "all" || (trace.satisfiedBy.length > 0) === (mode === "covered")
   );
   return (
-    <div className="syson-component-card p-0 overflow-hidden">
-      <div className="p-3 flex gap-3 border-b border-border-subtle">
-        {(["all", "covered", "uncovered"] as const).map((value) => (
-          <button
-            key={value}
-            className={cx(
-              "text-xs capitalize",
-              mode === value
-                ? "font-semibold text-fg-default"
-                : "text-fg-muted",
-            )}
-            onClick={() => setMode(value)}
-          >
-            {value}
-          </button>
-        ))}
-      </div>
-      <div className="max-h-[380px] overflow-y-auto divide-y divide-border-subtle">
-        {rows.map((trace) => {
-          const covered = trace.satisfiedBy.length > 0;
-          return (
-            <button
-              key={trace.requirement.id}
-              className={cx(
-                "w-full text-left px-4 py-2.5 border-l-2 hover:bg-bg-muted",
-                covered ? "border-l-success" : "border-l-error",
-                selected === trace.requirement.id && "bg-accent-dim",
-              )}
-              onClick={() => {
-                setSelected(trace.requirement.id);
-                publishSelection(
-                  context,
-                  "select-requirement",
-                  "syson.requirement.selected",
-                  {
-                    id: trace.requirement.id,
-                    label: trace.requirement.label,
-                    satisfied: covered,
-                  },
-                );
-              }}
+    <Card
+      title="Requirements"
+      actions={
+        <Toolbar label="Requirement coverage filter">
+          {(["all", "covered", "uncovered"] as const).map((value) => (
+            <Button
+              key={value}
+              pressed={mode === value}
+              onClick={() => setMode(value)}
             >
-              <span
-                className={cx(
-                  "syson-chip mr-2",
-                  covered ? "text-success" : "text-error",
-                )}
-              >
-                {covered ? "Covered" : "Uncovered"}
-              </span>
-              <span>{trace.requirement.label || "(unnamed requirement)"}</span>
-              {trace.error && (
-                <span className="block mt-1 text-xs text-error">
-                  {trace.error}
-                </span>
-              )}
-            </button>
+              {value}
+            </Button>
+          ))}
+        </Toolbar>
+      }
+    >
+      <DataTable
+        label="Requirement traces"
+        rows={rows}
+        rowKey={(trace) => trace.requirement.id}
+        selected={(trace) => selected === trace.requirement.id}
+        onSelect={(trace) => {
+          const covered = trace.satisfiedBy.length > 0;
+          setSelected(trace.requirement.id);
+          publishSelection(
+            context,
+            "select-requirement",
+            "syson.requirement.selected",
+            {
+              id: trace.requirement.id,
+              label: trace.requirement.label,
+              satisfied: covered,
+            },
           );
-        })}
-        {!rows.length && (
-          <div className="p-5 text-center text-fg-muted">
-            No {mode} requirements
-          </div>
-        )}
-      </div>
-    </div>
+        }}
+        emptyLabel={`No ${mode} requirements`}
+        columns={[
+          {
+            id: "status",
+            label: "Status",
+            render: (trace) => {
+              const covered = trace.satisfiedBy.length > 0;
+              return (
+                <Badge tone={covered ? "success" : "danger"}>
+                  {covered ? "Covered" : "Uncovered"}
+                </Badge>
+              );
+            },
+          },
+          {
+            id: "requirement",
+            label: "Requirement",
+            render: (trace) => (
+              <span className="syson-table-detail">
+                <span>
+                  {trace.requirement.label || "(unnamed requirement)"}
+                </span>
+                {trace.error && <small>{trace.error}</small>}
+              </span>
+            ),
+          },
+        ]}
+      />
+    </Card>
   );
 }
 
@@ -149,35 +173,47 @@ function SatisfactionLinks({ data }: { data: TraceData }) {
   const linked = data.traces.filter((trace) =>
     trace.satisfiedBy.length || trace.error
   );
+  if (!linked.length) {
+    return (
+      <StateMessage title="No satisfaction links">
+        No trace evidence was returned.
+      </StateMessage>
+    );
+  }
   return (
-    <div className="syson-component-card">
-      <div className="syson-component-title">Satisfaction links</div>
-      <div className="space-y-2">
-        {linked.map((trace) => (
-          <div key={trace.requirement.id}>
-            <div className="text-xs text-fg-muted">
-              {trace.requirement.label || trace.requirement.id}
-            </div>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {trace.satisfiedBy.map((target) => (
-                <span key={target.id} className="syson-chip">
-                  {target.label || target.kind.split("::").pop()}
-                </span>
-              ))}
-              {trace.error && (
-                <span className="text-xs text-error">{trace.error}</span>
-              )}
-            </div>
-          </div>
-        ))}
-        {!linked.length && (
-          <span className="text-fg-muted">No satisfaction links</span>
-        )}
-      </div>
-      <div className="text-[10px] font-mono text-fg-dim mt-3 break-all">
-        Root: {data.rootId}
-      </div>
-    </div>
+    <Card title="Satisfaction links" actions={<Badge>{linked.length}</Badge>}>
+      <DataTable
+        label="Satisfaction links"
+        rows={linked}
+        rowKey={(trace) =>
+          trace.requirement.id}
+        columns={[
+          {
+            id: "requirement",
+            label: "Requirement",
+            render: (trace) =>
+              trace.requirement.label || trace.requirement.id,
+          },
+          {
+            id: "targets",
+            label: "Satisfied by",
+            render: (trace) => (
+              <div className="mcp-view-badges">
+                {trace.satisfiedBy.map((target) => (
+                  <Badge key={target.id} tone="info">
+                    {target.label || target.kind.split("::").pop()}
+                  </Badge>
+                ))}
+                {trace.error && <Badge tone="danger">{trace.error}</Badge>}
+              </div>
+            ),
+          },
+        ]}
+      />
+      <p className="syson-provenance">
+        Root: <code>{data.rootId}</code>
+      </p>
+    </Card>
   );
 }
 

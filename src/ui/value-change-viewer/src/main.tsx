@@ -1,7 +1,13 @@
 /** Composable value read/change components. */
 
 import { defineComponentRegistry } from "@casys/mcp-view";
-import { cx } from "../../shared/interactions";
+import {
+  Badge,
+  Card,
+  KeyValueList,
+  MetricGrid,
+  StateMessage,
+} from "@casys/mcp-view/preact";
 import {
   defaultComponentSurface,
   VIEWER_COMPONENT_KEYS,
@@ -40,87 +46,104 @@ function formatNumber(value: number): string {
 function Readout({ data }: { data: ValueResult }) {
   if (!isSetValue(data)) {
     return (
-      <div className="syson-component-card flex items-center gap-3">
-        <span className="w-10 h-10 rounded-lg grid place-items-center bg-blue-500/20 text-blue-400">
-          ◉
-        </span>
-        <span className="text-2xl font-mono font-bold">
-          {formatNumber(data.value)}
-        </span>
-        {data.negated && <span className="syson-chip">negated</span>}
-      </div>
+      <Card
+        eyebrow="SysON value"
+        title="Current value"
+        actions={data.negated
+          ? <Badge tone="warning">negated</Badge>
+          : undefined}
+      >
+        <MetricGrid
+          items={[{
+            id: "value",
+            label: data.literal_kind ?? "Numeric literal",
+            value: formatNumber(data.value),
+            tone: "info",
+          }]}
+        />
+      </Card>
     );
   }
   const delta = data.new_value - data.old_value;
   return (
-    <div className="syson-component-card flex items-center gap-3 flex-wrap">
-      <span
-        className={cx(
-          "w-10 h-10 rounded-lg grid place-items-center text-lg font-bold",
-          data.success
-            ? "bg-green-500/20 text-green-400"
-            : "bg-red-500/20 text-red-400",
-        )}
-      >
-        {data.success ? "✓" : "✗"}
-      </span>
-      <span className="text-xl font-mono line-through text-fg-muted">
-        {formatNumber(data.old_value)}
-      </span>
-      <span>→</span>
-      <span className="text-2xl font-mono font-bold">
-        {formatNumber(data.new_value)}
-      </span>
-      <span className="syson-chip">
-        {delta >= 0 ? "+" : ""}
-        {formatNumber(delta)}
-      </span>
-    </div>
+    <Card
+      eyebrow="SysON value"
+      title="Value change"
+      actions={
+        <Badge tone={data.success ? "success" : "danger"}>
+          {data.success ? "Write verified" : "Write failed"}
+        </Badge>
+      }
+    >
+      <MetricGrid
+        items={[
+          { id: "old", label: "Previous", value: formatNumber(data.old_value) },
+          {
+            id: "new",
+            label: "Requested",
+            value: formatNumber(data.new_value),
+            tone: data.success ? "success" : "danger",
+          },
+          {
+            id: "delta",
+            label: "Change",
+            value: `${delta >= 0 ? "+" : ""}${formatNumber(delta)}`,
+            tone: "info",
+          },
+        ]}
+      />
+    </Card>
   );
 }
 
 function Identity({ data }: { data: ValueResult }) {
   return (
-    <div className="syson-component-card">
-      <div className="syson-component-title">Element identity</div>
-      <code className="text-xs text-fg-muted break-all">{data.element_id}</code>
-    </div>
+    <Card title="Element identity">
+      <KeyValueList
+        items={[{
+          id: "element-id",
+          label: "Element ID",
+          value: <code>{data.element_id}</code>,
+        }]}
+      />
+    </Card>
   );
 }
 
 function Verification({ data }: { data: ValueResult }) {
   const mismatch = isSetValue(data) && data.verified_value !== undefined &&
     data.verified_value !== data.new_value;
+  const warning = mismatch
+    ? `Verified value ${
+      formatNumber(data.verified_value!)
+    } does not match requested value.`
+    : isSetValue(data)
+    ? data.warning ??
+      (data.success ? undefined : "The value write was not verified.")
+    : undefined;
+  const verified = !isSetValue(data) || data.success;
   return (
-    <div className="syson-component-card space-y-2">
-      <div className="flex flex-wrap gap-2">
-        <span className="syson-chip">
-          {data.literal_kind ?? "numeric literal"}
-        </span>
-        {isSetValue(data) && (
-          <span
-            className={cx(
-              "syson-chip",
-              data.success ? "text-success" : "text-error",
-            )}
+    <Card
+      title="Verification"
+      actions={<Badge>{data.literal_kind ?? "numeric literal"}</Badge>}
+    >
+      {warning
+        ? (
+          <StateMessage tone="warning" title="Verification warning">
+            {warning}
+          </StateMessage>
+        )
+        : (
+          <StateMessage
+            tone={verified ? "success" : "danger"}
+            title={verified ? "Verified" : "Failed"}
           >
-            {data.success ? "write verified" : "write failed"}
-          </span>
+            {verified
+              ? "No verification warning"
+              : "The value write failed verification"}
+          </StateMessage>
         )}
-      </div>
-      {mismatch && (
-        <div className="text-xs text-warning">
-          Verified value {formatNumber(data.verified_value!)}{" "}
-          does not match requested value.
-        </div>
-      )}
-      {isSetValue(data) && data.warning && (
-        <div className="text-xs text-warning">{data.warning}</div>
-      )}
-      {!mismatch && !(isSetValue(data) && data.warning) && (
-        <div className="text-xs text-fg-muted">No verification warning</div>
-      )}
-    </div>
+    </Card>
   );
 }
 

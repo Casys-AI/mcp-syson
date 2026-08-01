@@ -4,14 +4,13 @@
  * Used by build-all.mjs to build each UI individually.
  * UI_NAME env var specifies which UI to build.
  *
- * Stack: Preact + Tailwind CSS v4
+ * Stack: Preact + the shared @casys/mcp-view theme
  */
 
 import { defineConfig } from "vite";
 import preact from "@preact/preset-vite";
-import tailwindcss from "@tailwindcss/vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -22,9 +21,11 @@ if (!uiName) {
 }
 
 export default defineConfig({
-  plugins: [preact(), tailwindcss(), viteSingleFile()],
+  plugins: [preact(), viteSingleFile()],
   root: resolve(__dirname, uiName),
   resolve: {
+    dedupe: ["preact"],
+    preserveSymlinks: true,
     alias: {
       "~": resolve(__dirname),
       "@": resolve(__dirname),

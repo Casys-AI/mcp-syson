@@ -1,8 +1,15 @@
 /** Composable AQL/search result components. */
 
 import { defineComponentRegistry } from "@casys/mcp-view";
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  KeyValueList,
+  Toolbar,
+} from "@casys/mcp-view/preact";
 import { useMemo, useState } from "preact/hooks";
-import { cx } from "../../components/utils";
 import {
   defaultComponentSurface,
   VIEWER_COMPONENT_KEYS,
@@ -52,15 +59,17 @@ function objectsOf(data: QueryData): ObjectResult[] | undefined {
 function Summary({ data }: { data: QueryData }) {
   const objects = objectsOf(data);
   return (
-    <div className="syson-component-card flex items-center gap-2">
-      <span className="syson-badge">SysON</span>
-      <span className="font-semibold">Query result</span>
-      <span className="syson-chip ml-auto">
-        {objects
-          ? `${objects.length} object${objects.length === 1 ? "" : "s"}`
-          : data.type ?? "unknown"}
-      </span>
-    </div>
+    <Card
+      eyebrow="SysON"
+      title="Query result"
+      actions={
+        <Badge tone="info">
+          {objects
+            ? `${objects.length} object${objects.length === 1 ? "" : "s"}`
+            : data.type ?? "unknown"}
+        </Badge>
+      }
+    />
   );
 }
 
@@ -71,12 +80,11 @@ function Expression({ data }: { data: QueryData }) {
     ? data.query
     : undefined;
   return (
-    <div className="syson-component-card">
-      <div className="syson-component-title">Expression</div>
-      <code className="block text-xs whitespace-pre-wrap break-words text-fg-muted">
+    <Card title="Expression">
+      <code className="syson-code-block">
         {text || "No expression supplied"}
       </code>
-    </div>
+    </Card>
   );
 }
 
@@ -104,12 +112,18 @@ function Values(
   if (!objects) {
     const value = "result" in data ? data.result : null;
     return (
-      <div className="syson-component-card flex items-center gap-2">
-        <span className="syson-chip">{data.type ?? "unknown"}</span>
-        <span className="font-mono break-all">
-          {value === null ? "null" : String(value)}
-        </span>
-      </div>
+      <Card
+        title="Scalar value"
+        actions={<Badge>{data.type ?? "unknown"}</Badge>}
+      >
+        <KeyValueList
+          items={[{
+            id: "result",
+            label: "Result",
+            value: <code>{value === null ? "null" : String(value)}</code>,
+          }]}
+        />
+      </Card>
     );
   }
   const toggleSort = (key: "label" | "kind") => {
@@ -120,75 +134,63 @@ function Values(
     }
   };
   return (
-    <div className="syson-component-card p-0 overflow-hidden">
-      <div className="p-3 border-b border-border-subtle">
-        <input
-          className="syson-input"
-          placeholder="Filter query results…"
-          value={filter}
-          onInput={(event) =>
-            setFilter((event.target as HTMLInputElement).value)}
-        />
-      </div>
-      <table className="syson-responsive-table w-full text-left">
-        <thead>
-          <tr className="border-b border-border-subtle">
-            <th
-              className="syson-table-heading cursor-pointer"
-              onClick={() => toggleSort("label")}
-            >
-              Label {sortKey === "label" ? (descending ? "↓" : "↑") : ""}
-            </th>
-            <th
-              className="syson-table-heading text-right cursor-pointer"
-              onClick={() => toggleSort("kind")}
-            >
-              Kind {sortKey === "kind" ? (descending ? "↓" : "↑") : ""}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((item) => (
-            <tr
-              key={item.id}
-              className={cx(
-                "cursor-pointer hover:bg-bg-muted",
-                selected === item.id && "bg-accent-dim",
-              )}
-              onClick={() => {
-                setSelected(item.id);
-                publishSelection(
-                  context,
-                  "select-result",
-                  "syson.element.selected",
-                  {
-                    id: item.id,
-                    label: item.label,
-                    kind: item.kind,
-                  },
-                );
-              }}
-            >
-              <td className="px-3 py-2 truncate">
-                {item.label || "(unnamed)"}
-              </td>
-              <td className="px-3 py-2 text-right">
-                <span className="syson-chip">
-                  {item.kind.split("::").pop()}
-                </span>
-              </td>
-            </tr>
-          ))}
-          {!rows.length && (
-            <tr>
-              <td className="p-5 text-center text-fg-muted" colSpan={2}>
-                No results
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <Card
+      title="Object results"
+      actions={
+        <Toolbar label="Query result controls">
+          <input
+            aria-label="Filter query results"
+            className="syson-input"
+            placeholder="Filter query results…"
+            value={filter}
+            onInput={(event) =>
+              setFilter((event.target as HTMLInputElement).value)}
+          />
+          <Button
+            pressed={sortKey === "label"}
+            onClick={() => toggleSort("label")}
+          >
+            Label {sortKey === "label" ? (descending ? "↓" : "↑") : ""}
+          </Button>
+          <Button
+            pressed={sortKey === "kind"}
+            onClick={() => toggleSort("kind")}
+          >
+            Kind {sortKey === "kind" ? (descending ? "↓" : "↑") : ""}
+          </Button>
+        </Toolbar>
+      }
+    >
+      <DataTable
+        label="Query results"
+        rows={rows}
+        rowKey={(item) => item.id}
+        selected={(item) => selected === item.id}
+        onSelect={(item) => {
+          setSelected(item.id);
+          publishSelection(
+            context,
+            "select-result",
+            "syson.element.selected",
+            { id: item.id, label: item.label, kind: item.kind },
+          );
+        }}
+        emptyLabel="No results"
+        columns={[
+          {
+            id: "label",
+            label: "Label",
+            render: (item) => item.label || "(unnamed)",
+          },
+          {
+            id: "kind",
+            label: "Kind",
+            align: "right",
+            render: (item) => <Badge>{item.kind.split("::").pop()}</Badge>,
+          },
+        ]}
+      />
+    </Card>
   );
 }
 

@@ -1,8 +1,14 @@
 /** Composable constraint-validation components. */
 
 import { defineComponentRegistry } from "@casys/mcp-view";
+import {
+  Badge,
+  Card,
+  DataTable,
+  KeyValueList,
+  MetricGrid,
+} from "@casys/mcp-view/preact";
 import { useState } from "preact/hooks";
-import { cx, statusStyles } from "../../shared/interactions";
 import {
   defaultComponentSurface,
   VIEWER_COMPONENT_KEYS,
@@ -53,49 +59,57 @@ function globalStatus(report: ValidationReport): ConstraintResult["status"] {
 }
 
 function StatusBadge({ status }: { status: ConstraintResult["status"] }) {
+  const tone = status === "pass"
+    ? "success"
+    : status === "fail" || status === "error"
+    ? "danger"
+    : "warning";
   return (
-    <span
-      className={cx(
-        "px-2 py-0.5 rounded-full text-xs font-semibold uppercase",
-        statusStyles[status],
-      )}
-    >
+    <Badge tone={tone}>
       {status === "unresolved" ? "N/A" : status}
-    </span>
+    </Badge>
   );
 }
 
 function Status({ data }: { data: ValidationReport }) {
   return (
-    <div className="syson-component-card flex items-center gap-3">
-      <div>
-        <div className="font-semibold">{data.elementName || "Validation"}</div>
-        <div className="text-xs text-fg-muted">
-          Validated {new Date(data.validatedAt).toLocaleString()}
-        </div>
-      </div>
-      <div className="ml-auto">
-        <StatusBadge status={globalStatus(data)} />
-      </div>
-    </div>
+    <Card
+      eyebrow="SysON validation"
+      title={data.elementName || "Validation"}
+      actions={<StatusBadge status={globalStatus(data)} />}
+    >
+      <p className="syson-provenance">
+        Validated {new Date(data.validatedAt).toLocaleString()}
+      </p>
+    </Card>
   );
 }
 
 function Summary({ data }: { data: ValidationReport }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-      {([
-        ["Pass", data.summary.pass, "text-success"],
-        ["Fail", data.summary.fail, "text-error"],
-        ["Error", data.summary.error, "text-warning"],
-        ["N/A", data.summary.unresolved, "text-fg-muted"],
-      ] as const).map(([label, count, tone]) => (
-        <div key={label} className="syson-component-card text-center">
-          <div className={cx("text-xl font-bold font-mono", tone)}>{count}</div>
-          <div className="text-xs text-fg-muted">{label}</div>
-        </div>
-      ))}
-    </div>
+    <MetricGrid
+      items={[
+        {
+          id: "pass",
+          label: "Pass",
+          value: data.summary.pass,
+          tone: "success",
+        },
+        { id: "fail", label: "Fail", value: data.summary.fail, tone: "danger" },
+        {
+          id: "error",
+          label: "Error",
+          value: data.summary.error,
+          tone: "danger",
+        },
+        {
+          id: "unresolved",
+          label: "N/A",
+          value: data.summary.unresolved,
+          tone: data.summary.unresolved ? "warning" : "neutral",
+        },
+      ]}
+    />
   );
 }
 
@@ -112,26 +126,23 @@ function formatResolved(
 function ResolvedValues({ data }: { data: ValidationReport }) {
   const values = Object.entries(data.resolvedValues ?? {});
   return (
-    <div className="syson-component-card">
-      <div className="syson-component-title">Resolved model values</div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1">
-        {values.map(([name, value]) => (
-          <div
-            key={name}
-            className="flex justify-between gap-2 px-2.5 py-1.5 bg-bg-subtle rounded"
-          >
-            <span className="text-xs text-fg-muted truncate">{name}</span>
-            <span className="text-xs font-mono font-semibold">
-              {formatResolved(value)}
-            </span>
-          </div>
-        ))}
-        {!values.length && (
-          <span className="text-fg-muted">No resolved model values</span>
-        )}
-      </div>
-    </div>
+    <Card title="Resolved model values">
+      <KeyValueList
+        items={values.map(([name, value]) => ({
+          id: name,
+          label: name,
+          value: <code>{formatResolved(value)}</code>,
+        }))}
+      />
+      {!values.length && (
+        <p className="mcp-view-empty">No resolved model values</p>
+      )}
+    </Card>
   );
+}
+
+function formatValue(value: number | undefined, digits = 2): string {
+  return value === undefined ? "−" : value.toFixed(digits);
 }
 
 function Constraints(
@@ -142,96 +153,85 @@ function Constraints(
 ) {
   const [selected, setSelected] = useState<string>();
   return (
-    <div className="syson-component-card p-0 overflow-hidden">
-      <table className="syson-responsive-table w-full text-sm">
-        <thead>
-          <tr className="border-b border-border-default bg-bg-subtle">
-            <th className="syson-table-heading">Status</th>
-            <th className="syson-table-heading">Constraint</th>
-            <th className="syson-table-heading text-right">Value</th>
-            <th className="syson-table-heading text-right">Threshold</th>
-            <th className="syson-table-heading text-right">Margin</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.constraints.map((constraint) => (
-            <tr
-              key={constraint.constraintId}
-              className={cx(
-                "border-b border-border-subtle cursor-pointer hover:bg-bg-muted",
-                selected === constraint.constraintId && "bg-accent-dim",
-              )}
-              onClick={() => {
-                setSelected(constraint.constraintId);
-                publishSelection(
-                  context,
-                  "select_constraint",
-                  "syson.constraint.selected",
-                  {
-                    constraintId: constraint.constraintId,
-                    constraintName: constraint.constraintName,
-                    status: constraint.status,
-                  },
-                );
-              }}
-            >
-              <td className="px-3 py-2">
-                <StatusBadge status={constraint.status} />
-              </td>
-              <td className="px-3 py-2">
-                <span className="font-medium">{constraint.constraintName}</span>
-                {constraint.expression && (
-                  <code className="block text-xs text-fg-muted mt-0.5">
-                    {constraint.expression}
-                  </code>
-                )}
-                {constraint.error && (
-                  <span className="block text-xs text-error">
-                    {constraint.error}
-                  </span>
-                )}
+    <Card
+      title="Constraints"
+      actions={<Badge>{data.constraints.length}</Badge>}
+    >
+      <DataTable
+        label="Constraint validation results"
+        rows={data.constraints}
+        rowKey={(constraint) => constraint.constraintId}
+        selected={(constraint) => selected === constraint.constraintId}
+        onSelect={(constraint) => {
+          setSelected(constraint.constraintId);
+          publishSelection(
+            context,
+            "select_constraint",
+            "syson.constraint.selected",
+            {
+              constraintId: constraint.constraintId,
+              constraintName: constraint.constraintName,
+              status: constraint.status,
+            },
+          );
+        }}
+        emptyLabel="No constraints found on this element"
+        columns={[
+          {
+            id: "status",
+            label: "Status",
+            render: (constraint) => <StatusBadge status={constraint.status} />,
+          },
+          {
+            id: "constraint",
+            label: "Constraint",
+            render: (constraint) => (
+              <span className="syson-table-detail">
+                <strong>{constraint.constraintName}</strong>
+                {constraint.expression && <code>{constraint.expression}</code>}
+                {constraint.error && <small>{constraint.error}</small>}
                 {!!constraint.unresolvedRefs?.length && (
-                  <span className="block text-xs text-fg-muted">
-                    Missing: {constraint.unresolvedRefs.join(", ")}
-                  </span>
+                  <small>Missing: {constraint.unresolvedRefs.join(", ")}</small>
                 )}
-              </td>
-              <td className="px-3 py-2 text-right font-mono">
-                {constraint.computedValue?.toFixed(2) ?? "−"}
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-fg-muted">
-                {constraint.threshold?.toFixed(2) ?? "−"}
-              </td>
-              <td
-                className={cx(
-                  "px-3 py-2 text-right font-mono",
-                  constraint.margin !== undefined && constraint.margin < 0
-                    ? "text-error"
-                    : "text-fg-default",
-                )}
-              >
-                {constraint.margin === undefined
-                  ? "−"
-                  : `${constraint.margin >= 0 ? "+" : ""}${
-                    constraint.margin.toFixed(1)
-                  }${
-                    constraint.marginPercent === undefined
+              </span>
+            ),
+          },
+          {
+            id: "value",
+            label: "Value",
+            align: "right",
+            render: (constraint) => (
+              <code>{formatValue(constraint.computedValue)}</code>
+            ),
+          },
+          {
+            id: "threshold",
+            label: "Threshold",
+            align: "right",
+            render: (constraint) => (
+              <code>{formatValue(constraint.threshold)}</code>
+            ),
+          },
+          {
+            id: "margin",
+            label: "Margin",
+            align: "right",
+            render: (constraint) =>
+              constraint.margin === undefined
+                ? "−"
+                : (
+                  <Badge tone={constraint.margin < 0 ? "danger" : "success"}>
+                    {constraint.margin >= 0 ? "+" : ""}
+                    {formatValue(constraint.margin, 1)}
+                    {constraint.marginPercent === undefined
                       ? ""
-                      : ` (${constraint.marginPercent.toFixed(0)}%)`
-                  }`}
-              </td>
-            </tr>
-          ))}
-          {!data.constraints.length && (
-            <tr>
-              <td colSpan={5} className="p-5 text-center text-fg-muted">
-                No constraints found on this element
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+                      : ` (${constraint.marginPercent.toFixed(0)}%)`}
+                  </Badge>
+                ),
+          },
+        ]}
+      />
+    </Card>
   );
 }
 

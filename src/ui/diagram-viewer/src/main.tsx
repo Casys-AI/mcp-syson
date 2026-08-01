@@ -1,6 +1,15 @@
 /** Small composable SysON diagram components with a standalone default surface. */
 
 import { defineComponentRegistry } from "@casys/mcp-view";
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  KeyValueList,
+  StateMessage,
+  Toolbar,
+} from "@casys/mcp-view/preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { cx } from "../../components/utils";
 import {
@@ -31,14 +40,16 @@ interface DiagramSnapshot extends Record<string, unknown> {
 
 function Summary({ data }: { data: DiagramSnapshot }) {
   return (
-    <div className="syson-component-card flex flex-wrap items-center gap-2">
-      <span className="syson-badge">SysON</span>
-      <span className="font-semibold text-fg-default">
-        {data.diagramLabel || "Diagram"}
-      </span>
-      <span className="syson-chip">{data.nodeCount} nodes</span>
-      <span className="syson-chip">{data.edgeCount} edges</span>
-    </div>
+    <Card
+      eyebrow="SysON"
+      title={data.diagramLabel || "Diagram"}
+      actions={
+        <div className="mcp-view-badges">
+          <Badge tone="info">{data.nodeCount} nodes</Badge>
+          <Badge>{data.edgeCount} edges</Badge>
+        </div>
+      }
+    />
   );
 }
 
@@ -64,43 +75,43 @@ function Visual({ data }: { data: DiagramSnapshot }) {
 
   if (!data.svg) {
     return (
-      <div className="syson-component-card text-fg-muted">
-        Diagram has no SVG content
-      </div>
+      <StateMessage title="No diagram">Diagram has no SVG content</StateMessage>
     );
   }
   return (
-    <div className="syson-component-card relative overflow-hidden">
-      <div className="absolute top-2 right-2 z-10 flex gap-1">
-        <button
-          className="syson-button"
-          onClick={() => setScale((value) => Math.min(value * 1.2, 5))}
-        >
-          +
-        </button>
-        <button
-          className="syson-button"
-          onClick={() => setScale((value) => Math.max(value * 0.8, 0.1))}
-        >
-          −
-        </button>
-        <button
-          className="syson-button"
-          onClick={() => {
-            setScale(1);
-            setTranslate({ x: 0, y: 0 });
-          }}
-        >
-          Reset
-        </button>
-      </div>
-      <div className="absolute bottom-2 right-2 z-10 syson-chip">
-        {Math.round(scale * 100)}%
-      </div>
+    <Card
+      className="syson-diagram-card"
+      title="Diagram canvas"
+      actions={
+        <Toolbar label="Diagram zoom controls">
+          <Button
+            title="Zoom in"
+            onClick={() => setScale((value) => Math.min(value * 1.2, 5))}
+          >
+            +
+          </Button>
+          <Button
+            title="Zoom out"
+            onClick={() => setScale((value) => Math.max(value * 0.8, 0.1))}
+          >
+            −
+          </Button>
+          <Button
+            onClick={() => {
+              setScale(1);
+              setTranslate({ x: 0, y: 0 });
+            }}
+          >
+            Reset
+          </Button>
+          <Badge tone="info">{Math.round(scale * 100)}%</Badge>
+        </Toolbar>
+      }
+    >
       <div
         ref={containerRef}
         className={cx(
-          "w-full min-h-[300px] max-h-[600px] overflow-hidden",
+          "syson-diagram-canvas",
           dragging ? "cursor-grabbing" : "cursor-grab",
         )}
         onMouseDown={(event) => {
@@ -128,7 +139,7 @@ function Visual({ data }: { data: DiagramSnapshot }) {
           dangerouslySetInnerHTML={{ __html: data.svg }}
         />
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -141,47 +152,50 @@ function Elements(
   const [selected, setSelected] = useState<string>();
   if (!data.nodes?.length) {
     return (
-      <div className="syson-component-card text-fg-muted">
-        No diagram elements
-      </div>
+      <StateMessage title="No elements">
+        The diagram contains no semantic elements.
+      </StateMessage>
     );
   }
   return (
-    <div className="syson-component-card p-0 overflow-hidden">
-      <div className="syson-component-title px-3 py-2">
-        Diagram elements ({data.nodes.length})
-      </div>
-      <div className="max-h-[240px] overflow-y-auto divide-y divide-border-subtle">
-        {data.nodes.map((node) => (
-          <button
-            key={node.id}
-            className={cx(
-              "w-full text-left px-3 py-2 hover:bg-bg-muted",
-              selected === node.id && "bg-accent-dim",
-            )}
-            onClick={() => {
-              setSelected(node.id);
-              publishSelection(
-                context,
-                "select-node",
-                "syson.element.selected",
-                { nodeId: node.id, label: node.label },
-              );
-            }}
-          >
-            {node.label || "(unnamed)"}
-          </button>
-        ))}
-      </div>
-    </div>
+    <Card title="Diagram elements" actions={<Badge>{data.nodes.length}</Badge>}>
+      <DataTable
+        label="Diagram elements"
+        rows={data.nodes}
+        rowKey={(node) =>
+          node.id}
+        selected={(node) =>
+          selected === node.id}
+        onSelect={(node) => {
+          setSelected(node.id);
+          publishSelection(
+            context,
+            "select-node",
+            "syson.element.selected",
+            { nodeId: node.id, label: node.label },
+          );
+        }}
+        columns={[{
+          id: "label",
+          label: "Element",
+          render: (node) => node.label || "(unnamed)",
+        }]}
+      />
+    </Card>
   );
 }
 
 function Identity({ data }: { data: DiagramSnapshot }) {
   return (
-    <div className="syson-component-card text-xs font-mono text-fg-dim break-all">
-      Diagram ID: {data.diagramId || "unknown"}
-    </div>
+    <Card title="Diagram identity">
+      <KeyValueList
+        items={[{
+          id: "diagram-id",
+          label: "Diagram ID",
+          value: <code>{data.diagramId || "unknown"}</code>,
+        }]}
+      />
+    </Card>
   );
 }
 
