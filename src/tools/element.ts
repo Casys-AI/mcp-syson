@@ -80,6 +80,22 @@ export const elementInsertSysmlOutputSchema = {
   required: ["inserted", "parentId", "text"],
 };
 
+/** Closed MCP output contract for an exact SysON element read. */
+export const elementGetOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    id: { type: "string" },
+    kind: { type: "string" },
+    label: { type: "string" },
+    iconURLs: {
+      type: "array",
+      items: { type: "string" },
+    },
+  },
+  required: ["id", "kind", "label", "iconURLs"],
+};
+
 /** Expose mutation evidence natively while keeping model-facing text concise. */
 export function toElementInsertSysmlResult(
   value: unknown,
@@ -221,6 +237,7 @@ export const elementTools: SysonTool[] = [
       },
       required: ["editing_context_id", "element_id"],
     },
+    outputSchema: elementGetOutputSchema,
     handler: async ({ editing_context_id, element_id }) => {
       const client = getSysonClient();
       const data = await client.query<GetObjectResult>(GET_OBJECT, {

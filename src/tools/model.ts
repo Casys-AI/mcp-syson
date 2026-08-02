@@ -25,6 +25,25 @@ import type {
 } from "../api/types.ts";
 
 /**
+ * Closed MCP output contract for a created SysML document.
+ *
+ * The general-purpose tool permits a document without a root Package, so its
+ * ID is nullable and the root label is absent in that case.
+ */
+export const modelCreateOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    documentId: { type: "string" },
+    documentName: { type: "string" },
+    documentKind: { type: "string" },
+    rootPackageId: { type: ["string", "null"] },
+    rootPackageLabel: { type: "string" },
+  },
+  required: ["documentId", "documentName", "documentKind", "rootPackageId"],
+};
+
+/**
  * Extract mutation result, throwing on ErrorPayload.
  */
 function unwrapMutation<T extends object>(
@@ -34,7 +53,9 @@ function unwrapMutation<T extends object>(
   const payload = Object.values(result)[0] as Record<string, unknown>;
   if (payload?.__typename === "ErrorPayload") {
     throw new Error(
-      `[lib/syson] ${operationName} failed: ${(payload as { message: string }).message}`,
+      `[lib/syson] ${operationName} failed: ${
+        (payload as { message: string }).message
+      }`,
     );
   }
   return payload;
@@ -43,8 +64,7 @@ function unwrapMutation<T extends object>(
 export const modelTools: SysonTool[] = [
   {
     name: "syson_model_stereotypes",
-    description:
-      "List available document stereotypes (e.g., SysML v2). " +
+    description: "List available document stereotypes (e.g., SysML v2). " +
       "Needed by syson_model_create if auto-detection fails.",
     category: "model",
     inputSchema: {
@@ -52,7 +72,8 @@ export const modelTools: SysonTool[] = [
       properties: {
         editing_context_id: {
           type: "string",
-          description: "Editing context ID (from syson_project_get or syson_project_create)",
+          description:
+            "Editing context ID (from syson_project_get or syson_project_create)",
         },
       },
       required: ["editing_context_id"],
@@ -104,7 +125,9 @@ export const modelTools: SysonTool[] = [
       );
 
       return {
-        childTypes: data.viewer.editingContext.childCreationDescriptions.map((d) => ({
+        childTypes: data.viewer.editingContext.childCreationDescriptions.map((
+          d,
+        ) => ({
           id: d.id,
           label: d.label,
           iconURL: d.iconURL ?? null,
@@ -134,7 +157,8 @@ export const modelTools: SysonTool[] = [
         },
         stereotype_id: {
           type: "string",
-          description: "Stereotype ID (from syson_model_stereotypes). Auto-detected if omitted.",
+          description:
+            "Stereotype ID (from syson_model_stereotypes). Auto-detected if omitted.",
         },
         create_root_package: {
           type: "boolean",
@@ -142,11 +166,13 @@ export const modelTools: SysonTool[] = [
         },
         root_package_name: {
           type: "string",
-          description: "Name for the root package. Default: same as document name",
+          description:
+            "Name for the root package. Default: same as document name",
         },
       },
       required: ["editing_context_id"],
     },
+    outputSchema: modelCreateOutputSchema,
     handler: async ({
       editing_context_id,
       name,
@@ -162,14 +188,18 @@ export const modelTools: SysonTool[] = [
       // Auto-detect stereotype if not provided
       let resolvedStereotypeId = stereotype_id as string | undefined;
       if (!resolvedStereotypeId) {
-        const stereotypes = await client.query<GetStereotypesResult>(GET_STEREOTYPES, {
-          editingContextId: ecId,
-        });
-        const sysmlStereotype = stereotypes.viewer.editingContext.stereotypes.edges.find(
-          (e) =>
-            e.node.label.toLowerCase().includes("sysml") ||
-            e.node.label.toLowerCase().includes("syson"),
+        const stereotypes = await client.query<GetStereotypesResult>(
+          GET_STEREOTYPES,
+          {
+            editingContextId: ecId,
+          },
         );
+        const sysmlStereotype = stereotypes.viewer.editingContext.stereotypes
+          .edges.find(
+            (e) =>
+              e.node.label.toLowerCase().includes("sysml") ||
+              e.node.label.toLowerCase().includes("syson"),
+          );
         if (!sysmlStereotype) {
           throw new Error(
             "[lib/syson] syson_model_create: No SysML stereotype found. " +
@@ -181,18 +211,22 @@ export const modelTools: SysonTool[] = [
 
       // Create document
       const docMutationId = crypto.randomUUID();
-      const docResult = await client.mutate<CreateDocumentResult>(CREATE_DOCUMENT, {
-        input: {
-          id: docMutationId,
-          editingContextId: ecId,
-          stereotypeId: resolvedStereotypeId,
-          name: docName,
+      const docResult = await client.mutate<CreateDocumentResult>(
+        CREATE_DOCUMENT,
+        {
+          input: {
+            id: docMutationId,
+            editingContextId: ecId,
+            stereotypeId: resolvedStereotypeId,
+            name: docName,
+          },
         },
-      });
+      );
 
       const docPayload = unwrapMutation(docResult, "createDocument");
-      const document = (docPayload as { document: { id: string; name: string; kind: string } })
-        .document;
+      const document =
+        (docPayload as { document: { id: string; name: string; kind: string } })
+          .document;
 
       const result: Record<string, unknown> = {
         documentId: document.id,
@@ -216,30 +250,41 @@ export const modelTools: SysonTool[] = [
 
         if (sysmlDomain) {
           // Get root object creation descriptions for the domain
-          const rootDescs = await client.query<GetRootObjectCreationDescriptionsResult>(
+          const rootDescs = await client.query<
+            GetRootObjectCreationDescriptionsResult
+          >(
             GET_ROOT_OBJECT_CREATION_DESCRIPTIONS,
-            { editingContextId: ecId, domainId: sysmlDomain.id, suggested: true },
+            {
+              editingContextId: ecId,
+              domainId: sysmlDomain.id,
+              suggested: true,
+            },
           );
 
-          const packageDesc = rootDescs.viewer.editingContext.rootObjectCreationDescriptions.find(
-            (d) => d.label.toLowerCase().includes("package"),
-          );
+          const packageDesc = rootDescs.viewer.editingContext
+            .rootObjectCreationDescriptions.find(
+              (d) => d.label.toLowerCase().includes("package"),
+            );
 
           if (packageDesc) {
             const rootMutationId = crypto.randomUUID();
-            const rootResult = await client.mutate<CreateRootObjectResult>(CREATE_ROOT_OBJECT, {
-              input: {
-                id: rootMutationId,
-                editingContextId: ecId,
-                documentId: document.id,
-                domainId: sysmlDomain.id,
-                rootObjectCreationDescriptionId: packageDesc.id,
+            const rootResult = await client.mutate<CreateRootObjectResult>(
+              CREATE_ROOT_OBJECT,
+              {
+                input: {
+                  id: rootMutationId,
+                  editingContextId: ecId,
+                  documentId: document.id,
+                  domainId: sysmlDomain.id,
+                  rootObjectCreationDescriptionId: packageDesc.id,
+                },
               },
-            });
+            );
 
             const rootPayload = unwrapMutation(rootResult, "createRootObject");
-            const rootObj =
-              (rootPayload as { object: { id: string; kind: string; label: string } }).object;
+            const rootObj = (rootPayload as {
+              object: { id: string; kind: string; label: string };
+            }).object;
             result.rootPackageId = rootObj.id;
             result.rootPackageLabel = rootObj.label;
           }
@@ -252,7 +297,8 @@ export const modelTools: SysonTool[] = [
 
   {
     name: "syson_model_domains",
-    description: "List available metamodel domains (e.g., 'sysml'). Rarely needed directly.",
+    description:
+      "List available metamodel domains (e.g., 'sysml'). Rarely needed directly.",
     category: "model",
     inputSchema: {
       type: "object",

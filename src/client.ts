@@ -26,6 +26,19 @@ import type {
   SysonTool,
 } from "./tools/types.ts";
 
+/**
+ * Non-viewer tools whose MCP callers require a machine-readable result.
+ *
+ * Keep this deliberately closed: generic SysON reads continue to use their
+ * established JSON-text response unless they declare a native output contract.
+ * These declared tools retain that JSON text as their compatibility fallback.
+ */
+const STRUCTURED_MCP_RESULT_TOOL_NAMES = new Set<string>([
+  "syson_project_create",
+  "syson_model_create",
+  "syson_element_get",
+]);
+
 // Re-export from tools
 export {
   allTools,
@@ -123,6 +136,12 @@ export class SysonToolsClient {
         if (tool.name === "syson_element_insert_sysml") {
           return toElementInsertSysmlResult(result);
         }
+        if (
+          STRUCTURED_MCP_RESULT_TOOL_NAMES.has(tool.name) &&
+          isRecord(result)
+        ) {
+          return toNativeStructuredToolResult(result);
+        }
         return tool._meta?.ui && isRecord(result)
           ? toUiToolResult(tool.name, result)
           : result;
@@ -141,6 +160,25 @@ export function toUiToolResult(
 ): StructuredToolResult {
   return {
     content: summariseUiResult(toolName, structuredContent),
+    structuredContent,
+  };
+}
+
+/**
+ * Add a machine-readable payload while preserving the former plain-object
+ * wire text exactly for content-only MCP clients.
+ */
+function toNativeStructuredToolResult(
+  structuredContent: Record<string, unknown>,
+): StructuredToolResult {
+  const content = JSON.stringify(structuredContent, null, 2);
+  if (content === undefined) {
+    throw new TypeError(
+      "Native structured SysON result must be JSON serializable.",
+    );
+  }
+  return {
+    content,
     structuredContent,
   };
 }

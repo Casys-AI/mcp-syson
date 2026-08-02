@@ -4,6 +4,14 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `syson_project_create`, `syson_model_create`, and `syson_element_get` now
+  declare closed `outputSchema` contracts and return their existing payloads in
+  `structuredContent` over MCP HTTP while retaining their JSON-text fallback.
+  They remain non-viewer tools; direct `SysonToolsClient.execute()` behavior is
+  unchanged.
+
 ## [0.5.0] - 2026-08-01
 
 ### Added

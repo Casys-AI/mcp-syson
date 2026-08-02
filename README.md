@@ -208,7 +208,11 @@ Preact MCP App and advertises a catalog of small domain components through
 in `io.casys.mcp.surface/v1`; other hosts receive the complete standalone
 default surface. Viewer-backed tool calls put concise text in `content` and the
 full UI payload in `structuredContent`, with explicit JSON-text fallback
-compatibility. Element, requirement, and constraint selections emit named
+compatibility. The non-viewer model-container tools `syson_project_create`,
+`syson_model_create`, and `syson_element_get` likewise declare an `outputSchema`
+and return their native payload in `structuredContent`; this is for strict MCP
+workflows, not an MCP App attachment, and retain their JSON-text fallback for
+content-only clients. Element, requirement, and constraint selections emit named
 Compose events only when the host opens the optional event channel. Exact
 component keys, lifecycle rules, and the shared mcp-view 0.7 dependency are
 documented in [SysON component surfaces](docs/component-surfaces.md).

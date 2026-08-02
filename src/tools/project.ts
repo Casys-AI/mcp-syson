@@ -8,7 +8,11 @@
 
 import type { SysonTool } from "./types.ts";
 import { getSysonClient } from "../api/graphql-client.ts";
-import { GET_PROJECT, GET_PROJECT_TEMPLATES, LIST_PROJECTS } from "../api/queries.ts";
+import {
+  GET_PROJECT,
+  GET_PROJECT_TEMPLATES,
+  LIST_PROJECTS,
+} from "../api/queries.ts";
 import { CREATE_PROJECT, DELETE_PROJECT } from "../api/mutations.ts";
 import type {
   CreateProjectResult,
@@ -17,6 +21,18 @@ import type {
   GetProjectTemplatesResult,
   ListProjectsResult,
 } from "../api/types.ts";
+
+/** Closed MCP output contract for a created SysON project. */
+export const projectCreateOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    id: { type: "string" },
+    name: { type: "string" },
+    editingContextId: { type: "string" },
+  },
+  required: ["id", "name", "editingContextId"],
+};
 
 /**
  * Extract mutation result, throwing on ErrorPayload.
@@ -29,7 +45,9 @@ function unwrapMutation<T extends object>(
   const payload = Object.values(result)[0] as Record<string, unknown>;
   if (payload?.__typename === "ErrorPayload") {
     throw new Error(
-      `[lib/syson] ${operationName} failed: ${(payload as { message: string }).message}`,
+      `[lib/syson] ${operationName} failed: ${
+        (payload as { message: string }).message
+      }`,
     );
   }
   return payload;
@@ -126,20 +144,22 @@ export const projectTools: SysonTool[] = [
         },
         template_id: {
           type: "string",
-          description:
-            "Template ID to use (from syson_project_templates). " +
+          description: "Template ID to use (from syson_project_templates). " +
             "If omitted, creates a blank project.",
         },
       },
       required: ["name"],
     },
+    outputSchema: projectCreateOutputSchema,
     handler: async ({ name, template_id }) => {
       const client = getSysonClient();
 
       // If no template specified, try to find SysON template
       let resolvedTemplateId = template_id as string | undefined;
       if (!resolvedTemplateId) {
-        const templates = await client.query<GetProjectTemplatesResult>(GET_PROJECT_TEMPLATES);
+        const templates = await client.query<GetProjectTemplatesResult>(
+          GET_PROJECT_TEMPLATES,
+        );
         const sysonTemplate = templates.viewer.allProjectTemplates.find(
           (t) =>
             t.label.toLowerCase().includes("sysmlv2") ||
@@ -170,7 +190,8 @@ export const projectTools: SysonTool[] = [
       });
 
       const payload = unwrapMutation(data, "createProject");
-      const project = (payload as { project: { id: string; name: string } }).project;
+      const project =
+        (payload as { project: { id: string; name: string } }).project;
 
       // Fetch the project to get editingContextId
       const projectData = await client.query<GetProjectResult>(GET_PROJECT, {
@@ -180,14 +201,16 @@ export const projectTools: SysonTool[] = [
       return {
         id: project.id,
         name: project.name,
-        editingContextId: projectData.viewer.project.currentEditingContext?.id ?? project.id,
+        editingContextId:
+          projectData.viewer.project.currentEditingContext?.id ?? project.id,
       };
     },
   },
 
   {
     name: "syson_project_delete",
-    description: "Permanently delete a project and all its contents. Irreversible.",
+    description:
+      "Permanently delete a project and all its contents. Irreversible.",
     category: "project",
     inputSchema: {
       type: "object",
@@ -226,7 +249,9 @@ export const projectTools: SysonTool[] = [
     },
     handler: async () => {
       const client = getSysonClient();
-      const data = await client.query<GetProjectTemplatesResult>(GET_PROJECT_TEMPLATES);
+      const data = await client.query<GetProjectTemplatesResult>(
+        GET_PROJECT_TEMPLATES,
+      );
 
       return {
         templates: data.viewer.allProjectTemplates.map((t) => ({
