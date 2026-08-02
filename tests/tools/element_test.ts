@@ -2,8 +2,11 @@
  * Tests for SysON element tools
  */
 
-import { assertEquals, assertRejects } from "jsr:@std/assert";
-import { setSysonClient, SysonGraphQLClient } from "../../src/api/graphql-client.ts";
+import { assertEquals, assertRejects } from "@std/assert";
+import {
+  setSysonClient,
+  SysonGraphQLClient,
+} from "../../src/api/graphql-client.ts";
 import { elementTools } from "../../src/tools/element.ts";
 
 function getHandler(name: string) {
@@ -37,7 +40,12 @@ Deno.test("syson_element_get - returns element", async () => {
   const restore = mockFetch([{
     viewer: {
       editingContext: {
-        object: { id: "e1", kind: "sysml::PartUsage", label: "Propulsion", iconURLs: [] },
+        object: {
+          id: "e1",
+          kind: "sysml::PartUsage",
+          label: "Propulsion",
+          iconURLs: [],
+        },
       },
     },
   }]);
@@ -179,6 +187,27 @@ Deno.test("syson_element_delete - returns success", async () => {
       element_id: "e1",
     }) as Record<string, unknown>;
     assertEquals(result.deleted, true);
+  } finally {
+    restore();
+  }
+});
+
+Deno.test("syson_element_insert_sysml - returns exact mutation evidence", async () => {
+  const restore = mockFetch([{
+    insertTextualSysMLv2: { __typename: "SuccessPayload", id: "m1" },
+  }]);
+
+  try {
+    const result = await getHandler("syson_element_insert_sysml")({
+      editing_context_id: "ec-1",
+      parent_id: "part-1",
+      sysml_text: "attribute mass : Real = 2.86;",
+    });
+    assertEquals(result, {
+      inserted: true,
+      parentId: "part-1",
+      text: "attribute mass : Real = 2.86;",
+    });
   } finally {
     restore();
   }

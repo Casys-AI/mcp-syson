@@ -7,8 +7,15 @@
  */
 
 import { assertEquals, assertRejects } from "jsr:@std/assert@^1";
-import { constraintTools } from "../../src/tools/constraint.ts";
-import { setSysonClient, SysonGraphQLClient } from "../../src/api/graphql-client.ts";
+import { Ajv } from "ajv";
+import {
+  constraintExtractOutputSchema,
+  constraintTools,
+} from "../../src/tools/constraint.ts";
+import {
+  setSysonClient,
+  SysonGraphQLClient,
+} from "../../src/api/graphql-client.ts";
 import type { Constraint, ConstraintExpr } from "@casys/constraint-solver";
 
 function getHandler(name: string) {
@@ -46,7 +53,13 @@ Deno.test("syson_constraint_evaluate - explicit values, pass and fail counted", 
     values: { totalMass: 2.86 },
   }) as Record<string, unknown>;
 
-  assertEquals(result.summary, { total: 2, pass: 1, fail: 1, error: 0, unresolved: 0 });
+  assertEquals(result.summary, {
+    total: 2,
+    pass: 1,
+    fail: 1,
+    error: 0,
+    unresolved: 0,
+  });
 });
 
 Deno.test("syson_constraint_evaluate - unit-carrying values convert (kg vs lb)", async () => {
@@ -173,6 +186,41 @@ Deno.test("constraintTools - every required field exists in properties", () => {
       );
     }
   }
+});
+
+Deno.test("syson_constraint_extract - output schema covers the recursive expression contract", () => {
+  const validate = new Ajv({ strict: false }).compile(
+    constraintExtractOutputSchema,
+  );
+  const extraction = {
+    constraints: [{
+      id: "c-1",
+      name: "Bounded transformed mass",
+      sourceId: "requirement-1",
+      expression: {
+        kind: "binary",
+        op: "<=",
+        left: {
+          kind: "call",
+          name: "abs",
+          args: [{
+            kind: "unary",
+            op: "-",
+            operand: {
+              kind: "ref",
+              featurePath: ["assembly", "mass"],
+              elementId: "mass-attribute",
+            },
+          }],
+        },
+        right: { kind: "literal", value: 5, unit: "kg" },
+      },
+    }],
+    errors: [{ id: "c-2", name: "Unreadable", error: "No body" }],
+  };
+
+  assertEquals(validate(extraction), true, JSON.stringify(validate.errors));
+  assertEquals(validate({ ...extraction, legacyText: "{}" }), false);
 });
 
 // ── AQL injection hardening ─────────────────────────────────────────────────

@@ -1,11 +1,37 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { createSysonServer, parseCli } from "../server.ts";
+import {
+  resetSysonClient,
+  setSysonClient,
+  SysonGraphQLClient,
+} from "../src/api/graphql-client.ts";
 
 const PROTOCOL_VERSION = "2026-07-28";
 const PROTOCOL_VERSION_KEY = "io.modelcontextprotocol/protocolVersion";
 const CLIENT_CAPABILITIES_KEY = "io.modelcontextprotocol/clientCapabilities";
 
-Deno.test("SysON serves only stateless 2026-07-28 HTTP and evaluates constraints structurally", async () => {
+Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured results", async () => {
+  const graphql = Deno.serve(
+    { hostname: "127.0.0.1", port: 0, onListen: () => {} },
+    () =>
+      Response.json({
+        data: {
+          evaluateExpression: {
+            __typename: "EvaluateExpressionSuccessPayload",
+            result: { __typename: "VoidExpressionResult" },
+          },
+          insertTextualSysMLv2: {
+            __typename: "SuccessPayload",
+            id: "mutation-1",
+          },
+        },
+      }),
+  );
+  setSysonClient(
+    new SysonGraphQLClient({
+      baseUrl: `http://127.0.0.1:${graphql.addr.port}`,
+    }),
+  );
   const listener = Deno.listen({ hostname: "127.0.0.1", port: 0 });
   const port = (listener.addr as Deno.NetAddr).port;
   listener.close();
@@ -18,10 +44,89 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP and evaluates constraints
   });
   try {
     const listed = await rpc(port, "tools/list", {});
-    const evaluate = (listed.result.tools as Array<Record<string, unknown>>)
-      .find(
-        (tool) => tool.name === "syson_constraint_evaluate",
-      );
+    const tools = listed.result.tools as Array<Record<string, unknown>>;
+    const insert = tools.find((tool) =>
+      tool.name === "syson_element_insert_sysml"
+    );
+    const insertOutputSchema = insert?.outputSchema as {
+      type?: string;
+      additionalProperties?: boolean;
+      required?: string[];
+      properties?: Record<string, Record<string, unknown>>;
+    };
+    assertEquals(insertOutputSchema.type, "object");
+    assertEquals(insertOutputSchema.additionalProperties, false);
+    assertEquals(insertOutputSchema.required, ["inserted", "parentId", "text"]);
+    assertEquals(Object.keys(insertOutputSchema.properties ?? {}), [
+      "inserted",
+      "parentId",
+      "text",
+    ]);
+    assertEquals(insertOutputSchema.properties?.inserted, {
+      type: "boolean",
+      const: true,
+    });
+
+    const inserted = await rpc(port, "tools/call", {
+      name: "syson_element_insert_sysml",
+      arguments: {
+        editing_context_id: "ec-1",
+        parent_id: "part-1",
+        sysml_text: "attribute mass : Real = 2.86;",
+      },
+    });
+    assertEquals(inserted.result.content, [{
+      type: "text",
+      text: "Inserted SysML text under part-1.",
+    }]);
+    assertEquals(inserted.result.structuredContent, {
+      inserted: true,
+      parentId: "part-1",
+      text: "attribute mass : Real = 2.86;",
+    });
+
+    const extract = tools.find((tool) =>
+      tool.name === "syson_constraint_extract"
+    );
+    const extractOutputSchema = extract?.outputSchema as {
+      type?: string;
+      additionalProperties?: boolean;
+      required?: string[];
+      properties?: Record<string, unknown>;
+      $defs?: Record<string, unknown>;
+    };
+    assertEquals(extractOutputSchema.type, "object");
+    assertEquals(extractOutputSchema.additionalProperties, false);
+    assertEquals(extractOutputSchema.required, ["constraints"]);
+    assertEquals(Object.keys(extractOutputSchema.properties ?? {}), [
+      "constraints",
+      "errors",
+      "message",
+    ]);
+    assertEquals(
+      Object.hasOwn(extractOutputSchema.$defs ?? {}, "constraintExpression"),
+      true,
+    );
+
+    const extracted = await rpc(port, "tools/call", {
+      name: "syson_constraint_extract",
+      arguments: {
+        editing_context_id: "ec-1",
+        element_id: "requirement-1",
+      },
+    });
+    assertEquals(extracted.result.content, [{
+      type: "text",
+      text: "Extracted 0 constraints.",
+    }]);
+    assertEquals(extracted.result.structuredContent, {
+      constraints: [],
+      message: "No ConstraintUsage found under this element",
+    });
+
+    const evaluate = tools.find((tool) =>
+      tool.name === "syson_constraint_evaluate"
+    );
     const outputSchema = evaluate?.outputSchema as {
       type?: string;
       additionalProperties?: boolean;
@@ -81,6 +186,8 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP and evaluates constraints
     assertEquals(sse.status, 405);
   } finally {
     await http.shutdown();
+    await graphql.shutdown();
+    resetSysonClient();
   }
 });
 

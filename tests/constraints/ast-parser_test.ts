@@ -120,8 +120,18 @@ Deno.test("parseAstNode - binary <=", () => {
     label: "<=",
     props: { operator: "<=" },
     children: [
-      { id: "ref1", kind: "FeatureReferenceExpression", label: "totalMass", props: { referentName: "totalMass" } },
-      { id: "lit1", kind: "LiteralInteger", label: "500", props: { value: 500 } },
+      {
+        id: "ref1",
+        kind: "FeatureReferenceExpression",
+        label: "totalMass",
+        props: { referentName: "totalMass" },
+      },
+      {
+        id: "lit1",
+        kind: "LiteralInteger",
+        label: "500",
+        props: { value: 500 },
+      },
     ],
   };
   const expr = parseAstNode(node);
@@ -155,6 +165,54 @@ Deno.test("parseAstNode - binary + (arithmetic)", () => {
   }
 });
 
+Deno.test("parseAstNode - quantity bracket preserves the referenced SI unit", () => {
+  const node: SysonAstNode = {
+    id: "quantity",
+    kind: "OperatorExpression",
+    label: "[",
+    props: { operator: "[" },
+    children: [
+      {
+        id: "value",
+        kind: "LiteralInteger",
+        label: "20000000",
+        props: { value: 20_000_000 },
+      },
+      {
+        id: "unit-ref",
+        kind: "FeatureReferenceExpression",
+        label: "not-used-as-the-unit",
+        props: { referentName: "SI::Pa" },
+      },
+    ],
+  };
+
+  assertEquals(parseAstNode(node), {
+    kind: "literal",
+    value: 20_000_000,
+    unit: "Pa",
+  });
+});
+
+Deno.test("parseAstNode - BracketExpression preserves millimetres", () => {
+  const node: SysonAstNode = {
+    id: "quantity",
+    kind: "BracketExpression",
+    label: "",
+    children: [
+      { id: "value", kind: "LiteralInteger", label: "1", props: { value: 1 } },
+      {
+        id: "unit-ref",
+        kind: "FeatureReferenceExpression",
+        label: "mm",
+        props: { referentName: "mm" },
+      },
+    ],
+  };
+
+  assertEquals(parseAstNode(node), { kind: "literal", value: 1, unit: "mm" });
+});
+
 Deno.test("parseAstNode - unary not", () => {
   const node: SysonAstNode = {
     id: "op1",
@@ -163,7 +221,9 @@ Deno.test("parseAstNode - unary not", () => {
     props: { operator: "not" },
     children: [
       {
-        id: "inner", kind: "OperatorExpression", label: "<",
+        id: "inner",
+        kind: "OperatorExpression",
+        label: "<",
         props: { operator: "<" },
         children: [
           { id: "l1", kind: "LiteralInteger", label: "5", props: { value: 5 } },
@@ -217,11 +277,26 @@ Deno.test("parseAstNode - nested: (a + b) <= 500", () => {
         label: "+",
         props: { operator: "+" },
         children: [
-          { id: "a", kind: "FeatureReferenceExpression", label: "structMass", props: { referentName: "structMass" } },
-          { id: "b", kind: "FeatureReferenceExpression", label: "payloadMass", props: { referentName: "payloadMass" } },
+          {
+            id: "a",
+            kind: "FeatureReferenceExpression",
+            label: "structMass",
+            props: { referentName: "structMass" },
+          },
+          {
+            id: "b",
+            kind: "FeatureReferenceExpression",
+            label: "payloadMass",
+            props: { referentName: "payloadMass" },
+          },
         ],
       },
-      { id: "limit", kind: "LiteralInteger", label: "500", props: { value: 500 } },
+      {
+        id: "limit",
+        kind: "LiteralInteger",
+        label: "500",
+        props: { value: 500 },
+      },
     ],
   };
 
@@ -232,8 +307,14 @@ Deno.test("parseAstNode - nested: (a + b) <= 500", () => {
     assertEquals(expr.left.kind, "binary");
     if (expr.left.kind === "binary") {
       assertEquals(expr.left.op, "+");
-      assertEquals(expr.left.left, { kind: "ref", featurePath: ["structMass"] });
-      assertEquals(expr.left.right, { kind: "ref", featurePath: ["payloadMass"] });
+      assertEquals(expr.left.left, {
+        kind: "ref",
+        featurePath: ["structMass"],
+      });
+      assertEquals(expr.left.right, {
+        kind: "ref",
+        featurePath: ["payloadMass"],
+      });
     }
     assertEquals(expr.right, { kind: "literal", value: 500 });
   }
@@ -273,7 +354,12 @@ Deno.test("parseAstNode - unwraps single-child wrapper", () => {
     kind: "SomeWrapperType",
     label: "",
     children: [
-      { id: "inner", kind: "LiteralInteger", label: "99", props: { value: 99 } },
+      {
+        id: "inner",
+        kind: "LiteralInteger",
+        label: "99",
+        props: { value: 99 },
+      },
     ],
   };
   const expr = parseAstNode(node);

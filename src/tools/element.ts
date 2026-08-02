@@ -8,6 +8,7 @@
  * @module lib/syson/tools/element
  */
 
+import type { StructuredToolResult } from "@casys/mcp-server";
 import type { SysonTool } from "./types.ts";
 import { getSysonClient } from "../api/graphql-client.ts";
 import { GET_CHILD_CREATION_DESCRIPTIONS, GET_OBJECT } from "../api/queries.ts";
@@ -35,7 +36,9 @@ function unwrapMutation<T extends object>(
   const payload = Object.values(result)[0] as Record<string, unknown>;
   if (payload?.__typename === "ErrorPayload") {
     throw new Error(
-      `[lib/syson] ${operationName} failed: ${(payload as { message: string }).message}`,
+      `[lib/syson] ${operationName} failed: ${
+        (payload as { message: string }).message
+      }`,
     );
   }
   return payload;
@@ -45,12 +48,47 @@ function unwrapMutation<T extends object>(
  * Rename an element using AQL eSet on declaredName.
  * This is the reliable way — renameTreeItem requires a representationId we don't have.
  */
-async function renameViaAql(ecId: string, elementId: string, newName: string): Promise<void> {
+async function renameViaAql(
+  ecId: string,
+  elementId: string,
+  newName: string,
+): Promise<void> {
   await evalAql(
     ecId,
-    `aql:self.eSet(self.eClass().getEStructuralFeature('declaredName'), '${aqlEscape(newName)}')`,
+    `aql:self.eSet(self.eClass().getEStructuralFeature('declaredName'), '${
+      aqlEscape(newName)
+    }')`,
     [elementId],
   );
+}
+
+export interface ElementInsertSysmlOutput extends Record<string, unknown> {
+  inserted: true;
+  parentId: string;
+  text: string;
+}
+
+/** Closed wire contract for a successful textual SysML insertion. */
+export const elementInsertSysmlOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    inserted: { type: "boolean", const: true },
+    parentId: { type: "string" },
+    text: { type: "string" },
+  },
+  required: ["inserted", "parentId", "text"],
+};
+
+/** Expose mutation evidence natively while keeping model-facing text concise. */
+export function toElementInsertSysmlResult(
+  value: unknown,
+): StructuredToolResult {
+  const insertion = value as ElementInsertSysmlOutput;
+  return {
+    content: `Inserted SysML text under ${insertion.parentId}.`,
+    structuredContent: insertion,
+  };
 }
 
 export const elementTools: SysonTool[] = [
@@ -79,7 +117,8 @@ export const elementTools: SysonTool[] = [
         },
         name: {
           type: "string",
-          description: "Name for the new element (renames after creation via AQL)",
+          description:
+            "Name for the new element (renames after creation via AQL)",
         },
       },
       required: ["editing_context_id", "parent_id", "child_type"],
@@ -95,18 +134,23 @@ export const elementTools: SysonTool[] = [
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(childTypeInput);
 
       if (!isUuid) {
-        const descriptions = await client.query<GetChildCreationDescriptionsResult>(
+        const descriptions = await client.query<
+          GetChildCreationDescriptionsResult
+        >(
           GET_CHILD_CREATION_DESCRIPTIONS,
           { editingContextId: ecId, containerId: parentId },
         );
 
-        const match = descriptions.viewer.editingContext.childCreationDescriptions.find(
-          (d) => d.label.toLowerCase() === childTypeInput.toLowerCase() ||
-            d.label.toLowerCase().includes(childTypeInput.toLowerCase()),
-        );
+        const match = descriptions.viewer.editingContext
+          .childCreationDescriptions.find(
+            (d) =>
+              d.label.toLowerCase() === childTypeInput.toLowerCase() ||
+              d.label.toLowerCase().includes(childTypeInput.toLowerCase()),
+          );
 
         if (!match) {
-          const available = descriptions.viewer.editingContext.childCreationDescriptions
+          const available = descriptions.viewer.editingContext
+            .childCreationDescriptions
             .map((d) => d.label)
             .join(", ");
           throw new Error(
@@ -130,7 +174,8 @@ export const elementTools: SysonTool[] = [
 
       const payload = unwrapMutation(data, "createChild");
       const element =
-        (payload as { object: { id: string; kind: string; label: string } }).object;
+        (payload as { object: { id: string; kind: string; label: string } })
+          .object;
 
       const result: Record<string, unknown> = {
         id: element.id,
@@ -335,28 +380,35 @@ export const elementTools: SysonTool[] = [
         },
         sysml_text: {
           type: "string",
-          description:
-            "SysML v2 textual content. E.g. 'part Heater;', " +
+          description: "SysML v2 textual content. E.g. 'part Heater;', " +
             "'requirement ThermalReq { doc /* Must maintain 20-25C */ }'",
         },
       },
       required: ["editing_context_id", "parent_id", "sysml_text"],
     },
+    outputSchema: elementInsertSysmlOutputSchema,
     handler: async ({ editing_context_id, parent_id, sysml_text }) => {
       const client = getSysonClient();
       const mutationId = crypto.randomUUID();
 
-      const data = await client.mutate<InsertTextualSysMLv2Result>(INSERT_TEXTUAL_SYSMLV2, {
-        input: {
-          id: mutationId,
-          editingContextId: editing_context_id as string,
-          objectId: parent_id as string,
-          textualContent: sysml_text as string,
+      const data = await client.mutate<InsertTextualSysMLv2Result>(
+        INSERT_TEXTUAL_SYSMLV2,
+        {
+          input: {
+            id: mutationId,
+            editingContextId: editing_context_id as string,
+            objectId: parent_id as string,
+            textualContent: sysml_text as string,
+          },
         },
-      });
+      );
 
       unwrapMutation(data, "insertTextualSysMLv2");
-      return { inserted: true, parentId: parent_id, text: sysml_text };
+      return {
+        inserted: true,
+        parentId: parent_id as string,
+        text: sysml_text as string,
+      } satisfies ElementInsertSysmlOutput;
     },
   },
 ];

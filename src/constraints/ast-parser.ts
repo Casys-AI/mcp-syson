@@ -40,9 +40,18 @@ export interface SysonAstNode {
 // ============================================================================
 
 const BINARY_OPS = new Set<string>([
-  "+", "-", "*", "/",
-  "<", "<=", ">", ">=", "==", "!=",
-  "and", "or",
+  "+",
+  "-",
+  "*",
+  "/",
+  "<",
+  "<=",
+  ">",
+  ">=",
+  "==",
+  "!=",
+  "and",
+  "or",
 ]);
 
 const UNARY_OPS = new Set<string>(["not", "-"]);
@@ -80,6 +89,12 @@ const OPERATOR_KINDS = new Set([
   "OperatorExpression",
   "sysml::OperatorExpression",
   "kerml::OperatorExpression",
+]);
+
+const BRACKET_KINDS = new Set([
+  "BracketExpression",
+  "sysml::BracketExpression",
+  "kerml::BracketExpression",
 ]);
 
 const INVOCATION_KINDS = new Set([
@@ -134,6 +149,10 @@ export function parseAstNode(node: SysonAstNode): ConstraintExpr {
     return parseOperator(node);
   }
 
+  if (BRACKET_KINDS.has(normalized.kind)) {
+    return parseMeasurementReference(node);
+  }
+
   if (INVOCATION_KINDS.has(normalized.kind)) {
     return parseInvocation(node);
   }
@@ -160,7 +179,9 @@ function parseLiteral(node: SysonAstNode): LiteralExpr {
     : parseFloat(node.label);
 
   if (isNaN(value)) {
-    throw new Error(`[lib/syson] Cannot parse literal value from '${node.label}'`);
+    throw new Error(
+      `[lib/syson] Cannot parse literal value from '${node.label}'`,
+    );
   }
 
   const unit = node.props?.unit;
@@ -187,16 +208,19 @@ function parseRef(node: SysonAstNode): ConstraintExpr {
     }
   }
 
-  const refName = (node.props?.referentName as string | undefined)
-    ?? firstChild?.label
-    ?? node.label;
+  const refName = (node.props?.referentName as string | undefined) ??
+    firstChild?.label ??
+    node.label;
 
   if (!refName) {
-    throw new Error(`[lib/syson] FeatureReferenceExpression has no referent name`);
+    throw new Error(
+      `[lib/syson] FeatureReferenceExpression has no referent name`,
+    );
   }
 
   const featurePath = refName.split(".");
-  const elementId = (node.props?.referentId as string | undefined) ?? firstChild?.id;
+  const elementId = (node.props?.referentId as string | undefined) ??
+    firstChild?.id;
 
   const result: RefExpr = { kind: "ref", featurePath };
   if (elementId) result.elementId = elementId;
@@ -211,6 +235,14 @@ function parseOperator(node: SysonAstNode): ConstraintExpr {
   }
 
   const children = node.children ?? [];
+
+  // KerML represents a quantity literal such as `20 [MPa]` as a bracket
+  // expression whose first argument is the numeric literal and whose second
+  // argument references the unit feature. Preserve that model reference as a
+  // unit instead of silently reducing the quantity to a bare number.
+  if (operator === "[" && children.length === 2) {
+    return parseMeasurementReference(node);
+  }
 
   if (UNARY_OPS.has(operator) && children.length === 1) {
     return {
@@ -233,6 +265,37 @@ function parseOperator(node: SysonAstNode): ConstraintExpr {
     `[lib/syson] Unexpected OperatorExpression: operator='${operator}', ` +
       `children=${children.length}. Expected binary (2 children) or unary (1 child).`,
   );
+}
+
+function parseMeasurementReference(node: SysonAstNode): LiteralExpr {
+  const children = node.children ?? [];
+  if (children.length !== 2) {
+    throw new Error(
+      `[lib/syson] Measurement bracket must have a value and a unit reference; got ${children.length} children.`,
+    );
+  }
+
+  const value = parseAstNode(children[0]);
+  const unitReference = parseAstNode(children[1]);
+  if (value.kind !== "literal" || value.unit !== undefined) {
+    throw new Error(
+      "[lib/syson] Measurement bracket value must be one unitless numeric literal.",
+    );
+  }
+  if (unitReference.kind !== "ref" || unitReference.featurePath.length === 0) {
+    throw new Error(
+      "[lib/syson] Measurement bracket unit must resolve to a model feature reference.",
+    );
+  }
+
+  const referencedName = unitReference.featurePath.at(-1)!;
+  const unit = referencedName.split("::").at(-1)?.trim();
+  if (!unit) {
+    throw new Error(
+      "[lib/syson] Measurement bracket resolved an empty unit name.",
+    );
+  }
+  return { kind: "literal", value: value.value, unit };
 }
 
 function parseInvocation(node: SysonAstNode): ConstraintExpr {
@@ -267,13 +330,13 @@ function parseChain(node: SysonAstNode): ConstraintExpr {
   for (const child of children) {
     const childKind = normalizeKind(child.kind);
     if (REF_KINDS.has(childKind)) {
-      const refName = (child.props?.referentName as string | undefined)
-        ?? child.children?.[0]?.label
-        ?? child.label;
+      const refName = (child.props?.referentName as string | undefined) ??
+        child.children?.[0]?.label ??
+        child.label;
       if (refName) segments.push(refName);
-      lastElementId = (child.props?.referentId as string | undefined)
-        ?? child.children?.[0]?.id
-        ?? child.id;
+      lastElementId = (child.props?.referentId as string | undefined) ??
+        child.children?.[0]?.id ??
+        child.id;
     } else {
       // Non-ref child in a chain — recurse (could be an expression)
       return parseAstNode(child);

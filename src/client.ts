@@ -13,7 +13,11 @@ import {
   getToolsByCategory,
   toolsByCategory,
 } from "./tools/mod.ts";
-import { toConstraintEvaluateResult } from "./tools/constraint.ts";
+import {
+  toConstraintEvaluateResult,
+  toConstraintExtractResult,
+} from "./tools/constraint.ts";
+import { toElementInsertSysmlResult } from "./tools/element.ts";
 import type { StructuredToolResult } from "@casys/mcp-server";
 import type {
   MCPClientBase,
@@ -101,7 +105,7 @@ export class SysonToolsClient {
     return this.tools.length;
   }
 
-  /** Bind the one explicit SysON output contract to the MCP wire response. */
+  /** Bind explicit native SysON output contracts to MCP wire responses. */
   buildHandlersMap(): Map<
     string,
     (args: Record<string, unknown>) => Promise<unknown>
@@ -110,8 +114,14 @@ export class SysonToolsClient {
       tool.name,
       async (args: Record<string, unknown>) => {
         const result = await tool.handler(args);
+        if (tool.name === "syson_constraint_extract") {
+          return toConstraintExtractResult(result);
+        }
         if (tool.name === "syson_constraint_evaluate") {
           return toConstraintEvaluateResult(result);
+        }
+        if (tool.name === "syson_element_insert_sysml") {
+          return toElementInsertSysmlResult(result);
         }
         return tool._meta?.ui && isRecord(result)
           ? toUiToolResult(tool.name, result)

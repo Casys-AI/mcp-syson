@@ -76,14 +76,31 @@ async function buildAstTree(
   }
 
   if (shortKind.includes("FeatureReferenceExpression")) {
+    let referentName: string | undefined;
     try {
-      const ref = await evalAql(ecId, "aql:self.referent.declaredName", [
+      const shortRef = await evalAql(ecId, "aql:self.referent.shortName", [
         elementId,
       ]);
-      if (ref.__typename === "StringExpressionResult") {
-        props = { ...props, referentName: ref.strValue };
+      if (
+        shortRef.__typename === "StringExpressionResult" &&
+        shortRef.strValue.trim() !== ""
+      ) {
+        referentName = shortRef.strValue;
       }
-    } catch { /* no referent on this node */ }
+    } catch { /* most ordinary features do not declare a short name */ }
+    if (!referentName) {
+      try {
+        const ref = await evalAql(ecId, "aql:self.referent.declaredName", [
+          elementId,
+        ]);
+        if (ref.__typename === "StringExpressionResult") {
+          referentName = ref.strValue;
+        }
+      } catch { /* no referent on this node */ }
+    }
+    if (referentName) {
+      props = { ...props, referentName };
+    }
   }
 
   const childNodes: SysonAstNode[] = [];
@@ -179,6 +196,126 @@ type ConstraintEvaluationOutput = {
   resolvedValues: Record<string, QuantityValue>;
 } & Record<string, unknown>;
 
+type ConstraintExtractionOutput = {
+  constraints: Constraint[];
+  errors?: ExtractionError[];
+  message?: string;
+};
+
+const constraintExpressionOutputSchema = {
+  oneOf: [
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        kind: { const: "literal" },
+        value: { type: "number" },
+        unit: { type: "string" },
+      },
+      required: ["kind", "value"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        kind: { const: "ref" },
+        featurePath: { type: "array", items: { type: "string" } },
+        elementId: { type: "string" },
+      },
+      required: ["kind", "featurePath"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        kind: { const: "binary" },
+        op: {
+          enum: [
+            "+",
+            "-",
+            "*",
+            "/",
+            "<",
+            "<=",
+            ">",
+            ">=",
+            "==",
+            "!=",
+            "and",
+            "or",
+          ],
+        },
+        left: { $ref: "#/$defs/constraintExpression" },
+        right: { $ref: "#/$defs/constraintExpression" },
+      },
+      required: ["kind", "op", "left", "right"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        kind: { const: "unary" },
+        op: { enum: ["not", "-"] },
+        operand: { $ref: "#/$defs/constraintExpression" },
+      },
+      required: ["kind", "op", "operand"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        kind: { const: "call" },
+        name: { type: "string" },
+        args: {
+          type: "array",
+          items: { $ref: "#/$defs/constraintExpression" },
+        },
+      },
+      required: ["kind", "name", "args"],
+    },
+  ],
+};
+
+/** Closed contract for constraints extracted from the SysON expression tree. */
+export const constraintExtractOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    constraints: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          sourceId: { type: "string" },
+          expression: { $ref: "#/$defs/constraintExpression" },
+        },
+        required: ["id", "name", "expression"],
+      },
+    },
+    errors: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          error: { type: "string" },
+        },
+        required: ["id", "name", "error"],
+      },
+    },
+    message: { type: "string" },
+  },
+  required: ["constraints"],
+  $defs: {
+    constraintExpression: constraintExpressionOutputSchema,
+  },
+};
+
 const quantityOutputSchema = {
   type: "object",
   additionalProperties: false,
@@ -253,6 +390,24 @@ export function toConstraintEvaluateResult(
   };
 }
 
+/** Expose extracted constraints natively without asking callers to parse text. */
+export function toConstraintExtractResult(
+  value: unknown,
+): StructuredToolResult {
+  const extraction = value as ConstraintExtractionOutput;
+  const errorCount = extraction.errors?.length ?? 0;
+  return {
+    content: `Extracted ${extraction.constraints.length} constraint${
+      extraction.constraints.length === 1 ? "" : "s"
+    }${
+      errorCount > 0
+        ? ` with ${errorCount} parse error${errorCount === 1 ? "" : "s"}`
+        : ""
+    }.`,
+    structuredContent: extraction,
+  };
+}
+
 /** Count statuses over results that may include extraction errors. */
 function summarise(results: ConstraintResult[]) {
   return {
@@ -292,6 +447,7 @@ export const constraintTools: SysonTool[] = [
       },
       required: ["editing_context_id", "element_id"],
     },
+    outputSchema: constraintExtractOutputSchema,
     handler: async ({ editing_context_id, element_id }) => {
       const { constraints, errors } = await extractConstraints(
         editing_context_id as string,
