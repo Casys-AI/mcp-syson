@@ -4,6 +4,8 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-08-02
+
 ### Added
 
 - `syson_project_create`, `syson_model_create`, and `syson_element_get` now
