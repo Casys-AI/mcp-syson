@@ -9,7 +9,7 @@ import { SysonToolsClient } from "./src/client.ts";
 import { loadUiHtml, UI_RESOURCES } from "./src/ui/mod.ts";
 
 const DEFAULT_HTTP_PORT = 3009;
-const PACKAGE_VERSION = "0.5.1";
+const PACKAGE_VERSION = "0.5.2";
 
 /** Register every shipped viewer, including the currently standalone explorer. */
 export function registerUiResources(
