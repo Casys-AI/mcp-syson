@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "mcp-syson: MCP server for SysON — SysML v2 MBSE modelling, AQL queries and requirements tracing for AI agents"
+authors:
+  - family-names: Pesle
+    given-names: Erwan Lee
+year: 2026
+license: MIT
+repository-code: https://github.com/Casys-AI/mcp-syson
+type: software
