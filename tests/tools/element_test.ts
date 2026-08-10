@@ -118,7 +118,7 @@ Deno.test("syson_element_create - resolves child type by label", async () => {
     const result = await getHandler("syson_element_create")({
       editing_context_id: "ec-1",
       parent_id: "root-1",
-      child_type: "PartUsage",
+      child_type: "New PartUsage",
     }) as Record<string, unknown>;
     assertEquals(result.id, "new-1");
     assertEquals(result.kind, "sysml::PartUsage");
@@ -147,12 +147,45 @@ Deno.test("syson_element_create - throws on unknown child type", async () => {
           child_type: "NonExistent",
         }),
       Error,
-      "No child type matching 'NonExistent'",
+      "No exact child type matching 'NonExistent'",
     );
   } finally {
     restore();
   }
 });
+
+Deno.test(
+  "syson_element_create - refuses an ambiguous child label before creating",
+  async () => {
+    const restore = mockFetch([{
+      viewer: {
+        editingContext: {
+          childCreationDescriptions: [
+            { id: "desc-a", label: "New PartUsage", iconURL: null },
+            { id: "desc-b", label: "New PartUsage", iconURL: null },
+          ],
+        },
+      },
+    }]);
+
+    try {
+      let caught: { code?: string } | undefined;
+      try {
+        await getHandler("syson_element_create")({
+          editing_context_id: "ec-1",
+          parent_id: "root-1",
+          child_type: "New PartUsage",
+        });
+      } catch (error) {
+        caught = error as { code?: string };
+      }
+
+      assertEquals(caught?.code, "SYSON_ELEMENT_CREATE_CHILD_TYPE_AMBIGUOUS");
+    } finally {
+      restore();
+    }
+  },
+);
 
 Deno.test("syson_element_rename - returns success", async () => {
   // Rename goes through AQL eSet on declaredName, not renameTreeItem —
@@ -176,21 +209,8 @@ Deno.test("syson_element_rename - returns success", async () => {
   }
 });
 
-Deno.test("syson_element_delete - returns success", async () => {
-  const restore = mockFetch([{
-    deleteTreeItem: { __typename: "SuccessPayload", id: "m1" },
-  }]);
-
-  try {
-    const result = await getHandler("syson_element_delete")({
-      editing_context_id: "ec-1",
-      element_id: "e1",
-    }) as Record<string, unknown>;
-    assertEquals(result.deleted, true);
-  } finally {
-    restore();
-  }
-});
+// syson_element_delete invariant tests live in element_delete_test.ts —
+// the REST-based implementation has its own mock machinery (sequence + throw slots).
 
 Deno.test("syson_element_insert_sysml - returns exact mutation evidence", async () => {
   const restore = mockFetch([{

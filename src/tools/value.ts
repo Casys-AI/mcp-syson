@@ -4,6 +4,10 @@
  * Read and write numeric attribute values in the model. `syson_value_set`
  * mutates the underlying Literal node via AQL `eSet`, which is what makes
  * what-if loops possible: change a value, re-run syson_constraint_validate.
+ * This direct mutation bypasses Sirius Web's normal command/event pipeline;
+ * the tool reads back the numeric value, but editor-side listeners or undo
+ * state may not observe it like a UI edit. Keep that risk explicit until a
+ * standard SysML v2 write endpoint covers this operation.
  *
  * @module lib/syson/tools/value
  */
@@ -24,7 +28,10 @@ import { readAttributeValue } from "../constraints/resolver.ts";
  * @returns false when the AST manipulation does not apply — the caller then
  *          reports the limitation instead of pretending the sign changed
  */
-async function tryRemoveNegation(ecId: string, attributeId: string): Promise<boolean> {
+async function tryRemoveNegation(
+  ecId: string,
+  attributeId: string,
+): Promise<boolean> {
   const opResult = await evalAql(
     ecId,
     "aql:self.eAllContents()->select(e | e.oclIsKindOf(sysml::OperatorExpression))->first()",
@@ -45,11 +52,15 @@ async function tryRemoveNegation(ecId: string, attributeId: string): Promise<boo
   if (opMembership.__typename !== "ObjectExpressionResult") return false;
   const opMembershipId = opMembership.objValue.id;
 
-  const litMembership = await evalAql(ecId, "aql:self.eContainer()", [literalId]);
+  const litMembership = await evalAql(ecId, "aql:self.eContainer()", [
+    literalId,
+  ]);
   if (litMembership.__typename !== "ObjectExpressionResult") return false;
   const litMembershipId = litMembership.objValue.id;
 
-  const featureValue = await evalAql(ecId, "aql:self.eContainer()", [opMembershipId]);
+  const featureValue = await evalAql(ecId, "aql:self.eContainer()", [
+    opMembershipId,
+  ]);
   if (featureValue.__typename !== "ObjectExpressionResult") return false;
   const featureValueId = featureValue.objValue.id;
 
@@ -173,7 +184,9 @@ export const valueTools: SysonTool[] = [
       // Write the absolute value onto the literal node
       const isRational = current.literalKind.includes("LiteralRational");
       const valueStr = isRational
-        ? (Number.isInteger(absNewValue) ? `${absNewValue}.0` : absNewValue.toString())
+        ? (Number.isInteger(absNewValue)
+          ? `${absNewValue}.0`
+          : absNewValue.toString())
         : Math.round(absNewValue).toString();
 
       await evalAql(
@@ -214,7 +227,8 @@ export const valueTools: SysonTool[] = [
         verified_value: verifiedValue,
         literal_id: current.literalId,
         literal_kind: current.literalKind,
-        success: verifiedValue !== undefined && Math.abs(verifiedValue - newValue) < 1e-9,
+        success: verifiedValue !== undefined &&
+          Math.abs(verifiedValue - newValue) < 1e-9,
         ...(warning && { warning }),
       };
     },

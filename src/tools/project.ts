@@ -13,10 +13,14 @@ import {
   GET_PROJECT_TEMPLATES,
   LIST_PROJECTS,
 } from "../api/queries.ts";
-import { CREATE_PROJECT, DELETE_PROJECT } from "../api/mutations.ts";
+import { CREATE_PROJECT } from "../api/mutations.ts";
+import {
+  getSysonRestClient,
+  isSysonUuid,
+  type SysonRestClient,
+} from "../api/rest-client.ts";
 import type {
   CreateProjectResult,
-  DeleteProjectResult,
   GetProjectResult,
   GetProjectTemplatesResult,
   ListProjectsResult,
@@ -53,6 +57,23 @@ function unwrapMutation<T extends object>(
   return payload;
 }
 
+function projectDeleteError(
+  code: string,
+  message: string,
+  context: Record<string, unknown>,
+  recovery: string,
+  retryable: boolean,
+  reviewRequired: boolean,
+): Error {
+  return Object.assign(new Error(message), {
+    code,
+    context,
+    recovery,
+    retryable,
+    reviewRequired,
+  });
+}
+
 export const projectTools: SysonTool[] = [
   {
     name: "syson_project_list",
@@ -78,6 +99,10 @@ export const projectTools: SysonTool[] = [
       },
     },
     handler: async ({ filter, first, after }) => {
+      // GET /api/rest/projects was live-probed, but it returns an unpaginated
+      // array without GraphQL's natures, filter, or opaque cursor contract.
+      // Recreating those client-side would change pagination semantics and lose
+      // information, so REST is not at least as expressive for this tool.
       const client = getSysonClient();
       const data = await client.query<ListProjectsResult>(LIST_PROJECTS, {
         first: (first as number) ?? 20,
@@ -210,7 +235,8 @@ export const projectTools: SysonTool[] = [
   {
     name: "syson_project_delete",
     description:
-      "Permanently delete a project and all its contents. Irreversible.",
+      "Permanently delete a project and all its contents via the SysML v2 REST API. " +
+      "Irreversible. Returns only after a GET confirms the project is absent.",
     category: "project",
     inputSchema: {
       type: "object",
@@ -223,18 +249,162 @@ export const projectTools: SysonTool[] = [
       required: ["project_id"],
     },
     handler: async ({ project_id }) => {
-      const client = getSysonClient();
-      const mutationId = crypto.randomUUID();
+      /**
+       * Why REST and not deleteProject (GraphQL):
+       * the GraphQL mutation only acknowledges a Sirius Web UI operation. The
+       * standard REST DELETE is stateless and can be followed by GET /projects/{id}.
+       * A DELETE status is not proof of deletion: SysON has acknowledged unknown
+       * UUIDs too (and versions differ between 200 and 204 for acknowledged
+       * requests). We therefore never return success until the postcondition GET
+       * returns 404.
+       */
+      const projectId = project_id as string;
+      if (!isSysonUuid(projectId)) {
+        throw projectDeleteError(
+          "SYSON_PROJECT_DELETE_PRECONDITION_FAILED",
+          "[syson_project_delete] project_id must be a non-empty UUID",
+          { projectId },
+          "Pass a valid project UUID from syson_project_list.",
+          false,
+          false,
+        );
+      }
 
-      const data = await client.mutate<DeleteProjectResult>(DELETE_PROJECT, {
-        input: {
-          id: mutationId,
-          projectId: project_id as string,
+      let restClient: SysonRestClient;
+      try {
+        restClient = getSysonRestClient();
+      } catch (error) {
+        throw projectDeleteError(
+          "SYSON_PROJECT_DELETE_PRECONDITION_FAILED",
+          `[syson_project_delete] client configuration failed: ${
+            (error as Error).message
+          }`,
+          { projectId },
+          "Configure SYSON_URL and retry; no delete was dispatched.",
+          false,
+          false,
+        );
+      }
+      const projectPath = `/api/rest/projects/${projectId}`;
+
+      // Prove that the target exists before starting an irreversible request.
+      let preCheck: Response;
+      try {
+        preCheck = await restClient.get(projectPath);
+      } catch (error) {
+        throw projectDeleteError(
+          "SYSON_PROJECT_DELETE_PRECONDITION_FAILED",
+          `[syson_project_delete] pre-deletion check failed: ${
+            (error as Error).message
+          }`,
+          { projectId },
+          "Restore SysON connectivity and retry; no delete was dispatched.",
+          true,
+          false,
+        );
+      }
+      await preCheck.body?.cancel().catch(() => undefined);
+
+      if (preCheck.status === 404) {
+        throw projectDeleteError(
+          "SYSON_PROJECT_DELETE_PRECONDITION_FAILED",
+          `[syson_project_delete] project ${projectId} was not found`,
+          { projectId },
+          "Confirm project_id with syson_project_list before retrying.",
+          false,
+          false,
+        );
+      }
+
+      if (preCheck.status !== 200) {
+        throw projectDeleteError(
+          "SYSON_PROJECT_DELETE_PRECONDITION_FAILED",
+          `[syson_project_delete] unexpected pre-check status ${preCheck.status}`,
+          { projectId, httpStatus: preCheck.status },
+          "Inspect SysON health and retry only after the project can be read.",
+          preCheck.status >= 500,
+          false,
+        );
+      }
+
+      // From the moment fetch starts, a network failure cannot prove the
+      // server did not receive DELETE. Never automatically retry this path.
+      let deleteResponse: Response;
+      try {
+        deleteResponse = await restClient.delete(projectPath);
+      } catch (error) {
+        throw projectDeleteError(
+          "SYSON_PROJECT_DELETE_OUTCOME_UNKNOWN",
+          `[syson_project_delete] network failure during delete dispatch — outcome unknown, do NOT retry: ${
+            (error as Error).message
+          }`,
+          { projectId },
+          "Manually check whether the project still exists before deciding on any retry.",
+          false,
+          true,
+        );
+      }
+
+      const acknowledgementBody = await deleteResponse.text().catch(() => "");
+      if (!deleteResponse.ok) {
+        throw projectDeleteError(
+          "SYSON_PROJECT_DELETE_OUTCOME_UNKNOWN",
+          `[syson_project_delete] delete request returned HTTP ${deleteResponse.status} — outcome unknown, do NOT retry`,
+          {
+            projectId,
+            httpStatus: deleteResponse.status,
+            responseSnippet: acknowledgementBody.slice(0, 200),
+          },
+          "Manually check whether the project still exists before deciding on any retry.",
+          false,
+          true,
+        );
+      }
+
+      let verifyResponse: Response;
+      try {
+        verifyResponse = await restClient.get(projectPath);
+      } catch (error) {
+        throw projectDeleteError(
+          "SYSON_PROJECT_DELETE_ACKNOWLEDGED_UNVERIFIED",
+          `[syson_project_delete] delete acknowledged but verification GET failed — do NOT retry: ${
+            (error as Error).message
+          }`,
+          { projectId, httpStatus: deleteResponse.status },
+          "Manually verify that the project is absent before proceeding.",
+          false,
+          true,
+        );
+      }
+      await verifyResponse.body?.cancel().catch(() => undefined);
+
+      if (verifyResponse.status === 404) {
+        return { deleted: true, projectId };
+      }
+
+      if (verifyResponse.status === 200) {
+        throw projectDeleteError(
+          "SYSON_PROJECT_DELETE_POSTCONDITION_FAILED",
+          `[syson_project_delete] project ${projectId} is still present after delete was acknowledged — do NOT retry`,
+          { projectId, httpStatus: deleteResponse.status },
+          "Inspect SysON state manually; do not retry without human review.",
+          false,
+          true,
+        );
+      }
+
+      throw projectDeleteError(
+        "SYSON_PROJECT_DELETE_ACKNOWLEDGED_UNVERIFIED",
+        `[syson_project_delete] delete acknowledged but verification returned unexpected HTTP ${verifyResponse.status} — do NOT retry`,
+        {
+          projectId,
+          httpStatus: verifyResponse.status,
+          deleteHttpStatus: deleteResponse.status,
         },
-      });
-
-      unwrapMutation(data, "deleteProject");
-      return { deleted: true, projectId: project_id };
+        "Manually verify that the project is absent before proceeding.",
+        false,
+        true,
+      );
     },
   },
 

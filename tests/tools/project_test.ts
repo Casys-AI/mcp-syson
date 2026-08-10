@@ -4,8 +4,15 @@
  * Uses mock GraphQL client to test without a real SysON instance.
  */
 
-import { assertEquals, assertRejects } from "jsr:@std/assert";
-import { setSysonClient, SysonGraphQLClient } from "../../src/api/graphql-client.ts";
+import { assertEquals } from "@std/assert";
+import {
+  setSysonClient,
+  SysonGraphQLClient,
+} from "../../src/api/graphql-client.ts";
+import {
+  setSysonRestClient,
+  SysonRestClient,
+} from "../../src/api/rest-client.ts";
 import { projectTools } from "../../src/tools/project.ts";
 
 /** Get a tool handler by name */
@@ -39,12 +46,40 @@ function mockFetch(responses: Record<string, unknown>[]) {
   };
 }
 
+/** Setup a REST-only response sequence for irreversible project deletion. */
+function mockRestFetch(statuses: number[]): () => void {
+  let callIndex = 0;
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = () => {
+    const status = statuses[callIndex] ?? statuses[statuses.length - 1];
+    callIndex++;
+    return Promise.resolve(
+      new Response(status === 204 ? null : "", { status }),
+    );
+  };
+
+  setSysonRestClient(new SysonRestClient({ baseUrl: "http://mock:8080" }));
+  return () => {
+    globalThis.fetch = originalFetch;
+  };
+}
+
+const PROJECT_ID = "11111111-2222-4333-8444-555555555555";
+
 Deno.test("syson_project_list - returns projects", async () => {
   const restore = mockFetch([{
     viewer: {
       projects: {
         edges: [
-          { node: { id: "p1", name: "Satellite-v2", natures: [{ name: "sysml" }] }, cursor: "c1" },
+          {
+            node: {
+              id: "p1",
+              name: "Satellite-v2",
+              natures: [{ name: "sysml" }],
+            },
+            cursor: "c1",
+          },
           { node: { id: "p2", name: "Engine-v1", natures: [] }, cursor: "c2" },
         ],
         pageInfo: { count: 2, hasNextPage: false },
@@ -53,7 +88,10 @@ Deno.test("syson_project_list - returns projects", async () => {
   }]);
 
   try {
-    const result = await getHandler("syson_project_list")({}) as Record<string, unknown>;
+    const result = await getHandler("syson_project_list")({}) as Record<
+      string,
+      unknown
+    >;
     const projects = result.projects as Array<Record<string, unknown>>;
     assertEquals(projects.length, 2);
     assertEquals(projects[0].id, "p1");
@@ -87,33 +125,43 @@ Deno.test("syson_project_get - returns project with editingContextId", async () 
   }
 });
 
-Deno.test("syson_project_delete - returns success", async () => {
-  const restore = mockFetch([{
-    deleteProject: { __typename: "SuccessPayload", id: "m1" },
-  }]);
+Deno.test("syson_project_delete - returns only after GET confirms absence", async () => {
+  // pre-check GET exists, DELETE is acknowledged, postcondition GET is 404.
+  const restore = mockRestFetch([200, 200, 404]);
 
   try {
     const result = await getHandler("syson_project_delete")({
-      project_id: "p1",
+      project_id: PROJECT_ID,
     }) as Record<string, unknown>;
     assertEquals(result.deleted, true);
-    assertEquals(result.projectId, "p1");
+    assertEquals(result.projectId, PROJECT_ID);
   } finally {
     restore();
   }
 });
 
-Deno.test("syson_project_delete - throws on error payload", async () => {
-  const restore = mockFetch([{
-    deleteProject: { __typename: "ErrorPayload", id: "m1", message: "Project not found" },
-  }]);
+Deno.test("syson_project_delete - an acknowledgement alone is not success", async () => {
+  // SysON variants acknowledge DELETE with 200 or 204. Either is insufficient
+  // when the following GET still finds the project.
+  const restore = mockRestFetch([200, 204, 200]);
 
   try {
-    await assertRejects(
-      async () => await getHandler("syson_project_delete")({ project_id: "p1" }),
-      Error,
-      "deleteProject failed: Project not found",
-    );
+    let caught:
+      | { code?: string; retryable?: boolean; reviewRequired?: boolean }
+      | undefined;
+    try {
+      await getHandler("syson_project_delete")({ project_id: PROJECT_ID });
+    } catch (error) {
+      caught = error as {
+        code?: string;
+        retryable?: boolean;
+        reviewRequired?: boolean;
+      };
+    }
+
+    assertEquals(caught?.code, "SYSON_PROJECT_DELETE_POSTCONDITION_FAILED");
+    assertEquals(caught?.retryable, false);
+    assertEquals(caught?.reviewRequired, true);
   } finally {
     restore();
   }
@@ -130,7 +178,10 @@ Deno.test("syson_project_templates - returns templates", async () => {
   }]);
 
   try {
-    const result = await getHandler("syson_project_templates")({}) as Record<string, unknown>;
+    const result = await getHandler("syson_project_templates")({}) as Record<
+      string,
+      unknown
+    >;
     const templates = result.templates as Array<Record<string, unknown>>;
     assertEquals(templates.length, 2);
     assertEquals(templates[0].label, "SysON Project");
