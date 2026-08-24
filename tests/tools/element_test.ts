@@ -227,11 +227,37 @@ Deno.test("syson_element_insert_sysml - returns exact mutation evidence", async 
       inserted: true,
       parentId: "part-1",
       text: "attribute mass : Real = 2.86;",
+      acknowledged: true,
+      semanticCompleteness: "unverified",
     });
   } finally {
     restore();
   }
 });
+
+Deno.test(
+  "syson_element_insert_sysml - rejects unexpected payload typename instead of acknowledging",
+  async () => {
+    const restore = mockFetch([{
+      insertTextualSysMLv2: { __typename: "UnexpectedPayload", id: "m1" },
+    }]);
+
+    try {
+      await assertRejects(
+        async () =>
+          await getHandler("syson_element_insert_sysml")({
+            editing_context_id: "ec-1",
+            parent_id: "part-1",
+            sysml_text: "part heater;",
+          }),
+        Error,
+        "expected SuccessPayload, got UnexpectedPayload",
+      );
+    } finally {
+      restore();
+    }
+  },
+);
 
 Deno.test("elementTools - has correct tool count and categories", () => {
   assertEquals(elementTools.length, 6);

@@ -1,61 +1,95 @@
 # @casys/mcp-syson
 
-MCP server for [SysON](https://mbse-syson.org) — SysML v2 model-based systems
-engineering (MBSE) — **31 tools** across **7 categories**, with **six
-tool-backed, composable MCP App viewers**.
+[![Publish](https://github.com/Casys-AI/mcp-syson/actions/workflows/publish.yml/badge.svg)](https://github.com/Casys-AI/mcp-syson/actions/workflows/publish.yml)
+[![JSR](https://jsr.io/badges/@casys/mcp-syson)](https://jsr.io/@casys/mcp-syson)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Every tool is a primitive: it reads or writes the model and reports exactly what
-is there. None calls a language model, so the same model always yields the same
-answer. Aggregation, judgement and orchestration stay with the calling agent —
-`syson_query_aql` gives it the full power of AQL to compose whatever it needs.
+A [Model Context Protocol](https://modelcontextprotocol.io) server for
+[SysON](https://mbse-syson.org) and SysML v2 model-based systems engineering. It
+exposes focused modelling, query, diagram, constraint and value operations, with
+optional MCP App viewers for compatible hosts.
 
-Connect any MCP-compatible AI agent (Claude Desktop, PML, custom) to a SysON
-instance via the standard
-[Model Context Protocol](https://modelcontextprotocol.io). Agents can browse and
-edit SysML v2 models, run AQL queries, trace requirements, and drive diagrams.
+Use it to:
 
-## Requirements — SysON is self-hosted
+- create SysON projects, documents, packages and SysML v2 structures;
+- browse model elements, search, run AQL and trace requirement coverage;
+- derive part structures without inventing price or material data;
+- create and render diagrams;
+- extract, evaluate and solve constraints, including unit-aware what-if values;
+- update model values and perform fail-closed project or element deletion.
 
-Unlike SaaS-backed MCP servers, SysON is an
-[Eclipse](https://github.com/eclipse-syson/syson) web application you run
-yourself. There is no hosted endpoint and no API key. A `docker-compose.yml` is
-included so you can be running in one command:
+No tool calls a language model. The server exposes provider operations and
+structured results; interpretation, approval and orchestration stay with the
+calling client.
+
+## Quick start
+
+You need Deno 2.x and either an existing SysON instance or Docker Compose. `z3`
+is optional and only required by `syson_constraint_solve`. Node.js is only
+needed when rebuilding viewer bundles from source.
+
+### 1. Start SysON locally
+
+[SysON](https://github.com/eclipse-syson/syson) is an Eclipse application that
+you run yourself. The included development stack starts SysON and PostgreSQL:
 
 ```bash
 docker compose up -d
 ```
 
-That brings up SysON on **http://localhost:8180** with a PostgreSQL database on
-a named volume. Open the UI in a browser to confirm, then point the MCP server
-at it:
+SysON is then available at <http://localhost:8180>. Its PostgreSQL data lives in
+the named `syson-db-data` volume, so `docker compose down` preserves models;
+`docker compose down -v` deletes that volume and its models. On Apple Silicon,
+the compose file runs SysON's amd64 image under emulation, so the first healthy
+start can take several minutes.
+
+Point the MCP server at that base URL:
 
 ```bash
 export SYSON_URL=http://localhost:8180
 ```
 
-The server talks to `$SYSON_URL/api/graphql`. There is **no default URL** — if
-`SYSON_URL` is unset the server fails immediately with a configuration error,
-rather than guessing a port and reporting a misleading connection refused.
+The server uses both `$SYSON_URL/api/graphql` and the SysML v2 REST surface
+under `$SYSON_URL/api/rest`. There is **no default URL**: an unset `SYSON_URL`
+is a configuration error rather than a guessed port.
 
 > To pin a different SysON build, set `SYSON_IMAGE` (default
 > `eclipsesyson/syson:v2026.7.0`).
 
-## Quick Start
+### 2. Start the MCP server
 
-### Stateless HTTP
+This checkout's package metadata (`deno.json` and MCP `server/discover`) is
+prepared for **0.7.0**. That is local/manifest metadata only: JSR still lists
+**0.6.0** as latest, **0.7.0 is not published**, and this repository does not
+ship a 0.7.0 tag, image, or GitHub release.
+
+From a checkout:
 
 ```bash
-SYSON_URL=http://localhost:8180 deno task serve      # port 3009
-SYSON_URL=http://localhost:8180 \
-  deno run --allow-all server.ts --port=3009 --hostname=127.0.0.1
+deno task serve
 ```
 
-Connect MCP clients to `http://127.0.0.1:3009/mcp` using the 2026-07-28
-stateless HTTP protocol. There is no stdio, session, SSE, or `--http`
-compatibility mode. `--port` and `--hostname` accept either `--name=value` or
-`--name value` forms; the default hostname is loopback-only.
+The working published JSR command remains pinned to the actually published
+**0.6.0**. Do not treat the 0.7.0 manifest version as registry availability:
 
-### Category filtering
+```bash
+deno run -A jsr:@casys/mcp-syson@0.6.0/server --port=3009 --hostname=127.0.0.1
+```
+
+The endpoint is `http://127.0.0.1:3009/mcp`. Configure that URL in an MCP client
+that supports the stateless HTTP 2026-07-28 transport.
+
+This package does **not** expose stdio, session, SSE or a legacy `--http` mode.
+A stdio-only host therefore needs an external HTTP-to-stdio bridge; launching
+`server.ts` as a stdio server will not work. `--port` and `--hostname` accept
+both `--name=value` and `--name value` forms.
+
+The default bind is loopback-only and the MCP endpoint has no built-in
+authentication. Do not bind it to a public interface without a trusted reverse
+proxy or equivalent network controls. Please report suspected vulnerabilities
+according to [SECURITY.md](SECURITY.md).
+
+### 3. Select only the tools you need
 
 Load only the categories you need — useful to keep an agent's tool list small:
 
@@ -63,47 +97,136 @@ Load only the categories you need — useful to keep an agent's tool list small:
 deno run --allow-all server.ts --categories=project,element,query
 ```
 
-## Tools (31)
+Valid categories are `project`, `model`, `element`, `query`, `diagram`,
+`constraint` and `value`.
 
-Every tool needs an `editing_context_id`, obtained from `syson_project_get`.
-Start with `syson_project_list`.
+### 4. Follow the identifier flow
 
-### Project (5)
+For an existing project, start with `syson_project_list`, then pass its project
+ID to `syson_project_get`. The latter returns the distinct `editingContextId`
+used by most model and diagram tools. Do not continue with model writes if that
+value is `null`.
 
-| Tool                      | Description                                                                |
-| ------------------------- | -------------------------------------------------------------------------- |
-| `syson_project_list`      | List all SysML projects — start here to find a project ID                  |
-| `syson_project_get`       | Get a project by ID; returns the `editingContextId` every other tool needs |
-| `syson_project_create`    | Create a project, auto-selecting the SysML template                        |
-| `syson_project_delete`    | Permanently delete a project and its contents (irreversible)               |
-| `syson_project_templates` | List available project templates                                           |
+For a new model, the shortest useful workflow is:
 
-### Model (4)
+```text
+syson_project_create
+  -> acknowledged project id/name; editingContextId only when a follow-up GET
+     confirms currentEditingContext.id (never the project id)
+syson_project_get
+  -> confirmed, non-null editingContextId
+syson_model_create
+  -> documentId + rootPackageId (nullable; verify it before using it)
+syson_element_insert_sysml
+  -> provider acknowledgement (semantic completeness unverified)
+syson_element_children / syson_element_get / syson_query_aql
+  -> read-back of the created model
+```
 
-| Tool                      | Description                                               |
-| ------------------------- | --------------------------------------------------------- |
-| `syson_model_create`      | Create a SysML document in a project, with a root Package |
-| `syson_model_stereotypes` | List document stereotypes (e.g. SysML v2)                 |
-| `syson_model_child_types` | List creatable child types under a container              |
-| `syson_model_domains`     | List metamodel domains (e.g. `sysml`)                     |
+`syson_project_create` preserves the created project identity even when the
+editing context is missing or the post-create GET fails. In those cases
+`editingContextId` is `null` and `editingContextWarning` tells callers to call
+`syson_project_get` before model writes. Do not treat a project id as an
+editing context.
 
-### Element (6)
+`syson_model_create` keeps SysON's generated root label unless the caller
+supplies `root_package_name`. That explicit name is applied and read back after
+creation. If the rename cannot be confirmed, the created package is preserved
+and the result includes `rootPackageRenameWarning` with its last confirmed
+`rootPackageLabel`; use `syson_element_rename` for recovery.
 
-| Tool                         | Description                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------ |
-| `syson_element_insert_sysml` | Insert SysML v2 textual notation — best way to build complex structures in one call  |
-| `syson_element_create`       | Create one element under a parent; `child_type` accepts a label like `New PartUsage` |
-| `syson_element_get`          | Get an element's kind, label and type                                                |
-| `syson_element_children`     | List direct children — browse the model tree                                         |
-| `syson_element_rename`       | Rename an element (AQL `eSet` on `declaredName`)                                     |
-| `syson_element_delete`       | Delete an element and its children (irreversible)                                    |
+Project lookup and deletion use `project_id`; most model-scoped tools use
+`editing_context_id`; REST element deletion returns a separate `commitId`. These
+IDs are not interchangeable. Offline constraint evaluation and solving can
+operate on provided constraints and values without an editing context.
 
-### Query (5)
+## Safety and evidence
+
+Treat the server as write-capable even when only the `query` category is loaded:
+its AQL operations execute caller-supplied expressions, and AQL can mutate the
+model with operations such as `eSet`.
+
+| Surface              | Tools and behaviour                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Read-oriented        | Project/model metadata, element reads, search and trace, part structure, diagram list/snapshot, constraint extract/evaluate/validate/solve, and `syson_value_read` |
+| Write                | Project/model/element creation, textual SysML insertion, rename, diagram create/drop/arrange, and `syson_value_set`                                                |
+| Expression-dependent | `syson_query_aql` and `syson_query_eval` are reads only when the supplied AQL is read-only                                                                         |
+| Irreversible         | `syson_element_delete` and `syson_project_delete`; the server does not implement a human-approval UI, so callers must gate them before dispatch                    |
+
+A successful provider response does not mean the same thing for every write:
+
+- `syson_element_insert_sysml` returns `inserted: true` with `acknowledged: true`
+  and `semanticCompleteness: "unverified"`. That is what a GraphQL
+  `SuccessPayload` proves: SysON accepted the textual insertion request.
+  Re-read critical content; an invalid clause can be omitted even though the
+  request was accepted.
+- `syson_element_create` can create the element and then return a
+  `renameWarning` if its optional follow-up rename fails.
+- `syson_element_rename` and other direct AQL writes bypass the normal Sirius
+  Web editor command/event path. Editor-side listeners and undo state may not
+  observe them like a UI edit.
+- `syson_value_set` reads the numeric value back and reports `success`; inspect
+  `warning` too, because a requested sign change may not be applicable even when
+  the absolute literal was updated.
+
+The delete tools are stricter. They verify target existence before dispatch and
+return `deleted: true` only after a REST GET proves absence with HTTP 404.
+Element deletion verifies against the exact commit `@id` returned by SysON,
+never a guessed project or commit identity.
+
+| Delete state                | Meaning                                                                 | Caller action                                                                            |
+| --------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `*_PRECONDITION_FAILED`     | Failure occurred before irreversible dispatch                           | Correct the input or connectivity, then retry only when the reported recovery permits it |
+| `*_OUTCOME_UNKNOWN`         | The request may have reached SysON                                      | Do not retry; inspect the target manually                                                |
+| `*_ACKNOWLEDGED_UNVERIFIED` | SysON acknowledged the write, but read-back could not prove its outcome | Do not retry; verify manually                                                            |
+| `*_POSTCONDITION_FAILED`    | The target remained visible after acknowledgement                       | Require review before any further mutation                                               |
+
+Element errors use the `SYSON_DELETE_*` prefix; project errors use
+`SYSON_PROJECT_DELETE_*`. Typed errors also carry `context`, `recovery`,
+`retryable` and `reviewRequired` fields.
+
+## Tool reference
+
+Start with `syson_project_list` for an existing project. Most model-scoped tools
+then need the `editing_context_id` returned by `syson_project_get`;
+project-level and offline constraint tools have different inputs.
+
+### Project
+
+| Tool                      | Description                                                            |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `syson_project_list`      | List SysML projects page by page — start here to find a project ID     |
+| `syson_project_get`       | Get a project by ID; returns the model-scoped `editingContextId`       |
+| `syson_project_create`    | Create a project; confirmed `editingContextId`, or `null` with a warning |
+| `syson_project_delete`    | Permanently delete a project; succeeds only after a confirming GET 404 |
+| `syson_project_templates` | List available project templates                                       |
+
+### Model
+
+| Tool                      | Description                                            |
+| ------------------------- | ------------------------------------------------------ |
+| `syson_model_create`      | Create a SysML document, with an optional root Package |
+| `syson_model_stereotypes` | List document stereotypes (e.g. SysML v2)              |
+| `syson_model_child_types` | List creatable child types under a container           |
+| `syson_model_domains`     | List metamodel domains (e.g. `sysml`)                  |
+
+### Element
+
+| Tool                         | Description                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------- |
+| `syson_element_insert_sysml` | Insert SysML v2 text; acknowledgement only, semantic completeness unverified |
+| `syson_element_create`       | Create one element; `child_type` must be an exact returned ID or exact label        |
+| `syson_element_get`          | Get an element's Sirius ID, kind, label and icon URLs                               |
+| `syson_element_children`     | List direct children — browse the model tree                                        |
+| `syson_element_rename`       | Rename an element (AQL `eSet` on `declaredName`)                                    |
+| `syson_element_delete`       | Delete an element through a REST commit and verify absence (irreversible)           |
+
+### Query
 
 | Tool                             | Description                                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `syson_query_aql`                | Run an AQL expression against an element — the most powerful query tool                                |
-| `syson_query_eval`               | Evaluate an AQL expression across several elements at once                                             |
+| `syson_query_aql`                | Run AQL against one element; expressions can read or mutate the model                                  |
+| `syson_query_eval`               | Run AQL across several elements; expressions can read or mutate the model                              |
 | `syson_search`                   | Full-text search over element names and content; supports regex                                        |
 | `syson_query_requirements_trace` | Trace requirements to satisfying elements, with coverage metrics                                       |
 | `syson_part_structure`           | Derive the product breakdown structure (parts, hierarchy, quantities, numeric attributes) from a model |
@@ -120,7 +243,7 @@ into a costed BOM using ERPNext's generic document operations. This replaces the
 retired `plm_bom_generate`, which derived cost from name-matched materials and
 hardcoded default masses.
 
-### Diagram (5)
+### Diagram
 
 | Tool                     | Description                                                                |
 | ------------------------ | -------------------------------------------------------------------------- |
@@ -130,7 +253,7 @@ hardcoded default masses.
 | `syson_diagram_arrange`  | Auto-layout all elements on a diagram                                      |
 | `syson_diagram_snapshot` | Capture a diagram for rendering                                            |
 
-### Constraint (4)
+### Constraint
 
 Constraint checking is delegated to
 [`@casys/constraint-solver`](https://jsr.io/@casys/constraint-solver): units are
@@ -154,44 +277,61 @@ A constraint whose literal carries a unit then reports an `error` rather than
 silently comparing bare numbers; pass explicit `values` overrides with units
 when needed.
 
-### Value (2)
+### Value
 
-| Tool               | Description                                                                 |
-| ------------------ | --------------------------------------------------------------------------- |
-| `syson_value_read` | Read a numeric attribute value (handles negated literals)                   |
-| `syson_value_set`  | Write a numeric attribute value via AQL `eSet`, with read-back verification |
+| Tool               | Description                                                                    |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `syson_value_read` | Read a numeric attribute value (handles negated literals)                      |
+| `syson_value_set`  | Write a numeric literal via AQL `eSet`; reports read-back success and warnings |
 
-### Why there are no analysis or agent tools
+## Design scope
 
-Two families of tools were deliberately left out.
+This package is a provider-facing modelling surface, not an embedded agent. The
+calling client authors or selects SysML, while the tools execute explicit SysON,
+AQL and solver operations. Targeted derived results such as requirement
+coverage, part structure and constraint reports are included where their inputs
+and fallbacks are explicit.
 
-**LLM-backed tools.** Earlier drafts exposed `syson_agent_*` tools running
-agentic loops via MCP sampling. The caller is already a language model, so
-asking the host to run _another_ model added indirection without adding
-information. Sampling was also
-[deprecated in MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog),
-and its replacement
-([Multi Round-Trip Requests](https://blog.modelcontextprotocol.io/posts/2026-07-28/),
-SEP-2322) surfaces every round-trip to the client — removing the only real
-benefit, which was saving client context. Generating SysML is the caller's job;
-`syson_element_insert_sysml` writes it.
+### Casys Digital Thread boundary
 
-**Convenience aggregators.** A `syson_model_overview` was prototyped and
-dropped: it needed three AQL round-trips to produce what
-`syson_query_aql("aql:self.eAllContents()")` returns in one, and its "unnamed
-element" detection inferred intent from SysON's label fallback rather than
-reading the model. An agent composing AQL itself gets more, more cheaply, and
-without a heuristic that would silently break if SysON changed how it labels
-unnamed elements.
+This repository does not implement Digital Thread approvals, operation
+registration or Thread document seals. In the Casys Digital Thread:
 
-If a real need for context reduction on very large models shows up, the fix is
-one targeted tool backed by a measurement — not a speculative aggregation layer.
+- `model.write-architecture@1` is the renderer path: the server owns the
+  provider envelope, renders SysML and writes the resulting model to SysON;
+- `model.seal-architecture-sysml@1` is provider-free: it seals agent-authored
+  closed-subset SysML as a Thread document and **never calls SysON**.
+
+A direct `syson_element_insert_sysml` call is a SysON provider mutation. It is
+neither a Thread seal nor proof that a registered Digital Thread operation was
+approved or executed.
+
+## Data authority and provenance
+
+SysON and its PostgreSQL database remain authoritative for model state. This MCP
+server does not keep a second model store. Tool results are projections or write
+evidence from the configured provider at call time:
+
+- GraphQL project, editing-context, element and representation IDs preserve
+  Sirius Web's identifiers;
+- REST delete verification preserves the acknowledged commit `@id` returned by
+  SysON;
+- diagram SVG, trace tables, constraint reports and part structures are derived
+  views, not replacements for the underlying SysML model;
+- `inserted: true`, `dropped: true` or `arranged: true` are provider
+  acknowledgements with the read-back semantics documented above, not signed
+  provenance records. Textual insertion also reports
+  `semanticCompleteness: "unverified"`.
+
+The `ui://mcp-syson/*` resources described below are packaged presentation code.
+They are not SysML documents, model snapshots or audit records.
 
 ## UI Viewers
 
-Several tools return an [MCP App](https://modelcontextprotocol.io) UI resource
-next to their JSON payload, so a UI-capable host renders the result instead of
-printing raw data. The hint is additive — tools stay fully usable without it.
+Viewer-backed tools return an [MCP App](https://modelcontextprotocol.io) UI
+resource next to their JSON payload, so a UI-capable host renders the result
+instead of printing raw data. The hint is additive — tools stay fully usable
+without it.
 
 | Viewer                      | Renders                                    | Backing tools                         |
 | --------------------------- | ------------------------------------------ | ------------------------------------- |
@@ -202,24 +342,17 @@ printing raw data. The hint is additive — tools stay fully usable without it.
 | `value-change-viewer`       | Attribute value changes                    | `syson_value_read`, `syson_value_set` |
 | `model-explorer-viewer`     | Model tree exploration                     | `syson_element_children`              |
 
-Viewers are served as `ui://mcp-syson/<name>`. Each remains a normal standalone
-Preact MCP App and advertises a catalog of small domain components through
-`io.casys.mcp.view-components/v1`. Compatible hosts choose a stack, row, or grid
-in `io.casys.mcp.surface/v1`; other hosts receive the complete standalone
-default surface. Viewer-backed tool calls put concise text in `content` and the
-full UI payload in `structuredContent`, with explicit JSON-text fallback
-compatibility. The non-viewer model-container tools `syson_project_create`,
-`syson_model_create`, and `syson_element_get` likewise declare an `outputSchema`
-and return their native payload in `structuredContent`; this is for strict MCP
-workflows, not an MCP App attachment, and retain their JSON-text fallback for
-content-only clients. Element, requirement, and constraint selections emit named
-Compose events only when the host opens the optional event channel. Exact
-component keys, lifecycle rules, and the shared mcp-view 0.7 dependency are
-documented in [SysON component surfaces](docs/component-surfaces.md).
+Viewers are served as `ui://mcp-syson/<name>`. Hosts without MCP App support
+still receive normal tool results. Viewer-backed calls keep a concise summary in
+`content` and the complete UI payload in `structuredContent`. The non-viewer
+tools `syson_project_create`, `syson_model_create` and `syson_element_get` also
+declare closed output schemas and retain JSON-text fallbacks for content-only
+clients. Component contracts and optional Compose events are documented in
+[SysON component surfaces](docs/component-surfaces.md).
 
 The build generates a TypeScript bundle that is statically imported by the
 server, so a JSR/Deno consumer fetches the viewer HTML with its module graph;
-all six bundles are registered as MCP resources. Build them before local
+the viewer bundles are registered as MCP resources. Build them before local
 development or test runs:
 
 ```bash
@@ -237,6 +370,24 @@ built viewers without a Node toolchain.
 | `SYSON_URL`   | **yes**  | Base URL of the SysON instance, e.g. `http://localhost:8180`. No default — an unset value is a hard error. |
 | `SYSON_IMAGE` | no       | SysON Docker image for `docker-compose.yml` (default `eclipsesyson/syson:v2026.7.0`)                       |
 
+## SysON API boundaries
+
+The two provider APIs are complementary; this server does not force every tool
+through one transport.
+
+| Provider surface   | Current use                                                                                   | Why                                                                                     |
+| ------------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Sirius Web GraphQL | Project discovery/creation, model and diagram operations, search, AQL, constraints and values | It exposes the editing-context, representation and UI-object contracts those tools need |
+| OMG SysML v2 REST  | Permanent element and project deletion                                                        | It is stateless and supports an independently verifiable GET postcondition              |
+
+`syson_project_list` deliberately remains GraphQL because the observed REST list
+lacks equivalent filtering, pagination cursors and project natures.
+`syson_element_get` also remains GraphQL because the REST representation does
+not preserve the Sirius object ID, UI kind or icon URLs required by downstream
+tools. Conversely, the former GraphQL tree deletion depended on a live
+WebSocket-backed representation and did not work headlessly, so deletion now
+uses REST.
+
 ## Architecture
 
 ```
@@ -247,6 +398,7 @@ docker-compose.yml     # SysON + PostgreSQL for local use
 src/
   api/
     graphql-client.ts  # Zero-dependency GraphQL client over fetch()
+    rest-client.ts     # SysML v2 REST client + editing-context resolution
     queries.ts         # GraphQL queries
     mutations.ts       # GraphQL mutations
     types.ts           # Payload types
@@ -255,13 +407,13 @@ src/
     resolver.ts        # Feature reference -> model value resolution
   tools/
     aql.ts             # Shared AQL evaluation + traversal helpers
-    project.ts         # 5 project tools
-    model.ts           # 4 model/document tools
-    element.ts         # 6 element tools
-    query.ts           # 5 AQL / search / trace / part-structure tools
-    diagram.ts         # 5 diagram tools
-    constraint.ts      # 4 constraint tools (extract/evaluate/validate/solve)
-    value.ts           # 2 value tools
+    project.ts         # Project tools
+    model.ts           # Model/document tools
+    element.ts         # Element tools
+    query.ts           # AQL / search / trace / part-structure tools
+    diagram.ts         # Diagram tools
+    constraint.ts      # Constraint extract/evaluate/validate/solve tools
+    value.ts           # Numeric value tools
     mod.ts             # Registry
     types.ts           # Tool interface
   client.ts            # SysonToolsClient
@@ -270,16 +422,18 @@ src/
     requirements-trace-viewer/
     diagram-viewer/
     model-explorer-viewer/
+    validation-viewer/
+    value-change-viewer/
     shared/            # Shared theme + helpers
 tests/
   api/                 # GraphQL client contract tests
   tools/               # Per-category tool tests
 ```
 
-Most write operations go through the generic `evaluateExpression` AQL mutation
-rather than specialised Sirius mutations — for example rename uses `eSet` on
-`declaredName`, because `renameTreeItem` requires a `representationId` the tools
-do not have.
+Most non-delete model writes go through Sirius GraphQL. Direct property changes
+use the generic `evaluateExpression` AQL mutation; for example, rename uses
+`eSet` on `declaredName` because `renameTreeItem` requires a live
+`representationId`. Destructive tools use the REST path described above.
 
 ## Development
 
@@ -289,11 +443,13 @@ deno task check
 deno task lint
 deno task fmt
 
-# Run tests (76 tests, no SysON instance needed — GraphQL is mocked)
+# Run mocked GraphQL/REST contract and server tests (no SysON instance needed)
 deno task test
 
-# Build UI viewers
+# Type-check, build and verify UI viewers
+deno task ui:check
 deno task ui:build
+deno task ui:verify
 
 # Start HTTP server against a local SysON
 docker compose up -d

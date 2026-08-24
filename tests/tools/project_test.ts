@@ -4,7 +4,7 @@
  * Uses mock GraphQL client to test without a real SysON instance.
  */
 
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import {
   setSysonClient,
   SysonGraphQLClient,
@@ -166,6 +166,147 @@ Deno.test("syson_project_delete - an acknowledgement alone is not success", asyn
     restore();
   }
 });
+
+Deno.test(
+  "syson_project_create returns confirmed editingContextId without substituting project id",
+  async () => {
+    const restore = mockFetch([
+      {
+        createProject: {
+          __typename: "CreateProjectSuccessPayload",
+          id: "m1",
+          project: { id: "p-new", name: "Sat-v1" },
+        },
+      },
+      {
+        viewer: {
+          project: {
+            id: "p-new",
+            name: "Sat-v1",
+            natures: [],
+            currentEditingContext: { id: "ec-new" },
+          },
+        },
+      },
+    ]);
+
+    try {
+      const result = await getHandler("syson_project_create")({
+        name: "Sat-v1",
+        template_id: "t1",
+      });
+      assertEquals(result, {
+        id: "p-new",
+        name: "Sat-v1",
+        editingContextId: "ec-new",
+      });
+    } finally {
+      restore();
+    }
+  },
+);
+
+Deno.test(
+  "syson_project_create returns null editingContextId when GET_PROJECT has none",
+  async () => {
+    const restore = mockFetch([
+      {
+        createProject: {
+          __typename: "CreateProjectSuccessPayload",
+          id: "m1",
+          project: { id: "p-new", name: "Sat-v1" },
+        },
+      },
+      {
+        viewer: {
+          project: {
+            id: "p-new",
+            name: "Sat-v1",
+            natures: [],
+            currentEditingContext: null,
+          },
+        },
+      },
+    ]);
+
+    try {
+      const result = await getHandler("syson_project_create")({
+        name: "Sat-v1",
+        template_id: "t1",
+      }) as Record<string, unknown>;
+      assertEquals(result.id, "p-new");
+      assertEquals(result.name, "Sat-v1");
+      assertEquals(result.editingContextId, null);
+      assertEquals(
+        Object.keys(result).sort(),
+        ["editingContextId", "editingContextWarning", "id", "name"],
+      );
+      assertStringIncludes(
+        String(result.editingContextWarning),
+        "editing context was not confirmed",
+      );
+      assertStringIncludes(
+        String(result.editingContextWarning),
+        "syson_project_get",
+      );
+    } finally {
+      restore();
+    }
+  },
+);
+
+Deno.test(
+  "syson_project_create preserves project identity when post-create GET fails",
+  async () => {
+    let callIndex = 0;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = () => {
+      callIndex++;
+      if (callIndex === 1) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                createProject: {
+                  __typename: "CreateProjectSuccessPayload",
+                  id: "m1",
+                  project: { id: "p-new", name: "Sat-v1" },
+                },
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        );
+      }
+      return Promise.resolve(new Response("read-back failed", { status: 500 }));
+    };
+    setSysonClient(new SysonGraphQLClient({ baseUrl: "http://mock:8080" }));
+
+    try {
+      const result = await getHandler("syson_project_create")({
+        name: "Sat-v1",
+        template_id: "t1",
+      }) as Record<string, unknown>;
+      assertEquals(result.id, "p-new");
+      assertEquals(result.name, "Sat-v1");
+      assertEquals(result.editingContextId, null);
+      assertEquals(
+        Object.keys(result).sort(),
+        ["editingContextId", "editingContextWarning", "id", "name"],
+      );
+      assertEquals(
+        result.editingContextWarning,
+        "Project was created but the editing context was not confirmed; call syson_project_get before model writes.",
+      );
+      assertEquals(
+        String(result.editingContextWarning).includes("read-back failed"),
+        false,
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  },
+);
 
 Deno.test("syson_project_templates - returns templates", async () => {
   const restore = mockFetch([{

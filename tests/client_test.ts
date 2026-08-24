@@ -66,9 +66,14 @@ Deno.test("SysML insertion results expose native structured content", () => {
     inserted: true as const,
     parentId: "part-1",
     text: "attribute mass : Real = 2.86;",
+    acknowledged: true as const,
+    semanticCompleteness: "unverified" as const,
   };
   const result = toElementInsertSysmlResult(payload);
 
-  assertEquals(result.content, "Inserted SysML text under part-1.");
+  assertEquals(
+    result.content,
+    "SysON acknowledged a textual insertion request under part-1; semantic completeness is unverified.",
+  );
   assertStrictEquals(result.structuredContent, payload);
 });

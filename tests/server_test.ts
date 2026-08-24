@@ -171,15 +171,21 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
           },
         });
       }
+      if (query.includes("mutation InsertTextualSysMLv2")) {
+        return Response.json({
+          data: {
+            insertTextualSysMLv2: {
+              __typename: "SuccessPayload",
+              id: "mutation-1",
+            },
+          },
+        });
+      }
       return Response.json({
         data: {
           evaluateExpression: {
             __typename: "EvaluateExpressionSuccessPayload",
             result: { __typename: "VoidExpressionResult" },
-          },
-          insertTextualSysMLv2: {
-            __typename: "SuccessPayload",
-            id: "mutation-1",
           },
         },
       });
@@ -201,6 +207,14 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
     onListen: () => {},
   });
   try {
+    const discovered = await rpc(port, "server/discover", {});
+    const serverInfo = discovered.result.serverInfo as {
+      name?: unknown;
+      version?: unknown;
+    };
+    assertEquals(serverInfo.name, "mcp-syson");
+    assertEquals(serverInfo.version, "0.7.0");
+
     const listed = await rpc(port, "tools/list", {});
     const tools = listed.result.tools as Array<Record<string, unknown>>;
     const insert = tools.find((tool) =>
@@ -214,15 +228,31 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
     };
     assertEquals(insertOutputSchema.type, "object");
     assertEquals(insertOutputSchema.additionalProperties, false);
-    assertEquals(insertOutputSchema.required, ["inserted", "parentId", "text"]);
+    assertEquals(insertOutputSchema.required, [
+      "inserted",
+      "parentId",
+      "text",
+      "acknowledged",
+      "semanticCompleteness",
+    ]);
     assertEquals(Object.keys(insertOutputSchema.properties ?? {}), [
       "inserted",
       "parentId",
       "text",
+      "acknowledged",
+      "semanticCompleteness",
     ]);
     assertEquals(insertOutputSchema.properties?.inserted, {
       type: "boolean",
       const: true,
+    });
+    assertEquals(insertOutputSchema.properties?.acknowledged, {
+      type: "boolean",
+      const: true,
+    });
+    assertEquals(insertOutputSchema.properties?.semanticCompleteness, {
+      type: "string",
+      const: "unverified",
     });
 
     const projectCreate = tools.find((tool) =>
@@ -234,7 +264,8 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
       properties: {
         id: { type: "string" },
         name: { type: "string" },
-        editingContextId: { type: "string" },
+        editingContextId: { type: ["string", "null"] },
+        editingContextWarning: { type: "string" },
       },
       required: ["id", "name", "editingContextId"],
     });
@@ -251,6 +282,7 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
         documentKind: { type: "string" },
         rootPackageId: { type: ["string", "null"] },
         rootPackageLabel: { type: "string" },
+        rootPackageRenameWarning: { type: "string" },
       },
       required: ["documentId", "documentName", "documentKind", "rootPackageId"],
     });
@@ -382,12 +414,15 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
     });
     assertEquals(inserted.result.content, [{
       type: "text",
-      text: "Inserted SysML text under part-1.",
+      text:
+        "SysON acknowledged a textual insertion request under part-1; semantic completeness is unverified.",
     }]);
     assertEquals(inserted.result.structuredContent, {
       inserted: true,
       parentId: "part-1",
       text: "attribute mass : Real = 2.86;",
+      acknowledged: true,
+      semanticCompleteness: "unverified",
     });
 
     const extract = tools.find((tool) =>
@@ -526,7 +561,7 @@ function requiredInput(
 
 async function rpc(
   port: number,
-  method: "tools/list" | "tools/call",
+  method: "tools/list" | "tools/call" | "server/discover",
   params: Record<string, unknown>,
 ): Promise<{ result: Record<string, unknown> }> {
   const name = typeof params.name === "string" ? params.name : undefined;

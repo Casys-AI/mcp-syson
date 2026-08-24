@@ -373,7 +373,7 @@ export const diagramTools: SysonTool[] = [
       properties: {
         editing_context_id: {
           type: "string",
-          description: "SysON project UUID. Obtain via syson_project_list.",
+          description: "Editing context ID from syson_project_get.",
         },
       },
       required: ["editing_context_id"],
@@ -413,7 +413,7 @@ export const diagramTools: SysonTool[] = [
       properties: {
         editing_context_id: {
           type: "string",
-          description: "SysON project UUID. Obtain via syson_project_list.",
+          description: "Editing context ID from syson_project_get.",
         },
         element_id: {
           type: "string",
@@ -539,7 +539,7 @@ export const diagramTools: SysonTool[] = [
       properties: {
         editing_context_id: {
           type: "string",
-          description: "SysON project UUID. Obtain via syson_project_list.",
+          description: "Editing context ID from syson_project_get.",
         },
         diagram_id: {
           type: "string",
@@ -626,7 +626,7 @@ export const diagramTools: SysonTool[] = [
       properties: {
         editing_context_id: {
           type: "string",
-          description: "SysON project UUID. Obtain via syson_project_list.",
+          description: "Editing context ID from syson_project_get.",
         },
         diagram_id: {
           type: "string",
@@ -671,7 +671,7 @@ export const diagramTools: SysonTool[] = [
       properties: {
         editing_context_id: {
           type: "string",
-          description: "SysON project UUID. Obtain via syson_project_list.",
+          description: "Editing context ID from syson_project_get.",
         },
         diagram_id: {
           type: "string",

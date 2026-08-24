@@ -9,7 +9,7 @@ import { SysonToolsClient } from "./src/client.ts";
 import { loadUiHtml, UI_RESOURCES } from "./src/ui/mod.ts";
 
 const DEFAULT_HTTP_PORT = 3009;
-const PACKAGE_VERSION = "0.5.2";
+const PACKAGE_VERSION = "0.7.0";
 
 /** Register every shipped viewer, including the currently standalone explorer. */
 export function registerUiResources(
@@ -112,7 +112,7 @@ export function parseCli(args: readonly string[]): CliOptions {
 
 export async function main(args = Deno.args): Promise<void> {
   const cli = parseCli(args);
-  const { server, toolsClient } = createSysonServer({
+  const { server } = createSysonServer({
     categories: cli.categories,
   });
   await server.startHttp({
@@ -126,7 +126,7 @@ export async function main(args = Deno.args): Promise<void> {
     },
   });
   console.error(
-    `[mcp-syson] Server ready (${toolsClient.count} tools)${
+    `[mcp-syson] Server ready${
       cli.categories ? ` - categories: ${cli.categories.join(", ")}` : ""
     }.`,
   );

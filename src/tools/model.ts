@@ -11,15 +11,18 @@ import { getSysonClient } from "../api/graphql-client.ts";
 import {
   GET_CHILD_CREATION_DESCRIPTIONS,
   GET_DOMAINS,
+  GET_OBJECT,
   GET_ROOT_OBJECT_CREATION_DESCRIPTIONS,
   GET_STEREOTYPES,
 } from "../api/queries.ts";
 import { CREATE_DOCUMENT, CREATE_ROOT_OBJECT } from "../api/mutations.ts";
+import { aqlEscape, evalAql } from "./aql.ts";
 import type {
   CreateDocumentResult,
   CreateRootObjectResult,
   GetChildCreationDescriptionsResult,
   GetDomainsResult,
+  GetObjectResult,
   GetRootObjectCreationDescriptionsResult,
   GetStereotypesResult,
 } from "../api/types.ts";
@@ -39,6 +42,7 @@ export const modelCreateOutputSchema = {
     documentKind: { type: "string" },
     rootPackageId: { type: ["string", "null"] },
     rootPackageLabel: { type: "string" },
+    rootPackageRenameWarning: { type: "string" },
   },
   required: ["documentId", "documentName", "documentKind", "rootPackageId"],
 };
@@ -141,6 +145,9 @@ export const modelTools: SysonTool[] = [
     description:
       "Create a SysML document inside a project. Auto-detects the SysML stereotype. " +
       "By default creates a root Package — this is the top-level container for your model. " +
+      "An explicit root_package_name is applied and read back after creation; if that " +
+      "rename cannot be confirmed, the result preserves the created package and reports " +
+      "rootPackageRenameWarning. " +
       "Call after syson_project_create. Then use syson_element_insert_sysml or syson_element_create " +
       "to add parts, attributes, constraints, etc. under the root package.",
     category: "model",
@@ -166,8 +173,10 @@ export const modelTools: SysonTool[] = [
         },
         root_package_name: {
           type: "string",
+          minLength: 1,
           description:
-            "Name for the root package. Default: same as document name",
+            "Optional explicit name for the created root package. If omitted, " +
+            "the SysON-generated label is retained.",
         },
       },
       required: ["editing_context_id"],
@@ -178,12 +187,26 @@ export const modelTools: SysonTool[] = [
       name,
       stereotype_id,
       create_root_package,
-      root_package_name: _root_package_name,
+      root_package_name,
     }) => {
       const client = getSysonClient();
       const ecId = editing_context_id as string;
       const docName = (name as string) ?? "SysML Model";
       const createRoot = (create_root_package as boolean) ?? true;
+      const requestedRootName = root_package_name === undefined
+        ? undefined
+        : String(root_package_name).trim();
+
+      if (requestedRootName !== undefined && requestedRootName.length === 0) {
+        throw new TypeError(
+          "[lib/syson] syson_model_create: root_package_name must be non-empty",
+        );
+      }
+      if (!createRoot && requestedRootName !== undefined) {
+        throw new TypeError(
+          "[lib/syson] syson_model_create: root_package_name requires create_root_package=true",
+        );
+      }
 
       // Auto-detect stereotype if not provided
       let resolvedStereotypeId = stereotype_id as string | undefined;
@@ -287,6 +310,42 @@ export const modelTools: SysonTool[] = [
             }).object;
             result.rootPackageId = rootObj.id;
             result.rootPackageLabel = rootObj.label;
+
+            if (requestedRootName !== undefined) {
+              try {
+                await evalAql(
+                  ecId,
+                  `aql:self.eSet(self.eClass().getEStructuralFeature('declaredName'), '${
+                    aqlEscape(requestedRootName)
+                  }')`,
+                  [rootObj.id],
+                );
+                const readBack = await client.query<GetObjectResult>(
+                  GET_OBJECT,
+                  {
+                    editingContextId: ecId,
+                    objectId: rootObj.id,
+                  },
+                );
+                const observedLabel = readBack.viewer.editingContext.object
+                  .label;
+                if (observedLabel !== requestedRootName) {
+                  throw new Error(
+                    `[lib/syson] syson_model_create: root package rename was not confirmed; ` +
+                      `expected '${requestedRootName}', observed '${observedLabel}'`,
+                  );
+                }
+                result.rootPackageLabel = observedLabel;
+              } catch (renameError) {
+                const warning = renameError instanceof Error
+                  ? renameError.message
+                  : String(renameError);
+                console.error(
+                  `[lib/syson] Warning: root package created but rename failed: ${warning}`,
+                );
+                result.rootPackageRenameWarning = warning;
+              }
+            }
           }
         }
       }

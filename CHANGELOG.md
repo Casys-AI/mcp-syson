@@ -4,6 +4,57 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ## [Unreleased]
 
+### Documentation
+
+- Reworked the public setup, transport, tool-safety, API-boundary and provenance
+  guidance against the current registry and REST delete contracts.
+- Added a private vulnerability-reporting policy in `SECURITY.md`.
+
+### Fixed
+
+- Prepared and aligned the package manifest and MCP `server/discover` metadata
+  for `0.7.0`.
+- Made `syson_model_create.root_package_name` effective. An explicit name is now
+  applied and read back after root creation, while an unconfirmed rename returns
+  the created package with `rootPackageRenameWarning` instead of silently
+  ignoring the input.
+- `syson_project_create` never substitutes `project.id` for an absent
+  `currentEditingContext.id`. A confirmed follow-up GET still returns
+  `id`/`name`/`editingContextId`. When that context is missing or the
+  post-create GET fails after `CREATE_PROJECT` succeeded, the result preserves
+  the acknowledged project identity with `editingContextId: null` and
+  `editingContextWarning`; callers must call `syson_project_get` before model
+  writes.
+
+### Changed
+
+- `syson_element_insert_sysml` qualifies SuccessPayload evidence with
+  `acknowledged: true` and `semanticCompleteness: "unverified"`. The
+  model-facing summary states that SysON acknowledged a textual insertion
+  request; semantic completeness is unverified. Callers must still read back
+  critical content.
+
+## [0.6.0] - 2026-08-10
+
+### Added
+
+- `syson_element_delete` now uses the stateless SysML v2 REST commit API and
+  reports success only after a GET against the acknowledged commit confirms the
+  element is absent.
+- `syson_project_delete` now uses REST with existence precheck and GET-404
+  postcondition verification.
+- Destructive failures expose machine-readable precondition, unknown-outcome,
+  acknowledged-unverified and postcondition states with recovery and review
+  metadata.
+
+### Changed
+
+- `syson_element_create` accepts an exact child-creation ID or exact label and
+  rejects ambiguous labels before mutation.
+- Project listing and element reads remain on GraphQL where the observed REST
+  responses do not preserve their existing pagination or Sirius object
+  contracts.
+
 ## [0.5.2] - 2026-08-02
 
 ### Added
@@ -18,7 +69,7 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ### Added
 
-- All six Preact MCP Apps now advertise catalogs of small renderer-neutral
+- All shipped Preact MCP Apps now advertise catalogs of small renderer-neutral
   domain components under `io.casys.mcp.view-components/v1` and accept live
   layouts through `io.casys.mcp.surface/v1`. Their complete catalogs form the
   standalone default surfaces.
@@ -31,7 +82,7 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 - Viewer-backed calls now keep the full domain payload in `structuredContent`
   and send a concise factual summary in model-facing text. Direct
   `SysonToolsClient.execute()` behavior is unchanged.
-- The viewer build now uses `@modelcontextprotocol/ext-apps` 1.7.5; the six
+- The viewer build now uses `@modelcontextprotocol/ext-apps` 1.7.5; the
   self-contained bundles are smaller than the former 1.0.1 builds.
 - Preact components are mounted through the shared `@casys/mcp-view` 0.7 surface
   runtime, while notification handlers remain registered before the handshake
@@ -56,9 +107,9 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
   output.** Its concise text fallback is accompanied by `structuredContent`
   containing results, summary, and resolved values, so strict MCP clients can
   validate the response without parsing prose.
-- **MCP App handshake order.** All six viewer sources register their one-shot
-  result handler before `app.connect()`, and the bundle verifier enforces the
-  ordering before publication.
+- **MCP App handshake order.** Every viewer source registers its one-shot result
+  handler before `app.connect()`, and the bundle verifier enforces the ordering
+  before publication.
 
 ## [0.3.1] - 2026-07-30
 
@@ -67,7 +118,7 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 - **MCP App bundles are now static package dependencies.** JSR did publish the
   generated HTML, but Deno only fetched the imported module graph and the former
   runtime directory scan could not retrieve those unimported assets. The UI
-  build now produces an imported TypeScript bundle; all six viewers are
+  build now produces an imported TypeScript bundle; all shipped viewers are
   registered as readable MCP resources and checked in CI before JSR publication.
   `model-explorer-viewer` is available as a resource even though no tool
   attaches it yet.
@@ -76,17 +127,16 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ### Added
 
-- **`syson_part_structure`** (query category, 30 → 31 tools) — derives the
-  product breakdown structure (parts, hierarchy, quantities, numeric attributes)
-  from a SysML v2 model by recursive AQL traversal of `PartUsage` elements.
-  Quantity comes from the model's multiplicity when readable; when it isn't, the
-  tool reports SysML's own default of 1 labelled as
-  `quantitySource: "sysml-default"` — never a silent, unlabelled 1. Numeric
-  `AttributeUsage` children are read via the existing `readAttributeValue`
-  resolver and listed even when unvalued (`value: null`), never omitted.
-  Optional `flatten` adds a flat list with quantities multiplied along each
-  part's path; `max_depth` bounds recursion and `maxDepthReached` reports
-  truncation rather than hiding it.
+- **`syson_part_structure`** (query category) — derives the product breakdown
+  structure (parts, hierarchy, quantities, numeric attributes) from a SysML v2
+  model by recursive AQL traversal of `PartUsage` elements. Quantity comes from
+  the model's multiplicity when readable; when it isn't, the tool reports
+  SysML's own default of 1 labelled as `quantitySource: "sysml-default"` — never
+  a silent, unlabelled 1. Numeric `AttributeUsage` children are read via the
+  existing `readAttributeValue` resolver and listed even when unvalued
+  (`value: null`), never omitted. Optional `flatten` adds a flat list with
+  quantities multiplied along each part's path; `max_depth` bounds recursion and
+  `maxDepthReached` reports truncation rather than hiding it.
 - **eBOM/mBOM separation, made explicit in the tool surface.**
   `syson_part_structure` derives structure only — no prices, no inferred
   materials. Costing is entirely the ERP's job: the full bill-of-materials flow
@@ -98,7 +148,7 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
   derived cost from name-matched materials and hardcoded default masses —
   exactly the kind of invented data this tool refuses to produce (see
   `.claude/rules/no-hidden-heuristics.md`). `plm/` has been removed from the
-  monorepo; `syson_part_structure` is the one tool that survives the
+  monorepo; `syson_part_structure` is the capability that survives the
   dissolution.
 
 ## [0.2.1] - 2026-07-30
@@ -116,23 +166,23 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 ## [0.2.0] - 2026-07-30
 
 Absorbs the constraint stack from the internal `lib/sim` module, which is
-retired. 24 → 30 tools.
+retired, adding constraint and numeric-value capabilities.
 
 ### Added
 
-- **Constraint category (4 tools)** — `syson_constraint_extract`
-  (ConstraintUsage → structured AST), `syson_constraint_evaluate`,
-  `syson_constraint_validate` (one-shot extract + resolve + evaluate with
-  margins and what-if `values` overrides), and **`syson_constraint_solve`**:
-  satisfiability, solving and optimisation via
+- **Constraint category** — `syson_constraint_extract` (ConstraintUsage →
+  structured AST), `syson_constraint_evaluate`, `syson_constraint_validate`
+  (one-shot extract + resolve + evaluate with margins and what-if `values`
+  overrides), and **`syson_constraint_solve`**: satisfiability, solving and
+  optimisation via
   [`@casys/constraint-solver`](https://jsr.io/@casys/constraint-solver). A
   contradiction (`mass <= 2` and `mass >= 5`) returns `unsat` with the
   conflicting constraint ids — the question no evaluation can answer. Solving
   requires the `z3` executable.
-- **Value category (2 tools)** — `syson_value_read` / `syson_value_set` for
-  numeric attributes, with negation handling and read-back verification.
-- **Two MCP App viewers** — `validation-viewer` and `value-change-viewer`,
-  ported from `lib/sim` under the `ui://mcp-syson/*` namespace.
+- **Value category** — `syson_value_read` / `syson_value_set` for numeric
+  attributes, with negation handling and read-back verification.
+- **MCP App viewers** — `validation-viewer` and `value-change-viewer`, ported
+  from `lib/sim` under the `ui://mcp-syson/*` namespace.
 - **Constraint infrastructure exported** — `parseAstNode` (KerML expression tree
   → constraint AST), `resolveValues`, `readAttributeValue`, for downstream
   packages.
@@ -159,9 +209,8 @@ Initial public release.
 
 ### Added
 
-- **24 MCP tools across 5 categories** — project (5), model (4), element (6),
-  query (4), diagram (5). Every tool is a deterministic primitive; none calls a
-  language model.
+- **MCP tools for project, model, element, query, and diagram operations.**
+  Every tool is a deterministic primitive; none calls a language model.
 - **Shared AQL helper module** (`src/tools/aql.ts`) — `evalAql` plus
   `getChildren`/`getDescendants`/`getParent`/`getSelf`, exported from the
   package root for downstream packages to traverse models with. Replaces three
@@ -171,9 +220,8 @@ Initial public release.
   `/api/graphql`, throwing on both HTTP and GraphQL-level errors.
 - **AQL query surface** — `syson_query_aql`, `syson_query_eval`, full-text
   `syson_search`, and `syson_query_requirements_trace` with coverage metrics.
-- **Four MCP App viewers** — `query-results-viewer`,
-  `requirements-trace-viewer`, `diagram-viewer`, `model-explorer-viewer`, served
-  as `ui://mcp-syson/*`.
+- **MCP App viewers** — `query-results-viewer`, `requirements-trace-viewer`,
+  `diagram-viewer`, `model-explorer-viewer`, served as `ui://mcp-syson/*`.
 - **`docker-compose.yml`** bringing up SysON plus PostgreSQL on
   `http://localhost:8180`, with a named volume so models survive
   `docker compose down` (upstream's compose file has no volume) and a database
@@ -192,14 +240,14 @@ Initial public release.
 - **Test suite repaired.** Handlers had migrated to the generic
   `evaluateExpression` AQL mutation while mocks still described the older
   specialised queries (`queryBasedObjects`, `queryBasedString`,
-  `renameTreeItem`, `projectTemplates.edges`), leaving 8 failing tests. Six type
-  errors from `assertRejects` receiving non-async callbacks are also resolved.
-  36 tests now pass under type checking.
+  `renameTreeItem`, `projectTemplates.edges`), leaving failing tests. Type
+  errors from `assertRejects` receiving non-async callbacks are also resolved;
+  the suite now passes under type checking.
 
 ### Removed before release
 
-- **The 5 `syson_agent_*` tools and the sampling bridge.** They ran agentic
-  loops through MCP sampling, which is
+- **The `syson_agent_*` tools and the sampling bridge.** They ran agentic loops
+  through MCP sampling, which is
   [deprecated as of the 2026-07-28 revision](https://modelcontextprotocol.io/specification/2026-07-28/changelog).
   More fundamentally, the caller of an MCP tool is already a language model, so
   having the server ask the host to run another one added an indirection without

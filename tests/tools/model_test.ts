@@ -2,8 +2,11 @@
  * Tests for SysON model tools
  */
 
-import { assertEquals, assertRejects } from "jsr:@std/assert";
-import { setSysonClient, SysonGraphQLClient } from "../../src/api/graphql-client.ts";
+import { assertEquals, assertRejects } from "@std/assert";
+import {
+  setSysonClient,
+  SysonGraphQLClient,
+} from "../../src/api/graphql-client.ts";
 import { modelTools } from "../../src/tools/model.ts";
 
 function getHandler(name: string) {
@@ -133,19 +136,64 @@ Deno.test("syson_model_create - creates document with auto-stereotype", async ()
         object: { id: "pkg-1", kind: "sysml::Package", label: "Package1" },
       },
     },
+    // 6. apply the caller-declared root package name
+    {
+      evaluateExpression: {
+        __typename: "EvaluateExpressionSuccessPayload",
+        result: { __typename: "VoidExpressionResult" },
+      },
+    },
+    // 7. read back the renamed package
+    {
+      viewer: {
+        editingContext: {
+          object: {
+            id: "pkg-1",
+            kind: "sysml::Package",
+            label: "My Root",
+            iconURLs: [],
+          },
+        },
+      },
+    },
   ]);
 
   try {
     const result = await getHandler("syson_model_create")({
       editing_context_id: "ec-1",
       name: "My Model",
+      root_package_name: "My Root",
     }) as Record<string, unknown>;
     assertEquals(result.documentId, "doc-1");
     assertEquals(result.rootPackageId, "pkg-1");
+    assertEquals(result.rootPackageLabel, "My Root");
+    assertEquals(result.rootPackageRenameWarning, undefined);
   } finally {
     restore();
   }
 });
+
+Deno.test(
+  "syson_model_create rejects a root name when root package creation is disabled",
+  async () => {
+    const restore = mockFetch([{}]);
+    try {
+      await assertRejects(
+        async () =>
+          await getHandler("syson_model_create")({
+            editing_context_id: "ec-1",
+            stereotype_id: "s1",
+            create_root_package: false,
+            root_package_name: "Unused Root",
+          }),
+        TypeError,
+        "root_package_name requires create_root_package=true",
+      );
+    } finally {
+      restore();
+    }
+  },
+);
 
 Deno.test("syson_model_create - throws when no SysML stereotype found", async () => {
   const restore = mockFetch([{

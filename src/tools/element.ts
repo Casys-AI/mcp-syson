@@ -72,6 +72,8 @@ export interface ElementInsertSysmlOutput extends Record<string, unknown> {
   inserted: true;
   parentId: string;
   text: string;
+  acknowledged: true;
+  semanticCompleteness: "unverified";
 }
 
 /** Closed wire contract for a successful textual SysML insertion. */
@@ -82,8 +84,16 @@ export const elementInsertSysmlOutputSchema = {
     inserted: { type: "boolean", const: true },
     parentId: { type: "string" },
     text: { type: "string" },
+    acknowledged: { type: "boolean", const: true },
+    semanticCompleteness: { type: "string", const: "unverified" },
   },
-  required: ["inserted", "parentId", "text"],
+  required: [
+    "inserted",
+    "parentId",
+    "text",
+    "acknowledged",
+    "semanticCompleteness",
+  ],
 };
 
 /** Closed MCP output contract for an exact SysON element read. */
@@ -108,7 +118,8 @@ export function toElementInsertSysmlResult(
 ): StructuredToolResult {
   const insertion = value as ElementInsertSysmlOutput;
   return {
-    content: `Inserted SysML text under ${insertion.parentId}.`,
+    content:
+      `SysON acknowledged a textual insertion request under ${insertion.parentId}; semantic completeness is unverified.`,
     structuredContent: insertion,
   };
 }
@@ -809,9 +820,10 @@ export const elementTools: SysonTool[] = [
       "Examples: 'part heater : HeaterAssembly;', " +
       "'attribute totalMass : Real = 2.86;', " +
       "'constraint massConstraint { totalMass <= maxAllowedMass }'. " +
-      "Accepts multiple statements separated by newlines. Re-read critical " +
-      "content afterwards: SysON can acknowledge an insertion while omitting " +
-      "a clause that is invalid in its surrounding context.",
+      "Accepts multiple statements separated by newlines. A SuccessPayload is " +
+      "an acknowledgement only; semantic completeness is unverified. Re-read " +
+      "critical content afterwards: SysON can acknowledge an insertion while " +
+      "omitting a clause that is invalid in its surrounding context.",
     category: "element",
     inputSchema: {
       type: "object",
@@ -838,9 +850,8 @@ export const elementTools: SysonTool[] = [
       // request, not that every clause survived semantic/context validation.
       // Observed failure mode: `require constraint` outside a `requirement`
       // block inserted its attribute but silently dropped the constraint while
-      // reporting inserted: true. This needs a dedicated parse/read-back
-      // contract; keep this tool's existing wire format unchanged here, but do
-      // not use it as proof of complete semantic preservation.
+      // reporting SuccessPayload. acknowledged/semanticCompleteness qualify that
+      // evidence; they are not a parse, delta, or semantic read-back.
       const client = getSysonClient();
       const mutationId = crypto.randomUUID();
 
@@ -856,11 +867,20 @@ export const elementTools: SysonTool[] = [
         },
       );
 
-      unwrapMutation(data, "insertTextualSysMLv2");
+      const payload = unwrapMutation(data, "insertTextualSysMLv2");
+      if (payload.__typename !== "SuccessPayload") {
+        throw new Error(
+          `[lib/syson] insertTextualSysMLv2 failed: expected SuccessPayload, got ${
+            String(payload.__typename)
+          }`,
+        );
+      }
       return {
         inserted: true,
         parentId: parent_id as string,
         text: sysml_text as string,
+        acknowledged: true,
+        semanticCompleteness: "unverified",
       } satisfies ElementInsertSysmlOutput;
     },
   },

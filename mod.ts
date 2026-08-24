@@ -1,8 +1,8 @@
 /**
  * MCP SysON (MBSE) Library
  *
- * MCP tools for SysML v2 model management via SysON GraphQL API.
- * Zero external dependencies — custom GraphQL client using fetch().
+ * MCP tools for SysML v2 model management through SysON's GraphQL and
+ * SysML v2 REST surfaces. The custom GraphQL client uses fetch().
  *
  * @module lib/syson
  */

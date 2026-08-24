@@ -33,10 +33,33 @@ export const projectCreateOutputSchema = {
   properties: {
     id: { type: "string" },
     name: { type: "string" },
-    editingContextId: { type: "string" },
+    editingContextId: { type: ["string", "null"] },
+    editingContextWarning: { type: "string" },
   },
   required: ["id", "name", "editingContextId"],
 };
+
+export interface ProjectCreateOutput {
+  id: string;
+  name: string;
+  editingContextId: string | null;
+  editingContextWarning?: string;
+}
+
+const EDITING_CONTEXT_UNCONFIRMED_WARNING =
+  "Project was created but the editing context was not confirmed; call syson_project_get before model writes.";
+
+function unconfirmedProjectCreateResult(
+  id: string,
+  name: string,
+): ProjectCreateOutput {
+  return {
+    id,
+    name,
+    editingContextId: null,
+    editingContextWarning: EDITING_CONTEXT_UNCONFIRMED_WARNING,
+  };
+}
 
 /**
  * Extract mutation result, throwing on ErrorPayload.
@@ -78,8 +101,9 @@ export const projectTools: SysonTool[] = [
   {
     name: "syson_project_list",
     description:
-      "List all SysML projects. Returns project IDs needed by all other tools. " +
-      "Start here to find the project you want to work with.",
+      "List SysML projects. Returns project IDs for project lookup and deletion. " +
+      "Start here to find the project you want to work with, then call syson_project_get " +
+      "for its model-scoped editingContextId.",
     category: "project",
     inputSchema: {
       type: "object",
@@ -124,8 +148,9 @@ export const projectTools: SysonTool[] = [
   {
     name: "syson_project_get",
     description:
-      "Get a project by ID. Returns the editingContextId which is required " +
-      "by every other syson_* tool. Always call this after syson_project_list.",
+      "Get a project by ID. Returns the distinct editingContextId used by " +
+      "model, element, query, diagram and model-backed constraint/value operations. " +
+      "Project-level and offline constraint operations use their own inputs.",
     category: "project",
     inputSchema: {
       type: "object",
@@ -157,8 +182,13 @@ export const projectTools: SysonTool[] = [
     name: "syson_project_create",
     description:
       "Create a new SysML project. Auto-selects the SysML template if none specified. " +
-      "Returns project ID and editingContextId. " +
-      "After creating, use syson_model_create to add a SysML document with a root Package.",
+      "Returns the acknowledged project id and name. editingContextId is a confirmed " +
+      "currentEditingContext.id from a follow-up GET, never the project id. " +
+      "If that context is missing or the post-create read-back fails after CREATE_PROJECT " +
+      "succeeded, editingContextId is null and editingContextWarning tells callers to " +
+      "call syson_project_get before model writes. " +
+      "After a confirmed editing context, use syson_model_create to add a SysML document " +
+      "with a root Package.",
     category: "project",
     inputSchema: {
       type: "object",
@@ -170,7 +200,8 @@ export const projectTools: SysonTool[] = [
         template_id: {
           type: "string",
           description: "Template ID to use (from syson_project_templates). " +
-            "If omitted, creates a blank project.",
+            "If omitted, auto-selects a matching SysML/SysON template and " +
+            "fails if none is available.",
         },
       },
       required: ["name"],
@@ -216,19 +247,45 @@ export const projectTools: SysonTool[] = [
 
       const payload = unwrapMutation(data, "createProject");
       const project =
-        (payload as { project: { id: string; name: string } }).project;
+        (payload as { project?: { id?: unknown; name?: unknown } }).project;
+      if (
+        typeof project?.id !== "string" || project.id.length === 0 ||
+        typeof project.name !== "string"
+      ) {
+        throw new Error(
+          "[lib/syson] createProject failed: success payload missing project identity",
+        );
+      }
+      const projectId = project.id;
+      const projectName = project.name;
 
-      // Fetch the project to get editingContextId
-      const projectData = await client.query<GetProjectResult>(GET_PROJECT, {
-        projectId: project.id,
-      });
-
-      return {
-        id: project.id,
-        name: project.name,
-        editingContextId:
-          projectData.viewer.project.currentEditingContext?.id ?? project.id,
-      };
+      // A CREATE_PROJECT success is not a confirmed editing context. Never
+      // substitute project.id; only return a context id observed on GET_PROJECT.
+      try {
+        const projectData = await client.query<GetProjectResult>(GET_PROJECT, {
+          projectId,
+        });
+        const editingContextId = projectData.viewer?.project
+          ?.currentEditingContext?.id;
+        if (
+          typeof editingContextId === "string" && editingContextId.length > 0
+        ) {
+          return {
+            id: projectId,
+            name: projectName,
+            editingContextId,
+          } satisfies ProjectCreateOutput;
+        }
+        return unconfirmedProjectCreateResult(projectId, projectName);
+      } catch (readBackError) {
+        const detail = readBackError instanceof Error
+          ? readBackError.message
+          : String(readBackError);
+        console.error(
+          `[lib/syson] Warning: project created but editing context was not confirmed: ${detail}`,
+        );
+        return unconfirmedProjectCreateResult(projectId, projectName);
+      }
     },
   },
 
