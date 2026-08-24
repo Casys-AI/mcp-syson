@@ -4,6 +4,8 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-25
+
 ### Documentation
 
 - Reworked the public setup, transport, tool-safety, API-boundary and provenance
@@ -12,8 +14,8 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ### Fixed
 
-- Prepared and aligned the package manifest and MCP `server/discover` metadata
-  for `0.7.0`.
+- Package manifest and MCP `server/discover` metadata report `0.7.0`, matching
+  the published JSR package and source tag `v0.7.0`.
 - Made `syson_model_create.root_package_name` effective. An explicit name is now
   applied and read back after root creation, while an unconfirmed rename returns
   the created package with `rootPackageRenameWarning` instead of silently

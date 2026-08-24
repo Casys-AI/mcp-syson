@@ -58,10 +58,12 @@ is a configuration error rather than a guessed port.
 
 ### 2. Start the MCP server
 
-This checkout's package metadata (`deno.json` and MCP `server/discover`) is
-prepared for **0.7.0**. That is local/manifest metadata only: JSR still lists
-**0.6.0** as latest, **0.7.0 is not published**, and this repository does not
-ship a 0.7.0 tag, image, or GitHub release.
+`@casys/mcp-syson` **0.7.0** is published on JSR. Source tag `v0.7.0` exists,
+and this checkout's `deno.json` plus MCP `server/discover` report the same
+version.
+
+This package has **no Docker image of its own**. The compose instructions above
+run the separate upstream SysON and PostgreSQL runtime, not mcp-syson.
 
 From a checkout:
 
@@ -69,11 +71,10 @@ From a checkout:
 deno task serve
 ```
 
-The working published JSR command remains pinned to the actually published
-**0.6.0**. Do not treat the 0.7.0 manifest version as registry availability:
+From JSR:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.6.0/server --port=3009 --hostname=127.0.0.1
+deno run -A jsr:@casys/mcp-syson@0.7.0/server --port=3009 --hostname=127.0.0.1
 ```
 
 The endpoint is `http://127.0.0.1:3009/mcp`. Configure that URL in an MCP client
