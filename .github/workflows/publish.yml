@@ -21,7 +21,7 @@ jobs:
         with:
           deno-version: v2.5.4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22.18.0"
 
@@ -65,7 +65,7 @@ jobs:
         with:
           deno-version: v2.5.4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22.18.0"
 
