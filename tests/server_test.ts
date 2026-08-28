@@ -601,6 +601,7 @@ Deno.test("SysON serves stateless HTTP with native structured agent contracts", 
       headers: { Accept: "text/event-stream" },
     });
     assertEquals(sse.status, 405);
+    await sse.body?.cancel();
   } finally {
     await http.shutdown();
     await graphql.shutdown();
