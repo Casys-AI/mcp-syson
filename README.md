@@ -68,17 +68,20 @@ The image contains this MCP provider (including `z3` for constraint solving),
 not SysON or PostgreSQL. The compose instructions above still run the separate
 upstream SysON and PostgreSQL runtime.
 
-After the matching release tag has published it, run the immutable image with
-an explicit SysON endpoint:
+**Release status — 0.8.3 is published to JSR and GHCR.** Its immutable
+multi-architecture OCI index is
+`ghcr.io/casys-ai/mcp-syson@sha256:87eee6e35a636124d5ba6911492a245d69edcdf1ba67575676c22a0e9d7ce65e`.
+Run that verified digest with an explicit SysON endpoint:
 
 ```bash
 docker run --rm --publish 127.0.0.1:3009:3009 \
   --env SYSON_URL=http://host.docker.internal:8180 \
-  ghcr.io/casys-ai/mcp-syson:0.8.3
+  ghcr.io/casys-ai/mcp-syson@sha256:87eee6e35a636124d5ba6911492a245d69edcdf1ba67575676c22a0e9d7ce65e
 ```
 
-Use the image digest recorded in that release's runtime-contract asset for a
-long-lived deployment. `SYSON_KROKI_URL` and the `MCP_AUTH_*` settings are the
+The [runtime-contract asset](https://github.com/Casys-AI/mcp-syson/releases/download/v0.8.3/release-runtime-contract.json)
+binds that digest to `v0.8.3`, commit `cf22348`, and matching HTTP/stdio tool
+and UI fingerprints. `SYSON_KROKI_URL` and the `MCP_AUTH_*` settings are the
 only optional deployment settings exposed to the container; see the renderer
 and transport notes below before enabling either.
 
