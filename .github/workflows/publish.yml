@@ -170,12 +170,12 @@ jobs:
             --version "$VERSION" \
             --revision "$REVISION" \
             --image-digest "$IMAGE_DIGEST" \
-            --output release-runtime-contract.json
+            --output "$RUNNER_TEMP/release-runtime-contract.json"
 
       - uses: actions/upload-artifact@v4
         with:
           name: mcp-syson-runtime-contract-${{ steps.image.outputs.version }}
-          path: release-runtime-contract.json
+          path: ${{ runner.temp }}/release-runtime-contract.json
           if-no-files-found: error
 
       - name: Publish the exact JSR package after image smoke verification
@@ -189,6 +189,6 @@ jobs:
           IMAGE_NAME: ${{ steps.image.outputs.name }}
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          gh release create "$RELEASE_TAG" release-runtime-contract.json \
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-runtime-contract.json" \
             --title "mcp-syson $VERSION" \
             --notes "Published $IMAGE_NAME@$IMAGE_DIGEST after the runtime-contract smoke verification."

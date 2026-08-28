@@ -2,6 +2,17 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.8.3] - 2026-08-28
+
+### Fixed
+
+- The release runtime-contract is now written to the GitHub runner temporary
+  directory. JSR therefore verifies and publishes the exact clean tagged
+  source, while the identical generated evidence is uploaded and attached to
+  the GitHub Release. This reissues the complete package release after the
+  `v0.8.2` workflow published its OCI image but stopped before JSR and GitHub
+  Release creation.
+
 ## [0.8.2] - 2026-08-28
 
 ### Added
