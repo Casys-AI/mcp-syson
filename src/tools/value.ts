@@ -224,7 +224,7 @@ export const valueTools: SysonTool[] = [
         element_id: elementId,
         old_value: current.value,
         new_value: newValue,
-        verified_value: verifiedValue,
+        ...(verifiedValue !== undefined && { verified_value: verifiedValue }),
         literal_id: current.literalId,
         literal_kind: current.literalKind,
         success: verifiedValue !== undefined &&

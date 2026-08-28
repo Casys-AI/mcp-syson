@@ -2,7 +2,30 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
-## [Unreleased]
+## [0.8.0] - 2026-08-28
+
+### Added
+
+- Native `--stdio` transport with the same server factory, tools, MCP App
+  resources and server instructions as the default loopback HTTP transport.
+- Agent-facing MCP initialization instructions for the recommended project →
+  editing-context → model/element path, explicit AQL safety, and the boundary
+  between direct provider mutation and Digital Thread authority.
+- Closed output schemas and concise structured MCP results for the core project,
+  model, element and value chains.
+- Standard MCP annotations for every registered operation, including the fact
+  that caller-supplied AQL is potentially destructive and diagram rendering can
+  contact the external Kroki renderer.
+- Normalized structured domain errors for MCP tool-handler failures. Existing
+  delete error codes and no-retry unknown-outcome semantics remain intact.
+
+### Changed
+
+- Upgraded `@casys/mcp-server` to `0.26.1` so modern stdio requests use the same
+  protocol negotiation and result envelope as the HTTP path.
+- Core schema-declared non-viewer results now use concise `content` summaries;
+  their complete payload remains in `structuredContent` under the declared
+  output schema.
 
 ## [0.7.0] - 2026-08-25
 

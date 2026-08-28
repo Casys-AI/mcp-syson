@@ -4,7 +4,7 @@
  * @module lib/syson/tools/types
  */
 
-import type { MCPToolMeta } from "@casys/mcp-server";
+import type { MCPToolMeta, ToolAnnotations } from "@casys/mcp-server";
 
 /** MCP Tool definition */
 export interface MCPTool {
@@ -12,6 +12,7 @@ export interface MCPTool {
   description: string;
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
+  annotations?: ToolAnnotations;
   _meta?: MCPToolMeta;
 }
 
@@ -31,14 +32,8 @@ export interface MCPToolWireFormat {
   description: string;
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
-  _meta?: {
-    ui?: {
-      resourceUri: string;
-      visibility?: Array<"model" | "app">;
-      emits?: string[];
-      accepts?: string[];
-    };
-  };
+  annotations?: ToolAnnotations;
+  _meta?: MCPToolMeta;
 }
 
 /** SysON tool category identifier */
@@ -65,6 +60,7 @@ export interface SysonTool {
   category: SysonToolCategory;
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
+  annotations?: ToolAnnotations;
   handler: SysonToolHandler;
   _meta?: MCPToolMeta;
 }

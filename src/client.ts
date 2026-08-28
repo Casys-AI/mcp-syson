@@ -18,6 +18,8 @@ import {
   toConstraintExtractResult,
 } from "./tools/constraint.ts";
 import { toElementInsertSysmlResult } from "./tools/element.ts";
+import { withAgentToolContract } from "./tools/agent-contract.ts";
+import { toSysonToolErrorResult } from "./tool-error.ts";
 import type { StructuredToolResult } from "@casys/mcp-server";
 import type {
   MCPClientBase,
@@ -25,19 +27,6 @@ import type {
   MCPToolWireFormat,
   SysonTool,
 } from "./tools/types.ts";
-
-/**
- * Non-viewer tools whose MCP callers require a machine-readable result.
- *
- * Keep this deliberately closed: generic SysON reads continue to use their
- * established JSON-text response unless they declare a native output contract.
- * These declared tools retain that JSON text as their compatibility fallback.
- */
-const STRUCTURED_MCP_RESULT_TOOL_NAMES = new Set<string>([
-  "syson_project_create",
-  "syson_model_create",
-  "syson_element_get",
-]);
 
 // Re-export from tools
 export {
@@ -81,11 +70,10 @@ export class SysonToolsClient {
   private tools: SysonTool[];
 
   constructor(options?: SysonToolsClientOptions) {
-    if (options?.categories) {
-      this.tools = options.categories.flatMap((cat) => getToolsByCategory(cat));
-    } else {
-      this.tools = allTools;
-    }
+    const selected = options?.categories
+      ? options.categories.flatMap((cat) => getToolsByCategory(cat))
+      : allTools;
+    this.tools = selected.map(withAgentToolContract);
   }
 
   /** List available tools */
@@ -100,6 +88,7 @@ export class SysonToolsClient {
       description: t.description,
       inputSchema: t.inputSchema,
       ...(t.outputSchema && { outputSchema: t.outputSchema }),
+      ...(t.annotations && { annotations: t.annotations }),
       ...(t._meta && { _meta: t._meta }),
     }));
   }
@@ -126,25 +115,30 @@ export class SysonToolsClient {
     return new Map(this.tools.map((tool) => [
       tool.name,
       async (args: Record<string, unknown>) => {
-        const result = await tool.handler(args);
-        if (tool.name === "syson_constraint_extract") {
-          return toConstraintExtractResult(result);
+        try {
+          const result = await tool.handler(args);
+          if (tool.name === "syson_constraint_extract") {
+            return toConstraintExtractResult(result);
+          }
+          if (tool.name === "syson_constraint_evaluate") {
+            return toConstraintEvaluateResult(result);
+          }
+          if (tool.name === "syson_element_insert_sysml") {
+            return toElementInsertSysmlResult(result);
+          }
+          if (tool._meta?.ui && isRecord(result)) {
+            return toUiToolResult(tool.name, result);
+          }
+          return tool.outputSchema && isRecord(result)
+            ? toNativeStructuredToolResult(tool.name, result)
+            : result;
+        } catch (error) {
+          return toSysonToolErrorResult(
+            tool.name,
+            error,
+            tool.annotations ?? {},
+          );
         }
-        if (tool.name === "syson_constraint_evaluate") {
-          return toConstraintEvaluateResult(result);
-        }
-        if (tool.name === "syson_element_insert_sysml") {
-          return toElementInsertSysmlResult(result);
-        }
-        if (
-          STRUCTURED_MCP_RESULT_TOOL_NAMES.has(tool.name) &&
-          isRecord(result)
-        ) {
-          return toNativeStructuredToolResult(result);
-        }
-        return tool._meta?.ui && isRecord(result)
-          ? toUiToolResult(tool.name, result)
-          : result;
       },
     ]));
   }
@@ -165,22 +159,95 @@ export function toUiToolResult(
 }
 
 /**
- * Add a machine-readable payload while preserving the former plain-object
- * wire text exactly for content-only MCP clients.
+ * Keep schema-declared results machine-readable without making an agent parse
+ * a JSON dump in model-facing text.
  */
 function toNativeStructuredToolResult(
+  toolName: string,
   structuredContent: Record<string, unknown>,
 ): StructuredToolResult {
-  const content = JSON.stringify(structuredContent, null, 2);
-  if (content === undefined) {
-    throw new TypeError(
-      "Native structured SysON result must be JSON serializable.",
-    );
-  }
   return {
-    content,
+    content: summariseNativeResult(toolName, structuredContent),
     structuredContent,
   };
+}
+
+function summariseNativeResult(
+  toolName: string,
+  result: Record<string, unknown>,
+): string {
+  switch (toolName) {
+    case "syson_project_list":
+      return `Listed ${arrayLength(result.projects)} SysON project${
+        arrayLength(result.projects) === 1 ? "" : "s"
+      }.`;
+    case "syson_project_get":
+      return `Read project ${
+        JSON.stringify(String(result.name ?? result.id ?? ""))
+      }; ${
+        result.editingContextId === null
+          ? "no editing context is currently available"
+          : "an editing context is available"
+      }.`;
+    case "syson_project_create":
+      return `Created SysON project ${
+        JSON.stringify(String(result.name ?? result.id ?? ""))
+      }; ${
+        result.editingContextId === null
+          ? "read it again before model writes because its editing context is unconfirmed"
+          : "an editing context is ready for model writes"
+      }.`;
+    case "syson_project_templates":
+      return `Listed ${arrayLength(result.templates)} project template${
+        arrayLength(result.templates) === 1 ? "" : "s"
+      }.`;
+    case "syson_model_stereotypes":
+      return `Listed ${arrayLength(result.stereotypes)} document stereotype${
+        arrayLength(result.stereotypes) === 1 ? "" : "s"
+      }.`;
+    case "syson_model_child_types":
+      return `Listed ${arrayLength(result.childTypes)} child type${
+        arrayLength(result.childTypes) === 1 ? "" : "s"
+      } for the selected container.`;
+    case "syson_model_domains":
+      return `Listed ${arrayLength(result.domains)} metamodel domain${
+        arrayLength(result.domains) === 1 ? "" : "s"
+      }.`;
+    case "syson_model_create":
+      return result.rootPackageId === null
+        ? `Created ${String(result.documentKind ?? "SysML")} document ${
+          JSON.stringify(String(result.documentName ?? result.documentId ?? ""))
+        } without a root package.`
+        : `Created ${String(result.documentKind ?? "SysML")} document ${
+          JSON.stringify(String(result.documentName ?? result.documentId ?? ""))
+        } with root package ${
+          JSON.stringify(
+            String(result.rootPackageLabel ?? result.rootPackageId),
+          )
+        }.`;
+    case "syson_element_create":
+      return `Created ${String(result.kind ?? "SysON element")} ${
+        JSON.stringify(String(result.label ?? result.id ?? ""))
+      }.`;
+    case "syson_element_get":
+      return `Read ${String(result.kind ?? "SysON element")} ${
+        JSON.stringify(String(result.label ?? result.id ?? ""))
+      }.`;
+    case "syson_element_rename":
+      return `Renamed SysON element ${String(result.id ?? "")} to ${
+        JSON.stringify(String(result.newName ?? ""))
+      }.`;
+    case "syson_project_delete":
+      return `Deleted SysON project ${
+        String(result.projectId ?? "")
+      } after read-back verification.`;
+    case "syson_element_delete":
+      return `Deleted SysON element ${
+        String(result.elementId ?? "")
+      } after read-back verification.`;
+    default:
+      return `SysON ${toolName} completed.`;
+  }
 }
 
 function summariseUiResult(
@@ -249,6 +316,10 @@ function finiteNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
+}
+
+function arrayLength(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

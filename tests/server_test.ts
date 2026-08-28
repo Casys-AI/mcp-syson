@@ -10,7 +10,7 @@ const PROTOCOL_VERSION = "2026-07-28";
 const PROTOCOL_VERSION_KEY = "io.modelcontextprotocol/protocolVersion";
 const CLIENT_CAPABILITIES_KEY = "io.modelcontextprotocol/clientCapabilities";
 
-Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured results", async () => {
+Deno.test("SysON serves stateless HTTP with native structured agent contracts", async () => {
   const graphql = Deno.serve(
     { hostname: "127.0.0.1", port: 0, onListen: () => {} },
     async (request) => {
@@ -213,7 +213,11 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
       version?: unknown;
     };
     assertEquals(serverInfo.name, "mcp-syson");
-    assertEquals(serverInfo.version, "0.7.0");
+    assertEquals(serverInfo.version, "0.8.0");
+    assertEquals(
+      String(discovered.result.instructions).includes("syson_project_list"),
+      true,
+    );
 
     const listed = await rpc(port, "tools/list", {});
     const tools = listed.result.tools as Array<Record<string, unknown>>;
@@ -303,26 +307,66 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
       required: ["id", "kind", "label", "iconURLs"],
     });
 
+    const projectList = tools.find((tool) =>
+      tool.name === "syson_project_list"
+    );
+    assertEquals(projectList?.annotations, {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    });
+    assertEquals(
+      (projectList?.outputSchema as { type?: unknown } | undefined)?.type,
+      "object",
+    );
+
+    const queryAql = tools.find((tool) => tool.name === "syson_query_aql");
+    assertEquals(queryAql?.annotations, {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+    });
+
+    for (
+      const toolName of [
+        "syson_element_rename",
+        "syson_diagram_arrange",
+        "syson_value_set",
+      ]
+    ) {
+      const overwritingMutation = tools.find((tool) => tool.name === toolName);
+      assertEquals(overwritingMutation?.annotations, {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+      });
+    }
+
+    const constraintSolve = tools.find((tool) =>
+      tool.name === "syson_constraint_solve"
+    );
+    assertEquals(constraintSolve?.annotations, {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    });
+
     const projects = await rpc(port, "tools/call", {
       name: "syson_project_list",
       arguments: {},
     });
     assertEquals(projects.result.content, [{
       type: "text",
-      text: JSON.stringify(
-        {
-          projects: [{
-            id: "project-1",
-            name: "Inspection drone",
-            natures: [],
-          }],
-          pageInfo: { count: 1, hasNextPage: false },
-        },
-        null,
-        2,
-      ),
+      text: "Listed 1 SysON project.",
     }]);
-    assertEquals(projects.result.structuredContent, undefined);
+    assertEquals(projects.result.structuredContent, {
+      projects: [{
+        id: "project-1",
+        name: "Inspection drone",
+        natures: [],
+      }],
+      pageInfo: { count: 1, hasNextPage: false },
+    });
 
     const createdProject = await rpc(port, "tools/call", {
       name: "syson_project_create",
@@ -330,15 +374,8 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
     });
     assertEquals(createdProject.result.content, [{
       type: "text",
-      text: JSON.stringify(
-        {
-          id: "project-2",
-          name: "Inspection drone",
-          editingContextId: "editing-context-2",
-        },
-        null,
-        2,
-      ),
+      text:
+        'Created SysON project "Inspection drone"; an editing context is ready for model writes.',
     }]);
     assertEquals(createdProject.result.structuredContent, {
       id: "project-2",
@@ -357,17 +394,8 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
     });
     assertEquals(createdModel.result.content, [{
       type: "text",
-      text: JSON.stringify(
-        {
-          documentId: "document-2",
-          documentName: "Inspection drone model",
-          documentKind: "sysml",
-          rootPackageId: "package-2",
-          rootPackageLabel: "Inspection drone",
-        },
-        null,
-        2,
-      ),
+      text:
+        'Created sysml document "Inspection drone model" with root package "Inspection drone".',
     }]);
     assertEquals(createdModel.result.structuredContent, {
       documentId: "document-2",
@@ -386,16 +414,7 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
     });
     assertEquals(rootPackage.result.content, [{
       type: "text",
-      text: JSON.stringify(
-        {
-          id: "package-2",
-          kind: "sysml::Package",
-          label: "Inspection drone",
-          iconURLs: ["/icons/package.svg"],
-        },
-        null,
-        2,
-      ),
+      text: 'Read sysml::Package "Inspection drone".',
     }]);
     assertEquals(rootPackage.result.structuredContent, {
       id: "package-2",
@@ -520,6 +539,21 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
       value: 2.86,
     });
 
+    const failedRead = await rpc(port, "tools/call", {
+      name: "syson_model_stereotypes",
+      arguments: { editing_context_id: "ec-1" },
+    });
+    assertEquals(failedRead.result.isError, true);
+    assertEquals(failedRead.result.structuredContent, {
+      code: "SYSON_OPERATION_FAILED",
+      message: "Cannot read properties of undefined (reading 'editingContext')",
+      context: { toolName: "syson_model_stereotypes" },
+      recovery:
+        "Inspect the SysON model identity and provider response before retrying.",
+      retryable: false,
+      reviewRequired: false,
+    });
+
     const sse = await fetch(`http://127.0.0.1:${port}/mcp`, {
       headers: { Accept: "text/event-stream" },
     });
@@ -531,22 +565,43 @@ Deno.test("SysON serves only stateless 2026-07-28 HTTP with native structured re
   }
 });
 
-Deno.test("SysON CLI has no stdio or legacy HTTP switch", () => {
-  assertEquals(parseCli([]), { port: 3009, hostname: "127.0.0.1" });
+Deno.test("SysON CLI keeps HTTP as default and makes stdio explicit", () => {
+  assertEquals(parseCli([]), {
+    transport: "http",
+    port: 3009,
+    hostname: "127.0.0.1",
+  });
   assertEquals(
     parseCli([
       "--port",
       "3010",
       "--hostname=0.0.0.0",
-      "--categories=project, query",
+      "--categories=project, query,project",
     ]),
     {
+      transport: "http",
       port: 3010,
       hostname: "0.0.0.0",
       categories: ["project", "query"],
     },
   );
+  assertEquals(parseCli(["--stdio"]), { transport: "stdio" });
+  assertThrows(
+    () => parseCli(["--stdio", "--port=3010"]),
+    TypeError,
+    "--stdio",
+  );
   assertThrows(() => parseCli(["--http"]), TypeError, "Unknown argument");
+  assertThrows(
+    () => parseCli(["--categories=project,bogus"]),
+    TypeError,
+    "Unknown SysON category: bogus",
+  );
+  assertThrows(
+    () => createSysonServer({ categories: ["bogus"] }),
+    TypeError,
+    "Unknown SysON category: bogus",
+  );
 });
 
 function requiredInput(

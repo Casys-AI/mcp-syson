@@ -58,9 +58,9 @@ is a configuration error rather than a guessed port.
 
 ### 2. Start the MCP server
 
-`@casys/mcp-syson` **0.7.0** is published on JSR. Source tag `v0.7.0` exists,
-and this checkout's `deno.json` plus MCP `server/discover` report the same
-version.
+This checkout and its release package are versioned as **0.8.0**. The
+main-branch workflow publishes that exact version to JSR only after the checks
+and package dry-run pass.
 
 This package has **no Docker image of its own**. The compose instructions above
 run the separate upstream SysON and PostgreSQL runtime, not mcp-syson.
@@ -71,19 +71,25 @@ From a checkout:
 deno task serve
 ```
 
-From JSR:
+For a local stdio host:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.7.0/server --port=3009 --hostname=127.0.0.1
+deno task serve:stdio
 ```
 
-The endpoint is `http://127.0.0.1:3009/mcp`. Configure that URL in an MCP client
-that supports the stateless HTTP 2026-07-28 transport.
+The pinned JSR command is:
 
-This package does **not** expose stdio, session, SSE or a legacy `--http` mode.
-A stdio-only host therefore needs an external HTTP-to-stdio bridge; launching
-`server.ts` as a stdio server will not work. `--port` and `--hostname` accept
-both `--name=value` and `--name value` forms.
+```bash
+deno run -A jsr:@casys/mcp-syson@0.8.0/server --stdio
+```
+
+HTTP remains the default. Its endpoint is `http://127.0.0.1:3009/mcp`; configure
+that URL in an MCP client that supports the stateless HTTP 2026-07-28 transport.
+
+`--stdio` starts one local server process for one MCP client, using the same
+server factory, tool contracts and UI resources as HTTP. It cannot be combined
+with `--port` or `--hostname`. `--port` and `--hostname` accept both
+`--name=value` and `--name value` forms.
 
 The default bind is loopback-only and the MCP endpoint has no built-in
 authentication. Do not bind it to a public interface without a trusted reverse
@@ -127,8 +133,8 @@ syson_element_children / syson_element_get / syson_query_aql
 `syson_project_create` preserves the created project identity even when the
 editing context is missing or the post-create GET fails. In those cases
 `editingContextId` is `null` and `editingContextWarning` tells callers to call
-`syson_project_get` before model writes. Do not treat a project id as an
-editing context.
+`syson_project_get` before model writes. Do not treat a project id as an editing
+context.
 
 `syson_model_create` keeps SysON's generated root label unless the caller
 supplies `root_package_name`. That explicit name is applied and read back after
@@ -156,9 +162,9 @@ model with operations such as `eSet`.
 
 A successful provider response does not mean the same thing for every write:
 
-- `syson_element_insert_sysml` returns `inserted: true` with `acknowledged: true`
-  and `semanticCompleteness: "unverified"`. That is what a GraphQL
-  `SuccessPayload` proves: SysON accepted the textual insertion request.
+- `syson_element_insert_sysml` returns `inserted: true` with
+  `acknowledged: true` and `semanticCompleteness: "unverified"`. That is what a
+  GraphQL `SuccessPayload` proves: SysON accepted the textual insertion request.
   Re-read critical content; an invalid clause can be omitted even though the
   request was accepted.
 - `syson_element_create` can create the element and then return a
@@ -183,8 +189,24 @@ never a guessed project or commit identity.
 | `*_POSTCONDITION_FAILED`    | The target remained visible after acknowledgement                       | Require review before any further mutation                                               |
 
 Element errors use the `SYSON_DELETE_*` prefix; project errors use
-`SYSON_PROJECT_DELETE_*`. Typed errors also carry `context`, `recovery`,
-`retryable` and `reviewRequired` fields.
+`SYSON_PROJECT_DELETE_*`. Every MCP tool-handler failure now returns a bounded
+error result with `code`, `message`, `context`, `recovery`, `retryable` and
+`reviewRequired`. For an unexpected write failure, the server deliberately
+returns `SYSON_MUTATION_OUTCOME_UNKNOWN`: read back the model before deciding
+whether another write is safe.
+
+## Agent-oriented MCP contract
+
+The server advertises a short recommended route during MCP initialization:
+project list → project get → model/element reads using the returned
+`editingContextId`. Core navigation and mutation results are returned in closed
+`outputSchema` contracts with a concise text summary plus full
+`structuredContent`. The provider also labels read-only, destructive, idempotent
+and externally-rendered operations through standard MCP annotations.
+
+`syson_query_aql` and `syson_query_eval` are intentionally marked destructive:
+their caller-supplied expressions can mutate or delete model state. This is a
+safety signal, not a claim that every AQL expression writes.
 
 ## Tool reference
 
@@ -194,13 +216,13 @@ project-level and offline constraint tools have different inputs.
 
 ### Project
 
-| Tool                      | Description                                                            |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `syson_project_list`      | List SysML projects page by page — start here to find a project ID     |
-| `syson_project_get`       | Get a project by ID; returns the model-scoped `editingContextId`       |
+| Tool                      | Description                                                              |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `syson_project_list`      | List SysML projects page by page — start here to find a project ID       |
+| `syson_project_get`       | Get a project by ID; returns the model-scoped `editingContextId`         |
 | `syson_project_create`    | Create a project; confirmed `editingContextId`, or `null` with a warning |
-| `syson_project_delete`    | Permanently delete a project; succeeds only after a confirming GET 404 |
-| `syson_project_templates` | List available project templates                                       |
+| `syson_project_delete`    | Permanently delete a project; succeeds only after a confirming GET 404   |
+| `syson_project_templates` | List available project templates                                         |
 
 ### Model
 
@@ -213,14 +235,14 @@ project-level and offline constraint tools have different inputs.
 
 ### Element
 
-| Tool                         | Description                                                                         |
-| ---------------------------- | ----------------------------------------------------------------------------------- |
+| Tool                         | Description                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------------- |
 | `syson_element_insert_sysml` | Insert SysML v2 text; acknowledgement only, semantic completeness unverified |
-| `syson_element_create`       | Create one element; `child_type` must be an exact returned ID or exact label        |
-| `syson_element_get`          | Get an element's Sirius ID, kind, label and icon URLs                               |
-| `syson_element_children`     | List direct children — browse the model tree                                        |
-| `syson_element_rename`       | Rename an element (AQL `eSet` on `declaredName`)                                    |
-| `syson_element_delete`       | Delete an element through a REST commit and verify absence (irreversible)           |
+| `syson_element_create`       | Create one element; `child_type` must be an exact returned ID or exact label |
+| `syson_element_get`          | Get an element's Sirius ID, kind, label and icon URLs                        |
+| `syson_element_children`     | List direct children — browse the model tree                                 |
+| `syson_element_rename`       | Rename an element (AQL `eSet` on `declaredName`)                             |
+| `syson_element_delete`       | Delete an element through a REST commit and verify absence (irreversible)    |
 
 ### Query
 
@@ -345,10 +367,10 @@ without it.
 
 Viewers are served as `ui://mcp-syson/<name>`. Hosts without MCP App support
 still receive normal tool results. Viewer-backed calls keep a concise summary in
-`content` and the complete UI payload in `structuredContent`. The non-viewer
-tools `syson_project_create`, `syson_model_create` and `syson_element_get` also
-declare closed output schemas and retain JSON-text fallbacks for content-only
-clients. Component contracts and optional Compose events are documented in
+`content` and the complete UI payload in `structuredContent`. Core non-viewer
+navigation and mutation calls also declare closed output schemas: their
+`content` is a concise summary and their full result is in `structuredContent`.
+Component contracts and optional Compose events are documented in
 [SysON component surfaces](docs/component-surfaces.md).
 
 The build generates a TypeScript bundle that is statically imported by the
@@ -393,7 +415,7 @@ uses REST.
 
 ```
 mod.ts                 # Public API
-server.ts              # Stateless HTTP MCP server
+server.ts              # HTTP and stdio MCP entry point
 deno.json              # Package config
 docker-compose.yml     # SysON + PostgreSQL for local use
 src/

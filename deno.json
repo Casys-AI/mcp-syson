@@ -1,14 +1,15 @@
 {
   "name": "@casys/mcp-syson",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "nodeModulesDir": "auto",
   "tasks": {
     "serve": "deno run --allow-all server.ts --port=3009",
+    "serve:stdio": "deno run --allow-all server.ts --stdio",
     "compile": "deno compile -A --output mcp-syson server.ts",
     "test": "deno test --allow-all tests/",
     "check": "deno check mod.ts server.ts",
-    "fmt": "deno fmt --check deno.json server.ts src/client.ts src/api/rest-client.ts src/tools/constraint.ts src/tools/element.ts src/tools/project.ts src/tools/types.ts src/tools/value.ts src/ui/shared/component-catalog.ts src/ui/shared/preact-surface.tsx tests/api/rest-client_test.ts tests/client_test.ts tests/server_test.ts tests/tools/element_delete_test.ts tests/tools/element_test.ts tests/tools/project_test.ts tests/ui_components_test.ts tests/ui_resources_test.ts scripts/verify-ui-bundles.ts",
-    "lint": "deno lint mod.ts server.ts src/client.ts src/api/rest-client.ts src/tools/constraint.ts src/tools/element.ts src/tools/project.ts src/tools/types.ts src/tools/value.ts src/ui/shared/component-catalog.ts src/ui/shared/preact-surface.tsx tests/api/rest-client_test.ts tests/client_test.ts tests/server_test.ts tests/tools/element_delete_test.ts tests/tools/element_test.ts tests/tools/project_test.ts tests/ui_components_test.ts tests/ui_resources_test.ts scripts/verify-ui-bundles.ts",
+    "fmt": "deno fmt --check deno.json server.ts src/client.ts src/tool-error.ts src/api/rest-client.ts src/tools/agent-contract.ts src/tools/constraint.ts src/tools/element.ts src/tools/project.ts src/tools/types.ts src/tools/value.ts src/ui/shared/component-catalog.ts src/ui/shared/preact-surface.tsx tests/api/rest-client_test.ts tests/client_test.ts tests/server_test.ts tests/stdio_e2e_test.ts tests/fixtures/stdio_server.ts tests/tools/element_delete_test.ts tests/tools/element_test.ts tests/tools/project_test.ts tests/ui_components_test.ts tests/ui_resources_test.ts scripts/verify-ui-bundles.ts",
+    "lint": "deno lint mod.ts server.ts src/client.ts src/tool-error.ts src/api/rest-client.ts src/tools/agent-contract.ts src/tools/constraint.ts src/tools/element.ts src/tools/project.ts src/tools/types.ts src/tools/value.ts src/ui/shared/component-catalog.ts src/ui/shared/preact-surface.tsx tests/api/rest-client_test.ts tests/client_test.ts tests/server_test.ts tests/stdio_e2e_test.ts tests/fixtures/stdio_server.ts tests/tools/element_delete_test.ts tests/tools/element_test.ts tests/tools/project_test.ts tests/ui_components_test.ts tests/ui_resources_test.ts scripts/verify-ui-bundles.ts",
     "ui:build": "cd src/ui && node build-all.mjs",
     "ui:check": "cd src/ui && npx tsc --noEmit -p tsconfig.json --allowImportingTsExtensions",
     "ui:verify": "deno run --allow-read scripts/verify-ui-bundles.ts"
@@ -23,6 +24,9 @@
       "server.ts",
       "src/**/*.ts",
       "README.md",
+      "CHANGELOG.md",
+      "SECURITY.md",
+      "CITATION.cff",
       "LICENSE"
     ],
     "exclude": [
@@ -34,7 +38,7 @@
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1",
-    "@casys/mcp-server": "jsr:@casys/mcp-server@0.24.0",
+    "@casys/mcp-server": "jsr:@casys/mcp-server@0.26.1",
     "@casys/constraint-solver": "jsr:@casys/constraint-solver@0.1.0",
     "ajv": "npm:ajv@^8.17.1",
     "hono": "npm:hono@^4",
