@@ -69,6 +69,27 @@ Deno.test("stdio serves modern discovery, contracts and UI resources", async () 
     const viewerText = (viewer.result?.contents as Array<{ text: string }>)[0]
       .text;
     assert(viewerText.includes("Model Explorer"));
+
+    const projects = await process.request(
+      modernRequest(4, "tools/call", {
+        name: "syson_project_list",
+        arguments: {},
+      }),
+    );
+    assertEquals(projects.error, undefined);
+    assertEquals(projects.result?.resultType, "complete");
+    assertEquals(projects.result?.content, [{
+      type: "text",
+      text: "Listed 1 SysON project.",
+    }]);
+    assertEquals(projects.result?.structuredContent, {
+      projects: [{
+        id: "project-stdio",
+        name: "Stdio fixture",
+        natures: [],
+      }],
+      pageInfo: { count: 1, hasNextPage: false },
+    });
   } finally {
     await process.close();
   }

@@ -213,7 +213,7 @@ Deno.test("SysON serves stateless HTTP with native structured agent contracts", 
       version?: unknown;
     };
     assertEquals(serverInfo.name, "mcp-syson");
-    assertEquals(serverInfo.version, "0.8.0");
+    assertEquals(serverInfo.version, "0.8.1");
     assertEquals(
       String(discovered.result.instructions).includes("syson_project_list"),
       true,
@@ -326,6 +326,49 @@ Deno.test("SysON serves stateless HTTP with native structured agent contracts", 
       destructiveHint: true,
       idempotentHint: false,
     });
+    const queryEval = tools.find((tool) => tool.name === "syson_query_eval");
+    assertEquals(
+      (queryAql?.inputSchema as { additionalProperties?: unknown })
+        .additionalProperties,
+      undefined,
+    );
+    assertEquals(
+      (queryEval?.inputSchema as { additionalProperties?: unknown })
+        .additionalProperties,
+      undefined,
+    );
+    for (const tool of tools) {
+      if (tool.name === "syson_query_aql" || tool.name === "syson_query_eval") {
+        continue;
+      }
+      assertEquals(
+        (tool.inputSchema as { additionalProperties?: unknown })
+          .additionalProperties,
+        false,
+        `${tool.name} must reject unknown top-level arguments`,
+      );
+    }
+    for (
+      const toolName of [
+        "syson_search",
+        "syson_query_requirements_trace",
+        "syson_diagram_list",
+        "syson_diagram_create",
+        "syson_diagram_drop",
+        "syson_diagram_arrange",
+        "syson_diagram_snapshot",
+        "syson_constraint_validate",
+      ]
+    ) {
+      const tool = tools.find((candidate) => candidate.name === toolName);
+      assertEquals(
+        (tool?.outputSchema as { type?: unknown; oneOf?: unknown })?.type ===
+            "object" ||
+          Array.isArray((tool?.outputSchema as { oneOf?: unknown[] })?.oneOf),
+        true,
+        `${toolName} must expose an honest structured output contract`,
+      );
+    }
 
     for (
       const toolName of [

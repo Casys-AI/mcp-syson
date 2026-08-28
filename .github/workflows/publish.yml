@@ -1,9 +1,15 @@
-name: Publish
+name: Verify and release
 
 on:
+  pull_request:
   push:
     branches:
       - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
 
 jobs:
   check:
@@ -13,58 +19,176 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.5.4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.18.0"
 
-      - name: Build UI viewers
+      - name: Build UI viewers from the locked dependency graph
         run: |
           cd src/ui
           npm ci
           node build-all.mjs
 
-      - name: Verify UI bundles
-        run: deno task ui:verify
+      - name: Verify committed UI bundles
+        run: |
+          deno task ui:check
+          deno task ui:verify
+          git diff --exit-code -- src/ui/bundles.ts
 
-      - name: Install z3 (syson_constraint_solve backend)
+      - name: Install the image's solver dependency
         run: sudo apt-get update && sudo apt-get install -y z3
 
-      - name: Type check
-        run: deno check mod.ts server.ts
+      - name: Check formatting and types
+        run: |
+          deno task fmt
+          deno task lint
+          deno task check
 
-      - name: Run tests
-        run: deno test --allow-all tests/
+      - name: Run provider tests
+        run: deno task test
 
-  publish-jsr:
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: check
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
+      packages: write
+      attestations: write
     steps:
       - uses: actions/checkout@v5
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.5.4
 
       - uses: actions/setup-node@v4
         with:
-         node-version: "22"
+          node-version: "22.18.0"
 
-      - name: Build UI viewers
+      - name: Bind the release tag to deno.json
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          test -n "$VERSION"
+          test "$(deno eval --frozen 'console.log(JSON.parse(await Deno.readTextFile("deno.json")).version)')" = "$VERSION"
+          printf 'version=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build locked UI viewers
         run: |
           cd src/ui
           npm ci
           node build-all.mjs
+          cd ../..
+          deno task ui:verify
+          git diff --exit-code -- src/ui/bundles.ts
 
-      - name: Verify UI bundles
-        run: deno task ui:verify
+      - name: Verify the exact JSR package can publish
+        run: |
+          npx jsr publish --dry-run
 
-      - name: Verify JSR package contents
-        run: npx jsr publish --dry-run --allow-dirty
+      - uses: docker/setup-qemu-action@v3
 
-      - name: Publish to JSR
-        run: npx jsr publish --allow-dirty
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Define immutable image coordinates
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          IMAGE="ghcr.io/${OWNER,,}/mcp-syson"
+          printf 'name=%s\n' "$IMAGE" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+          printf 'created=%s\n' "$(date --utc +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/metadata-action@v5
+        id: metadata
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=${{ steps.image.outputs.version }}
+            type=raw,value=${{ github.ref_name }}
+            type=sha,format=long
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.image.outputs.version }}
+
+      - name: Build, attest and publish dedicated multi-arch image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.image.outputs.version }}
+            REVISION=${{ github.sha }}
+            CREATED=${{ steps.image.outputs.created }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Smoke the published image over HTTP and stdio
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          VERSION: ${{ steps.image.outputs.version }}
+          REVISION: ${{ github.sha }}
+        run: |
+          IMAGE="${IMAGE_NAME}@${IMAGE_DIGEST}"
+          docker pull "$IMAGE"
+          docker run --detach --rm --name mcp-syson-smoke --publish 127.0.0.1:3009:3009 "$IMAGE"
+          trap 'docker logs mcp-syson-smoke || true; docker stop mcp-syson-smoke || true' EXIT
+          READY=false
+          for attempt in $(seq 1 30); do
+            STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 2 http://127.0.0.1:3009/mcp || true)"
+            if test "$STATUS" = 405; then
+              READY=true
+              break
+            fi
+            sleep 1
+          done
+          test "$READY" = true
+          deno run --frozen --allow-net --allow-run --allow-write scripts/smoke-oci-image.ts \
+            --image "$IMAGE" \
+            --http-url http://127.0.0.1:3009/mcp \
+            --version "$VERSION" \
+            --revision "$REVISION" \
+            --image-digest "$IMAGE_DIGEST" \
+            --output release-runtime-contract.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-syson-runtime-contract-${{ steps.image.outputs.version }}
+          path: release-runtime-contract.json
+          if-no-files-found: error
+
+      - name: Publish the exact JSR package after image smoke verification
+        run: npx jsr publish
+
+      - name: Publish release evidence bound to tag, commit and image digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.image.outputs.version }}
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          gh release create "$RELEASE_TAG" release-runtime-contract.json \
+            --title "mcp-syson $VERSION" \
+            --notes "Published $IMAGE_NAME@$IMAGE_DIGEST after the runtime-contract smoke verification."

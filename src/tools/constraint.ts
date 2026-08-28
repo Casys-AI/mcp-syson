@@ -345,30 +345,59 @@ const constraintResultOutputSchema = {
   required: ["constraintId", "constraintName", "status", "expression"],
 };
 
+const constraintSummaryOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    total: { type: "integer", minimum: 0 },
+    pass: { type: "integer", minimum: 0 },
+    fail: { type: "integer", minimum: 0 },
+    error: { type: "integer", minimum: 0 },
+    unresolved: { type: "integer", minimum: 0 },
+  },
+  required: ["total", "pass", "fail", "error", "unresolved"],
+};
+
 /** Closed contract for the explicit, offline-capable constraint evaluation output. */
 export const constraintEvaluateOutputSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
     results: { type: "array", items: constraintResultOutputSchema },
-    summary: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        total: { type: "integer", minimum: 0 },
-        pass: { type: "integer", minimum: 0 },
-        fail: { type: "integer", minimum: 0 },
-        error: { type: "integer", minimum: 0 },
-        unresolved: { type: "integer", minimum: 0 },
-      },
-      required: ["total", "pass", "fail", "error", "unresolved"],
-    },
+    summary: constraintSummaryOutputSchema,
     resolvedValues: {
       type: "object",
       additionalProperties: quantityOutputSchema,
     },
   },
   required: ["results", "summary", "resolvedValues"],
+};
+
+/** Closed output contract for one-shot extraction, resolution and evaluation. */
+export const constraintValidateOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    editingContextId: { type: "string" },
+    elementId: { type: "string" },
+    elementName: { type: "string" },
+    constraints: { type: "array", items: constraintResultOutputSchema },
+    summary: constraintSummaryOutputSchema,
+    resolvedValues: {
+      type: "object",
+      additionalProperties: quantityOutputSchema,
+    },
+    validatedAt: { type: "string", format: "date-time" },
+  },
+  required: [
+    "editingContextId",
+    "elementId",
+    "elementName",
+    "constraints",
+    "summary",
+    "resolvedValues",
+    "validatedAt",
+  ],
 };
 
 /** Serialise a ValueMap for the tool response. */
@@ -560,6 +589,7 @@ export const constraintTools: SysonTool[] = [
         emits: ["syson.constraint.selected"],
       },
     },
+    outputSchema: constraintValidateOutputSchema,
     handler: async (args) => {
       const ecId = args.editing_context_id as string;
       const elementId = args.element_id as string;

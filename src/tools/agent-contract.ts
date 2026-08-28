@@ -11,6 +11,12 @@ import type { SysonTool } from "./types.ts";
 export interface AgentToolContract {
   annotations: ToolAnnotations;
   outputSchema?: Record<string, unknown>;
+  /**
+   * A caller-controlled expression is deliberately outside the closed agent
+   * contract. This is reserved for the two explicitly destructive AQL escape
+   * hatches; it is not a convenience flag for ordinary tools.
+   */
+  openInputSchema?: true;
 }
 
 const readOnly: ToolAnnotations = {
@@ -264,6 +270,179 @@ const valueSetOutputSchema = {
   ],
 };
 
+const searchOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    query: { type: "string" },
+    results: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          ...identitySchema.properties,
+          iconURLs: { type: "array", items: { type: "string" } },
+        },
+        required: [...identitySchema.required, "iconURLs"],
+      },
+    },
+    count: { type: "integer", minimum: 0 },
+  },
+  required: ["query", "results", "count"],
+};
+
+const requirementsTraceOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    rootId: { type: "string" },
+    requirementsCount: { type: "integer", minimum: 0 },
+    traces: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          requirement: {
+            type: "object",
+            additionalProperties: false,
+            properties: { id: { type: "string" }, label: { type: "string" } },
+            required: ["id", "label"],
+          },
+          satisfiedBy: { type: "array", items: identitySchema },
+          error: { type: "string" },
+        },
+        required: ["requirement", "satisfiedBy"],
+      },
+    },
+    coverage: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        total: { type: "integer", minimum: 0 },
+        satisfied: { type: "integer", minimum: 0 },
+        unsatisfied: { type: "integer", minimum: 0 },
+        percentage: { type: "integer", minimum: 0, maximum: 100 },
+      },
+      required: ["total", "satisfied", "unsatisfied", "percentage"],
+    },
+    error: { type: "string" },
+  },
+  required: ["rootId", "requirementsCount", "traces"],
+};
+
+const diagramListOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    representations: { type: "array", items: identitySchema },
+    count: { type: "integer", minimum: 0 },
+  },
+  required: ["representations", "count"],
+};
+
+const diagramCreateOutputSchema = {
+  oneOf: [
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        id: { type: "string" },
+        label: { type: "string" },
+        kind: { type: "string" },
+      },
+      required: ["id", "label", "kind"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        message: { type: "string" },
+        availableTypes: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: { id: { type: "string" }, label: { type: "string" } },
+            required: ["id", "label"],
+          },
+        },
+      },
+      required: ["message", "availableTypes"],
+    },
+  ],
+};
+
+const diagramDropOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    dropped: { type: "boolean", const: true },
+    diagramId: { type: "string" },
+    elementCount: { type: "integer", minimum: 1 },
+    elementIds: { type: "array", minItems: 1, items: { type: "string" } },
+  },
+  required: ["dropped", "diagramId", "elementCount", "elementIds"],
+};
+
+const diagramArrangeOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    arranged: { type: "boolean", const: true },
+    diagramId: { type: "string" },
+  },
+  required: ["arranged", "diagramId"],
+};
+
+const diagramSnapshotOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    diagramId: { type: "string" },
+    diagramLabel: { type: "string" },
+    nodeCount: { type: "integer", minimum: 0 },
+    edgeCount: { type: "integer", minimum: 0 },
+    nodes: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: { id: { type: "string" }, label: { type: "string" } },
+        required: ["id", "label"],
+      },
+    },
+    edges: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          sourceId: { type: "string" },
+          targetId: { type: "string" },
+          label: { type: "string" },
+        },
+        required: ["id", "sourceId", "targetId"],
+      },
+    },
+    svg: { type: "string" },
+    renderer: { enum: ["local", "external"] },
+    rendererWarning: { type: "string" },
+  },
+  required: [
+    "diagramId",
+    "diagramLabel",
+    "nodeCount",
+    "edgeCount",
+    "nodes",
+    "edges",
+    "svg",
+    "renderer",
+  ],
+};
+
 const CONTRACTS: Record<string, AgentToolContract> = {
   syson_project_list: {
     annotations: readOnly,
@@ -318,17 +497,35 @@ const CONTRACTS: Record<string, AgentToolContract> = {
 
   // User-supplied AQL can mutate or delete model state. Do not label either
   // expression evaluator read-only merely because many calls are reads.
-  syson_query_aql: { annotations: destructive },
-  syson_search: { annotations: readOnly },
-  syson_query_eval: { annotations: destructive },
-  syson_query_requirements_trace: { annotations: readOnly },
+  syson_query_aql: { annotations: destructive, openInputSchema: true },
+  syson_search: { annotations: readOnly, outputSchema: searchOutputSchema },
+  syson_query_eval: { annotations: destructive, openInputSchema: true },
+  syson_query_requirements_trace: {
+    annotations: readOnly,
+    outputSchema: requirementsTraceOutputSchema,
+  },
   syson_part_structure: { annotations: readOnly },
 
-  syson_diagram_list: { annotations: readOnly },
-  syson_diagram_create: { annotations: createOrUpdate },
-  syson_diagram_drop: { annotations: createOrUpdate },
-  syson_diagram_arrange: { annotations: destructive },
-  syson_diagram_snapshot: { annotations: externalRender },
+  syson_diagram_list: {
+    annotations: readOnly,
+    outputSchema: diagramListOutputSchema,
+  },
+  syson_diagram_create: {
+    annotations: createOrUpdate,
+    outputSchema: diagramCreateOutputSchema,
+  },
+  syson_diagram_drop: {
+    annotations: createOrUpdate,
+    outputSchema: diagramDropOutputSchema,
+  },
+  syson_diagram_arrange: {
+    annotations: destructive,
+    outputSchema: diagramArrangeOutputSchema,
+  },
+  syson_diagram_snapshot: {
+    annotations: externalRender,
+    outputSchema: diagramSnapshotOutputSchema,
+  },
 
   syson_constraint_extract: { annotations: readOnly },
   syson_constraint_evaluate: { annotations: readOnly },
@@ -364,6 +561,9 @@ export function withAgentToolContract(tool: SysonTool): SysonTool {
   const contract = agentToolContract(tool);
   return {
     ...tool,
+    inputSchema: contract.openInputSchema
+      ? tool.inputSchema
+      : closeTopLevelInputSchema(tool.inputSchema),
     ...(tool.outputSchema
       ? {}
       : contract.outputSchema
@@ -371,4 +571,18 @@ export function withAgentToolContract(tool: SysonTool): SysonTool {
       : {}),
     annotations: contract.annotations,
   };
+}
+
+/**
+ * Reject misspelled or silently ignored top-level tool arguments. Dynamic maps
+ * below a declared property (for example constraint values keyed by feature
+ * path) stay deliberately open, because their keys are model data rather than
+ * an agent-selected provider envelope.
+ */
+function closeTopLevelInputSchema(
+  inputSchema: Record<string, unknown>,
+): Record<string, unknown> {
+  return inputSchema.type === "object"
+    ? { ...inputSchema, additionalProperties: false }
+    : inputSchema;
 }

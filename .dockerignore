@@ -1,0 +1,9 @@
+.git
+.github
+node_modules
+src/ui/node_modules
+src/ui/dist
+tests
+scripts
+.env
+.env.*

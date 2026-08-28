@@ -2,6 +2,29 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.8.1] - 2026-08-28
+
+### Added
+
+- A dedicated, digest-pinned Deno OCI build for `ghcr.io/casys-ai/mcp-syson`,
+  including `z3`, OCI source/revision/version labels, and release-time
+  multi-architecture SBOM/provenance attestation.
+- A release runtime-contract manifest that binds the published image digest,
+  source revision, semantic version, server discovery, tool contracts and UI
+  resource fingerprints after actual HTTP and stdio image smoke tests.
+- Closed top-level input schemas for all normal provider tools, plus output
+  contracts for search, requirement trace, diagram and validation results.
+
+### Changed
+
+- External Kroki rendering is opt-in through operator-only `SYSON_KROKI_URL`.
+  Local SVG rendering is the default and external failures fall back locally
+  without exposing raw DOT.
+- The stdio integration test now makes a real `tools/call` through the same
+  mock provider fixture used to prove HTTP handler behavior.
+- `main` verifies source only; a matching `v<semver>` tag is required to
+  publish the linked JSR package and OCI image.
+
 ## [0.8.0] - 2026-08-28
 
 ### Added

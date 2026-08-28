@@ -6,7 +6,7 @@
  * - create: create a new diagram (General View, etc.)
  * - drop: add semantic elements onto a diagram
  * - arrange: auto-layout the diagram
- * - snapshot: render SVG and broadcast to PML Live Feed
+ * - snapshot: render an SVG locally, with an operator-controlled external option
  *
  * @module lib/syson/tools/diagram
  */
@@ -15,20 +15,20 @@ import type { SysonTool } from "./types.ts";
 import { getSysonClient } from "../api/graphql-client.ts";
 
 import {
-  LIST_REPRESENTATIONS,
   GET_REPRESENTATION_DESCRIPTIONS,
+  LIST_REPRESENTATIONS,
 } from "../api/queries.ts";
 import {
+  ARRANGE_ALL,
   CREATE_REPRESENTATION,
   DROP_ON_DIAGRAM,
-  ARRANGE_ALL,
 } from "../api/mutations.ts";
 import type {
-  ListRepresentationsResult,
-  GetRepresentationDescriptionsResult,
+  ArrangeAllResult,
   CreateRepresentationResult,
   DropOnDiagramResult,
-  ArrangeAllResult,
+  GetRepresentationDescriptionsResult,
+  ListRepresentationsResult,
 } from "../api/types.ts";
 
 /**
@@ -41,17 +41,37 @@ function unwrapMutation<T extends object>(
   const payload = Object.values(result)[0] as Record<string, unknown>;
   if (payload?.__typename === "ErrorPayload") {
     throw new Error(
-      `[lib/syson] ${operationName} failed: ${(payload as { message: string }).message}`,
+      `[lib/syson] ${operationName} failed: ${
+        (payload as { message: string }).message
+      }`,
     );
   }
   return payload;
+}
+
+function mapDiagramDescendants(
+  childToParent: Map<string, string>,
+  node: Record<string, unknown>,
+  topLevelId: string,
+): void {
+  const children = node.childNodes as
+    | Array<Record<string, unknown>>
+    | undefined;
+  const borders = node.borderNodes as
+    | Array<Record<string, unknown>>
+    | undefined;
+  for (const child of [...(children ?? []), ...(borders ?? [])]) {
+    childToParent.set(child.id as string, topLevelId);
+    mapDiagramDescendants(childToParent, child, topLevelId);
+  }
 }
 
 // ============================================================================
 // WebSocket diagram snapshot
 // ============================================================================
 
-const DIAGRAM_SUBSCRIPTION = `subscription DiagramEvent($input: DiagramEventInput!) {
+const DIAGRAM_SUBSCRIPTION =
+  `subscription DiagramEvent($input: DiagramEventInput!) {
   diagramEvent(input: $input) {
     __typename
     ... on DiagramRefreshedEventPayload {
@@ -87,7 +107,7 @@ const DIAGRAM_SUBSCRIPTION = `subscription DiagramEvent($input: DiagramEventInpu
   }
 }`;
 
-interface DiagramNode {
+export interface DiagramNode {
   id: string;
   label: string;
   x: number;
@@ -96,7 +116,7 @@ interface DiagramNode {
   height: number;
 }
 
-interface DiagramEdge {
+export interface DiagramEdge {
   id: string;
   sourceId: string;
   targetId: string;
@@ -107,19 +127,30 @@ interface DiagramEdge {
  * Fetch diagram data via WebSocket subscription (one-shot).
  * Connects, gets first DiagramRefreshedEventPayload, disconnects.
  */
-async function fetchDiagramData(
+function fetchDiagramData(
   baseUrl: string,
   ecId: string,
   diagramId: string,
   timeoutMs = 10_000,
-): Promise<{ nodes: DiagramNode[]; edges: DiagramEdge[]; label: string; childToParent: Map<string, string> }> {
+): Promise<
+  {
+    nodes: DiagramNode[];
+    edges: DiagramEdge[];
+    label: string;
+    childToParent: Map<string, string>;
+  }
+> {
   const wsUrl = baseUrl.replace(/^http/, "ws") + "/subscriptions";
 
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(wsUrl, "graphql-ws");
     const timer = setTimeout(() => {
       ws.close();
-      reject(new Error(`[lib/syson] diagram snapshot timed out after ${timeoutMs}ms`));
+      reject(
+        new Error(
+          `[lib/syson] diagram snapshot timed out after ${timeoutMs}ms`,
+        ),
+      );
     }, timeoutMs);
 
     ws.onopen = () => {
@@ -136,7 +167,11 @@ async function fetchDiagramData(
           payload: {
             query: DIAGRAM_SUBSCRIPTION,
             variables: {
-              input: { id: crypto.randomUUID(), editingContextId: ecId, diagramId },
+              input: {
+                id: crypto.randomUUID(),
+                editingContextId: ecId,
+                diagramId,
+              },
             },
           },
         }));
@@ -150,7 +185,10 @@ async function fetchDiagramData(
           ws.close();
 
           const d = payload.diagram;
-          const layoutMap = new Map<string, { x: number; y: number; w: number; h: number }>();
+          const layoutMap = new Map<
+            string,
+            { x: number; y: number; w: number; h: number }
+          >();
           for (const l of d.layoutData.nodeLayoutData) {
             layoutMap.set(l.id, {
               x: l.position.x,
@@ -162,41 +200,33 @@ async function fetchDiagramData(
 
           // Build child → top-level parent mapping (recursive — edges reference borderNodes/childNodes)
           const childToParent = new Map<string, string>();
-          function mapDescendants(node: Record<string, unknown>, topLevelId: string) {
-            const children = node.childNodes as Array<Record<string, unknown>> | undefined;
-            const borders = node.borderNodes as Array<Record<string, unknown>> | undefined;
-            if (children) {
-              for (const c of children) {
-                childToParent.set(c.id as string, topLevelId);
-                mapDescendants(c, topLevelId);
-              }
-            }
-            if (borders) {
-              for (const b of borders) {
-                childToParent.set(b.id as string, topLevelId);
-                mapDescendants(b, topLevelId);
-              }
-            }
-          }
           for (const n of d.nodes) {
             const topId = (n as Record<string, unknown>).id as string;
-            mapDescendants(n as Record<string, unknown>, topId);
+            mapDiagramDescendants(
+              childToParent,
+              n as Record<string, unknown>,
+              topId,
+            );
           }
 
           // Only top-level nodes (skip childNodes compartments)
-          const nodes: DiagramNode[] = d.nodes.map((n: Record<string, unknown>) => {
-            const layout = layoutMap.get(n.id as string);
-            return {
-              id: n.id as string,
-              label: (n.insideLabel as { text: string } | null)?.text ?? "",
-              x: layout?.x ?? 0,
-              y: layout?.y ?? 0,
-              width: layout?.w ?? (n.defaultWidth as number) ?? 150,
-              height: layout?.h ?? (n.defaultHeight as number) ?? 60,
-            };
-          });
+          const nodes: DiagramNode[] = d.nodes.map(
+            (n: Record<string, unknown>) => {
+              const layout = layoutMap.get(n.id as string);
+              return {
+                id: n.id as string,
+                label: (n.insideLabel as { text: string } | null)?.text ?? "",
+                x: layout?.x ?? 0,
+                y: layout?.y ?? 0,
+                width: layout?.w ?? (n.defaultWidth as number) ?? 150,
+                height: layout?.h ?? (n.defaultHeight as number) ?? 60,
+              };
+            },
+          );
 
-          const edges: DiagramEdge[] = d.edges.map((e: Record<string, unknown>) => ({
+          const edges: DiagramEdge[] = d.edges.map((
+            e: Record<string, unknown>,
+          ) => ({
             id: e.id as string,
             sourceId: e.sourceId as string,
             targetId: e.targetId as string,
@@ -210,7 +240,13 @@ async function fetchDiagramData(
       if (msg.type === "error") {
         clearTimeout(timer);
         ws.close();
-        reject(new Error(`[lib/syson] diagram subscription error: ${JSON.stringify(msg.payload)}`));
+        reject(
+          new Error(
+            `[lib/syson] diagram subscription error: ${
+              JSON.stringify(msg.payload)
+            }`,
+          ),
+        );
       }
     };
 
@@ -221,23 +257,45 @@ async function fetchDiagramData(
   });
 }
 
-const KROKI_URL = "https://kroki.io/graphviz/svg";
+const KROKI_ENV = "SYSON_KROKI_URL";
+
+export type SvgRenderResult = {
+  svg: string;
+  renderer: "local" | "external";
+  rendererWarning?: string;
+};
 
 /**
- * Convert diagram data to GraphViz DOT, send to Kroki, return SVG.
- * Falls back to a simple local SVG if Kroki is unreachable.
+ * Render locally by default. An operator can explicitly opt into an external
+ * Kroki-compatible renderer with SYSON_KROKI_URL; the MCP caller cannot select
+ * an endpoint or cause a model graph to leave the deployment.
  */
-async function renderSvg(
+export async function renderDiagramSvg(
   nodes: DiagramNode[],
   edges: DiagramEdge[],
   diagramLabel: string,
   childToParent?: Map<string, string>,
-): Promise<string> {
+): Promise<SvgRenderResult> {
   if (nodes.length === 0) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60">
+    return {
+      renderer: "local",
+      rendererWarning:
+        "External diagram rendering is disabled; returned a local SVG.",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60">
       <rect width="100%" height="100%" fill="#0f0d1a" rx="8"/>
       <text x="200" y="35" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#888">Empty diagram</text>
-    </svg>`;
+    </svg>`,
+    };
+  }
+
+  const externalRendererUrl = Deno.env.get(KROKI_ENV)?.trim();
+  if (!externalRendererUrl) {
+    return localDiagramSvg(
+      nodes,
+      edges,
+      diagramLabel,
+      "External rendering is disabled. Set SYSON_KROKI_URL only after approving the renderer as a model-data recipient.",
+    );
   }
 
   // Build DOT source
@@ -248,12 +306,20 @@ async function renderSvg(
   dotLines.push(`  pad=0.5`);
   dotLines.push(`  nodesep=0.8`);
   dotLines.push(`  ranksep=1.2`);
-  dotLines.push(`  node [shape=box,style="filled,rounded",fillcolor="#1e1b4b",fontcolor="#e0e7ff",color="#6366f1",penwidth=2,fontname="sans-serif",fontsize=12,margin="0.3,0.15"]`);
-  dotLines.push(`  edge [color="#818cf8",fontcolor="#a5b4fc",fontname="sans-serif",fontsize=10,penwidth=1.5]`);
+  dotLines.push(
+    `  node [shape=box,style="filled,rounded",fillcolor="#1e1b4b",fontcolor="#e0e7ff",color="#6366f1",penwidth=2,fontname="sans-serif",fontsize=12,margin="0.3,0.15"]`,
+  );
+  dotLines.push(
+    `  edge [color="#818cf8",fontcolor="#a5b4fc",fontname="sans-serif",fontsize=10,penwidth=1.5]`,
+  );
 
   // Title as invisible cluster
   dotLines.push(`  labelloc=t`);
-  dotLines.push(`  label=<<font color="#c4b5fd" point-size="14"><b>${esc(diagramLabel)}</b></font>>`);
+  dotLines.push(
+    `  label=<<font color="#c4b5fd" point-size="14"><b>${
+      esc(diagramLabel)
+    }</b></font>>`,
+  );
 
   // Pre-resolve edges (port borderNodes → parent part)
   const nodeMap = new Map<string, DiagramNode>();
@@ -274,8 +340,10 @@ async function renderSvg(
   const connectedNodeIds = new Set<string>();
   const seen = new Set<string>();
   for (const e of edges) {
-    const resolvedSrc = (childToParent?.get(e.sourceId)) ?? (nodeMap.has(e.sourceId) ? e.sourceId : undefined);
-    const resolvedTgt = (childToParent?.get(e.targetId)) ?? (nodeMap.has(e.targetId) ? e.targetId : undefined);
+    const resolvedSrc = (childToParent?.get(e.sourceId)) ??
+      (nodeMap.has(e.sourceId) ? e.sourceId : undefined);
+    const resolvedTgt = (childToParent?.get(e.targetId)) ??
+      (nodeMap.has(e.targetId) ? e.targetId : undefined);
     if (!resolvedSrc || !resolvedTgt || resolvedSrc === resolvedTgt) continue;
 
     // Route through matching interface node: Part A → Interface → Part B
@@ -283,8 +351,14 @@ async function renderSvg(
     if (ifaceId) {
       const d1 = `${resolvedSrc}->${ifaceId}`;
       const d2 = `${ifaceId}->${resolvedTgt}`;
-      if (!seen.has(d1)) { seen.add(d1); resolvedEdges.push({ src: resolvedSrc, tgt: ifaceId }); }
-      if (!seen.has(d2)) { seen.add(d2); resolvedEdges.push({ src: ifaceId, tgt: resolvedTgt }); }
+      if (!seen.has(d1)) {
+        seen.add(d1);
+        resolvedEdges.push({ src: resolvedSrc, tgt: ifaceId });
+      }
+      if (!seen.has(d2)) {
+        seen.add(d2);
+        resolvedEdges.push({ src: ifaceId, tgt: resolvedTgt });
+      }
       connectedNodeIds.add(resolvedSrc);
       connectedNodeIds.add(ifaceId);
       connectedNodeIds.add(resolvedTgt);
@@ -292,7 +366,11 @@ async function renderSvg(
       const dedup = `${resolvedSrc}->${resolvedTgt}:${e.label ?? ""}`;
       if (!seen.has(dedup)) {
         seen.add(dedup);
-        resolvedEdges.push({ src: resolvedSrc, tgt: resolvedTgt, label: e.label });
+        resolvedEdges.push({
+          src: resolvedSrc,
+          tgt: resolvedTgt,
+          label: e.label,
+        });
         connectedNodeIds.add(resolvedSrc);
         connectedNodeIds.add(resolvedTgt);
       }
@@ -311,9 +389,19 @@ async function renderSvg(
 
     const nodeId = `n_${n.id.replace(/[^a-zA-Z0-9]/g, "_")}`;
     if (isInterface) {
-      dotLines.push(`  ${nodeId} [label=<<font point-size="9" color="#a5b4fc">${esc(stereotype)}</font><br/><b>${esc(name)}</b>>,shape=diamond,style="filled",fillcolor="#1a1a2e",color="#818cf8",penwidth=1.5,margin="0.2,0.1"]`);
+      dotLines.push(
+        `  ${nodeId} [label=<<font point-size="9" color="#a5b4fc">${
+          esc(stereotype)
+        }</font><br/><b>${
+          esc(name)
+        }</b>>,shape=diamond,style="filled",fillcolor="#1a1a2e",color="#818cf8",penwidth=1.5,margin="0.2,0.1"]`,
+      );
     } else {
-      dotLines.push(`  ${nodeId} [label=<<font point-size="9" color="#a5b4fc">${esc(stereotype)}</font><br/><b>${esc(name)}</b>>]`);
+      dotLines.push(
+        `  ${nodeId} [label=<<font point-size="9" color="#a5b4fc">${
+          esc(stereotype)
+        }</font><br/><b>${esc(name)}</b>>]`,
+      );
     }
   }
 
@@ -329,7 +417,7 @@ async function renderSvg(
   const dot = dotLines.join("\n");
 
   try {
-    const resp = await fetch(KROKI_URL, {
+    const resp = await fetch(externalRendererUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: dot,
@@ -337,21 +425,69 @@ async function renderSvg(
     if (!resp.ok) {
       throw new Error(`Kroki returned ${resp.status}: ${await resp.text()}`);
     }
-    return await resp.text();
+    return { svg: await resp.text(), renderer: "external" };
   } catch (err) {
-    // Fallback: return DOT source wrapped in a simple SVG with error message
-    console.error(`[syson_diagram_snapshot] Kroki failed: ${(err as Error).message}, returning DOT source`);
-    const escaped = esc(dot).replace(/\n/g, "&#10;");
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200">
-      <rect width="100%" height="100%" fill="#0f0d1a" rx="8"/>
-      <text x="300" y="30" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#ef4444">Kroki unreachable — raw DOT:</text>
-      <text x="20" y="60" font-family="monospace" font-size="10" fill="#9ca3af" xml:space="preserve">${escaped}</text>
-    </svg>`;
+    const detail = (err as Error).message;
+    console.error(
+      `[syson_diagram_snapshot] External renderer failed: ${detail}; returning local SVG`,
+    );
+    return localDiagramSvg(
+      nodes,
+      edges,
+      diagramLabel,
+      `External renderer failed (${detail}); returned a local SVG without sending a retry.`,
+    );
   }
 }
 
+/** A bounded local fallback: it never serialises raw DOT or contacts a host. */
+function localDiagramSvg(
+  nodes: DiagramNode[],
+  edges: DiagramEdge[],
+  diagramLabel: string,
+  rendererWarning: string,
+): SvgRenderResult {
+  const visibleNodes = nodes.slice(0, 12);
+  const width = 760;
+  const rowHeight = 44;
+  const height = 132 + visibleNodes.length * rowHeight;
+  const labels = visibleNodes.map((node, index) => {
+    const y = 104 + index * rowHeight;
+    return `<rect x="28" y="${
+      y - 22
+    }" width="704" height="32" rx="6" fill="#1e1b4b" stroke="#6366f1"/>
+      <text x="44" y="${y}" font-family="sans-serif" font-size="13" fill="#e0e7ff">${
+      esc(node.label || node.id)
+    }</text>`;
+  }).join("\n");
+  const omitted = nodes.length - visibleNodes.length;
+  const overflow = omitted > 0
+    ? `<text x="28" y="${
+      height - 18
+    }" font-family="sans-serif" font-size="12" fill="#a5b4fc">${omitted} additional node${
+      omitted === 1 ? "" : "s"
+    } omitted from local preview.</text>`
+    : "";
+
+  return {
+    renderer: "local",
+    rendererWarning,
+    svg:
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="100%" height="100%" fill="#0f0d1a" rx="8"/>
+      <text x="28" y="34" font-family="sans-serif" font-size="16" font-weight="bold" fill="#e0e7ff">${
+        esc(diagramLabel)
+      }</text>
+      <text x="28" y="60" font-family="sans-serif" font-size="12" fill="#a5b4fc">Local fallback: ${nodes.length} nodes, ${edges.length} edges.</text>
+      ${labels}
+      ${overflow}
+    </svg>`,
+  };
+}
+
 function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 // ============================================================================
@@ -385,13 +521,14 @@ export const diagramTools: SysonTool[] = [
         { editingContextId: editing_context_id as string },
       );
 
-      const representations = data.viewer.editingContext.representations.edges.map(
-        (e) => ({
-          id: e.node.id,
-          label: e.node.label,
-          kind: e.node.kind,
-        }),
-      );
+      const representations = data.viewer.editingContext.representations.edges
+        .map(
+          (e) => ({
+            id: e.node.id,
+            label: e.node.label,
+            kind: e.node.kind,
+          }),
+        );
 
       return { representations, count: representations.length };
     },
@@ -423,7 +560,8 @@ export const diagramTools: SysonTool[] = [
         },
         name: {
           type: "string",
-          description: "Display name for the new diagram. Defaults to 'Diagram'.",
+          description:
+            "Display name for the new diagram. Defaults to 'Diagram'.",
         },
         description_id: {
           type: "string",
@@ -457,9 +595,10 @@ export const diagramTools: SysonTool[] = [
         { editingContextId: ecId, objectId: elementId },
       );
 
-      const descriptions = descData.viewer.editingContext.representationDescriptions.edges.map(
-        (e) => e.node,
-      );
+      const descriptions = descData.viewer.editingContext
+        .representationDescriptions.edges.map(
+          (e) => e.node,
+        );
 
       // If no description specified, list available types
       if (!description_id && !description_label) {
@@ -528,8 +667,7 @@ export const diagramTools: SysonTool[] = [
   // --------------------------------------------------------------------------
   {
     name: "syson_diagram_drop",
-    description:
-      "Make model elements visible on a diagram. " +
+    description: "Make model elements visible on a diagram. " +
       "Elements must already exist in the model (created via syson_element_create or " +
       "syson_element_insert_sysml). This adds their graphical representation to the diagram. " +
       "Call syson_diagram_arrange after to auto-layout.",
@@ -617,8 +755,7 @@ export const diagramTools: SysonTool[] = [
   // --------------------------------------------------------------------------
   {
     name: "syson_diagram_arrange",
-    description:
-      "Auto-layout all elements on a diagram. " +
+    description: "Auto-layout all elements on a diagram. " +
       "Call after syson_diagram_drop. Then use syson_diagram_snapshot to render.",
     category: "diagram",
     inputSchema: {
@@ -663,8 +800,9 @@ export const diagramTools: SysonTool[] = [
     name: "syson_diagram_snapshot",
     description:
       "Render a diagram as SVG. Shows parts, interfaces, and connections " +
-      "with a dark-themed layout. Broadcasts to the live feed for real-time display. " +
-      "Call after syson_diagram_arrange for best results.",
+      "with a dark-themed layout. Rendering is local by default. An operator may " +
+      "explicitly configure SYSON_KROKI_URL for an external renderer; the result " +
+      "then identifies that external path. Call after syson_diagram_arrange for best results.",
     category: "diagram",
     inputSchema: {
       type: "object",
@@ -693,8 +831,17 @@ export const diagramTools: SysonTool[] = [
       const ecId = editing_context_id as string;
       const diagId = diagram_id as string;
 
-      const { nodes, edges, label, childToParent } = await fetchDiagramData(baseUrl, ecId, diagId);
-      const svg = await renderSvg(nodes, edges, label, childToParent);
+      const { nodes, edges, label, childToParent } = await fetchDiagramData(
+        baseUrl,
+        ecId,
+        diagId,
+      );
+      const rendered = await renderDiagramSvg(
+        nodes,
+        edges,
+        label,
+        childToParent,
+      );
 
       const result = {
         diagramId: diagId,
@@ -702,8 +849,16 @@ export const diagramTools: SysonTool[] = [
         nodeCount: nodes.length,
         edgeCount: edges.length,
         nodes: nodes.map((n) => ({ id: n.id, label: n.label })),
-        edges: edges.map((e) => ({ id: e.id, sourceId: e.sourceId, targetId: e.targetId, label: e.label })),
-        svg,
+        edges: edges.map((e) => ({
+          id: e.id,
+          sourceId: e.sourceId,
+          targetId: e.targetId,
+          label: e.label,
+        })),
+        svg: rendered.svg,
+        renderer: rendered.renderer,
+        ...(rendered.rendererWarning &&
+          { rendererWarning: rendered.rendererWarning }),
       };
 
       return result;

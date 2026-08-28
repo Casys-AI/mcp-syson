@@ -58,12 +58,29 @@ is a configuration error rather than a guessed port.
 
 ### 2. Start the MCP server
 
-This checkout and its release package are versioned as **0.8.0**. The
-main-branch workflow publishes that exact version to JSR only after the checks
-and package dry-run pass.
+This checkout and its release package are versioned as **0.8.1**. `main` runs
+verification only. A matching immutable `v0.8.1` tag publishes JSR and the
+dedicated multi-architecture `ghcr.io/casys-ai/mcp-syson` image together, with
+OCI source/revision/version labels, an SBOM, provenance and an HTTP+stdio
+runtime-contract smoke manifest.
 
-This package has **no Docker image of its own**. The compose instructions above
-run the separate upstream SysON and PostgreSQL runtime, not mcp-syson.
+The image contains this MCP provider (including `z3` for constraint solving),
+not SysON or PostgreSQL. The compose instructions above still run the separate
+upstream SysON and PostgreSQL runtime.
+
+After the matching release tag has published it, run the immutable image with
+an explicit SysON endpoint:
+
+```bash
+docker run --rm --publish 127.0.0.1:3009:3009 \
+  --env SYSON_URL=http://host.docker.internal:8180 \
+  ghcr.io/casys-ai/mcp-syson:0.8.1
+```
+
+Use the image digest recorded in that release's runtime-contract asset for a
+long-lived deployment. `SYSON_KROKI_URL` and the `MCP_AUTH_*` settings are the
+only optional deployment settings exposed to the container; see the renderer
+and transport notes below before enabling either.
 
 From a checkout:
 
@@ -80,7 +97,7 @@ deno task serve:stdio
 The pinned JSR command is:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.8.0/server --stdio
+deno run -A jsr:@casys/mcp-syson@0.8.1/server --stdio
 ```
 
 HTTP remains the default. Its endpoint is `http://127.0.0.1:3009/mcp`; configure
@@ -95,6 +112,15 @@ The default bind is loopback-only and the MCP endpoint has no built-in
 authentication. Do not bind it to a public interface without a trusted reverse
 proxy or equivalent network controls. Please report suspected vulnerabilities
 according to [SECURITY.md](SECURITY.md).
+
+### Diagram renderer privacy
+
+`syson_diagram_snapshot` produces a bounded local SVG by default. It does not
+send model names, edges or generated DOT to the Internet. An operator may set
+`SYSON_KROKI_URL` to a specifically approved Kroki-compatible endpoint; that is
+an explicit deployment choice, never an MCP tool argument. When that endpoint
+fails, the server returns a local SVG with a `rendererWarning` and does not
+retry externally or embed raw DOT.
 
 ### 3. Select only the tools you need
 
