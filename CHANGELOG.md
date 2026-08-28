@@ -2,7 +2,7 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
-## [0.8.1] - 2026-08-28
+## [0.8.2] - 2026-08-28
 
 ### Added
 
@@ -17,6 +17,11 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ### Changed
 
+- The provider release now pins supported Deno 2.9.6 in CI and to its verified
+  multi-architecture OCI index (`sha256:2014dc167ece617ef7e7ba40631ac2234c59e75ce693e7cc2dc2602b3c87859d`),
+  with Node.js 24.20.0 LTS for the viewer build. The `v0.8.1` tag was cancelled
+  before image, JSR, or GitHub Release publication because its Deno 2.5.4 pin
+  was past LTS support.
 - External Kroki rendering is opt-in through operator-only `SYSON_KROKI_URL`.
   Local SVG rendering is the default and external failures fall back locally
   without exposing raw DOT.

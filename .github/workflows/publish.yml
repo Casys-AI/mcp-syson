@@ -19,11 +19,11 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.5.4
+          deno-version: v2.9.6
 
       - uses: actions/setup-node@v5
         with:
-          node-version: "22.18.0"
+          node-version: "24.20.0"
 
       - name: Build UI viewers from the locked dependency graph
         run: |
@@ -63,11 +63,11 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.5.4
+          deno-version: v2.9.6
 
       - uses: actions/setup-node@v5
         with:
-          node-version: "22.18.0"
+          node-version: "24.20.0"
 
       - name: Bind the release tag to deno.json
         id: version

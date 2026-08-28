@@ -1,6 +1,6 @@
 # The manifest-list digest resolves to reviewed amd64 and arm64 Deno images.
 # Keep this in sync with the release workflow's multi-platform build.
-FROM docker.io/denoland/deno@sha256:a5c9bbca7fe855a35a8656b7ce0ee7ff0084154d7c5cdc5005a89dc882a88b63
+FROM docker.io/denoland/deno@sha256:2014dc167ece617ef7e7ba40631ac2234c59e75ce693e7cc2dc2602b3c87859d
 
 ARG VERSION=0.0.0-dev
 ARG REVISION=unknown

@@ -58,8 +58,8 @@ is a configuration error rather than a guessed port.
 
 ### 2. Start the MCP server
 
-This checkout and its release package are versioned as **0.8.1**. `main` runs
-verification only. A matching immutable `v0.8.1` tag publishes JSR and the
+This checkout and its release package are versioned as **0.8.2**. `main` runs
+verification only. A matching immutable `v0.8.2` tag publishes JSR and the
 dedicated multi-architecture `ghcr.io/casys-ai/mcp-syson` image together, with
 OCI source/revision/version labels, an SBOM, provenance and an HTTP+stdio
 runtime-contract smoke manifest.
@@ -74,7 +74,7 @@ an explicit SysON endpoint:
 ```bash
 docker run --rm --publish 127.0.0.1:3009:3009 \
   --env SYSON_URL=http://host.docker.internal:8180 \
-  ghcr.io/casys-ai/mcp-syson:0.8.1
+  ghcr.io/casys-ai/mcp-syson:0.8.2
 ```
 
 Use the image digest recorded in that release's runtime-contract asset for a
@@ -97,7 +97,7 @@ deno task serve:stdio
 The pinned JSR command is:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.8.1/server --stdio
+deno run -A jsr:@casys/mcp-syson@0.8.2/server --stdio
 ```
 
 HTTP remains the default. Its endpoint is `http://127.0.0.1:3009/mcp`; configure
