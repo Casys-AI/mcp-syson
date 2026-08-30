@@ -59,29 +59,28 @@ is a configuration error rather than a guessed port.
 
 ### 2. Start the MCP server
 
-This checkout and its release package are versioned as **0.8.4**. `main` runs
-verification only. A matching immutable `v0.8.4` tag publishes JSR and the
-dedicated multi-architecture `ghcr.io/casys-ai/mcp-syson` image together, with
-OCI source/revision/version labels, an SBOM, provenance and an HTTP+stdio
+Version **0.8.4** is published on JSR and as a dedicated multi-architecture
+`ghcr.io/casys-ai/mcp-syson` image. Its immutable `v0.8.4` release binds the
+package and image to source revision `ce890edfa9c307701e0274503576c4445467ea65`,
+with OCI source/revision/version labels, an SBOM, provenance and an HTTP+stdio
 runtime-contract smoke manifest.
 
 The image contains this MCP provider (including `z3` for constraint solving),
 not SysON or PostgreSQL. The compose instructions above still run the separate
 upstream SysON and PostgreSQL runtime.
 
-After the matching `v0.8.4` tag has published it, run the matching image with
-an explicit SysON endpoint:
+Run the published image by its immutable OCI index digest with an explicit SysON
+endpoint:
 
 ```bash
 docker run --rm --publish 127.0.0.1:3009:3009 \
   --env SYSON_URL=http://host.docker.internal:8180 \
-  ghcr.io/casys-ai/mcp-syson:0.8.4
+  ghcr.io/casys-ai/mcp-syson@sha256:25dc484fe27e8bb6bd8c748bf3a0b35d7d6416105b139438b2f96d8dfd813624
 ```
 
-For a long-lived deployment, use the immutable image digest recorded in that
-release's evidence assets rather than a tag. `SYSON_KROKI_URL` and the
-`MCP_AUTH_*` settings are the only optional deployment settings exposed to the
-container; see the renderer and transport notes below before enabling either.
+`SYSON_KROKI_URL` and the `MCP_AUTH_*` settings are the only optional deployment
+settings exposed to the container; see the renderer and transport notes below
+before enabling either.
 
 ### Real SysON release qualification
 
@@ -94,11 +93,14 @@ exact project/root/element read-back. It fails closed if the pinned runtime,
 released image labels, MCP schemas, expected child description, or read-back
 values drift.
 
-The release exposes `release-runtime-qualification.json` as both a workflow
-artifact and release asset. It binds the three image digests, provider source
-revision, package version, and discovery/tool/read-back fingerprints. It is
-provider compatibility evidence only: it is not a Digital Thread seal, MRTR
-approval, or architecture verdict.
+The release exposes
+[`release-runtime-contract.json`](https://github.com/Casys-AI/mcp-syson/releases/download/v0.8.4/release-runtime-contract.json)
+and
+[`release-runtime-qualification.json`](https://github.com/Casys-AI/mcp-syson/releases/download/v0.8.4/release-runtime-qualification.json).
+The qualification binds the three image digests, provider source revision,
+package version, and discovery/tool/read-back fingerprints. It is provider
+compatibility evidence only: it is not a Digital Thread seal, MRTR approval, or
+architecture verdict.
 
 From a checkout:
 
