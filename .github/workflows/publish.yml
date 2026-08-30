@@ -178,7 +178,73 @@ jobs:
           path: ${{ runner.temp }}/release-runtime-contract.json
           if-no-files-found: error
 
-      - name: Publish the exact JSR package after image smoke verification
+      - name: Qualify the published provider against the reviewed SysON runtime
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          VERSION: ${{ steps.image.outputs.version }}
+          REVISION: ${{ github.sha }}
+          QUALIFICATION_MCP_PORT: "3010"
+          QUALIFICATION_SYSON_PORT: "3011"
+          QUALIFICATION_POSTGRES_IMAGE: postgres@sha256:c9d304da25223a60a3b3c5ec77b599c59f4a6088950ee612fdb5115d713d100d
+          QUALIFICATION_SYSON_IMAGE: eclipsesyson/syson@sha256:c1f457ed236757f717ea1c9f79f0c950be8d79db89f3f265a81a7310200bb690
+        run: |
+          QUALIFICATION_MCP_SYSON_IMAGE="${IMAGE_NAME}@${IMAGE_DIGEST}"
+          QUALIFICATION_PROJECT="mcp-syson-qualification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          export QUALIFICATION_MCP_SYSON_IMAGE QUALIFICATION_PROJECT
+          cleanup() {
+            STATUS=$?
+            docker compose --project-name "$QUALIFICATION_PROJECT" --file docker-compose.qualification.yml logs --no-color || true
+            if ! docker compose --project-name "$QUALIFICATION_PROJECT" --file docker-compose.qualification.yml down --volumes --remove-orphans; then
+              STATUS=1
+            fi
+            trap - EXIT
+            exit "$STATUS"
+          }
+          trap cleanup EXIT
+          docker compose --project-name "$QUALIFICATION_PROJECT" --file docker-compose.qualification.yml config > "$RUNNER_TEMP/mcp-syson-qualification-compose.yml"
+          docker compose --project-name "$QUALIFICATION_PROJECT" --file docker-compose.qualification.yml pull
+          docker compose --project-name "$QUALIFICATION_PROJECT" --file docker-compose.qualification.yml up --detach --wait --wait-timeout 600
+          QUALIFICATION_MCP_CONTAINER="$(docker compose --project-name "$QUALIFICATION_PROJECT" --file docker-compose.qualification.yml ps --quiet mcp-syson)"
+          QUALIFICATION_SYSON_CONTAINER="$(docker compose --project-name "$QUALIFICATION_PROJECT" --file docker-compose.qualification.yml ps --quiet syson)"
+          QUALIFICATION_DATABASE_CONTAINER="$(docker compose --project-name "$QUALIFICATION_PROJECT" --file docker-compose.qualification.yml ps --quiet database)"
+          test -n "$QUALIFICATION_MCP_CONTAINER"
+          test -n "$QUALIFICATION_SYSON_CONTAINER"
+          test -n "$QUALIFICATION_DATABASE_CONTAINER"
+          READY=false
+          for attempt in $(seq 1 60); do
+            STATUS="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 2 "http://127.0.0.1:${QUALIFICATION_MCP_PORT}/mcp" || true)"
+            if test "$STATUS" = 405; then
+              READY=true
+              break
+            fi
+            sleep 1
+          done
+          test "$READY" = true
+          deno run --frozen --allow-net --allow-read --allow-run --allow-write scripts/qualify-syson-runtime.ts \
+            --http-url "http://127.0.0.1:${QUALIFICATION_MCP_PORT}/mcp" \
+            --syson-url "http://127.0.0.1:${QUALIFICATION_SYSON_PORT}" \
+            --mcp-container "$QUALIFICATION_MCP_CONTAINER" \
+            --syson-container "$QUALIFICATION_SYSON_CONTAINER" \
+            --database-container "$QUALIFICATION_DATABASE_CONTAINER" \
+            --mcp-image "$QUALIFICATION_MCP_SYSON_IMAGE" \
+            --mcp-image-digest "$IMAGE_DIGEST" \
+            --syson-image "$QUALIFICATION_SYSON_IMAGE" \
+            --syson-image-digest sha256:c1f457ed236757f717ea1c9f79f0c950be8d79db89f3f265a81a7310200bb690 \
+            --database-image "$QUALIFICATION_POSTGRES_IMAGE" \
+            --database-image-digest sha256:c9d304da25223a60a3b3c5ec77b599c59f4a6088950ee612fdb5115d713d100d \
+            --version "$VERSION" \
+            --revision "$REVISION" \
+            --runtime-contract "$RUNNER_TEMP/release-runtime-contract.json" \
+            --output "$RUNNER_TEMP/release-runtime-qualification.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-syson-runtime-qualification-${{ steps.image.outputs.version }}
+          path: ${{ runner.temp }}/release-runtime-qualification.json
+          if-no-files-found: error
+
+      - name: Publish the exact JSR package after image smoke and SysON qualification
         run: npx jsr publish
 
       - name: Publish release evidence bound to tag, commit and image digest
@@ -189,6 +255,6 @@ jobs:
           IMAGE_NAME: ${{ steps.image.outputs.name }}
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-runtime-contract.json" \
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-runtime-contract.json" "$RUNNER_TEMP/release-runtime-qualification.json" \
             --title "mcp-syson $VERSION" \
-            --notes "Published $IMAGE_NAME@$IMAGE_DIGEST after the runtime-contract smoke verification."
+            --notes "Published $IMAGE_NAME@$IMAGE_DIGEST after HTTP/stdio smoke and bounded SysON provider-compatibility qualification. The qualification is not a Digital Thread seal, MRTR approval, or architecture verdict."

@@ -21,7 +21,9 @@
 
 services:
   database:
-    image: postgres:15
+    # Keep local PostgreSQL native on Apple Silicon while remaining immutable.
+    # The qualification overlay instead pins the reviewed linux/amd64 manifest.
+    image: "postgres@sha256:9b1d34adbce1dd07ee6e94b4a2cf698884b89bd44a6c9c12f5da8f3acbfe4957"
     environment:
       POSTGRES_DB: syson
       POSTGRES_USER: syson
@@ -37,7 +39,7 @@ services:
       - syson
 
   app:
-    image: "${SYSON_IMAGE:-eclipsesyson/syson:v2026.7.0}"
+    image: "${SYSON_IMAGE:-eclipsesyson/syson@sha256:c1f457ed236757f717ea1c9f79f0c950be8d79db89f3f265a81a7310200bb690}"
     # SysON does not publish an arm64 image; Docker Desktop/Colima emulates it
     # on Apple Silicon instead of failing image resolution.
     platform: linux/amd64
@@ -54,7 +56,13 @@ services:
       database:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
+      test: [
+        "CMD",
+        "wget",
+        "-q",
+        "--spider",
+        "http://localhost:8080/actuator/health",
+      ]
       interval: 10s
       timeout: 5s
       retries: 20

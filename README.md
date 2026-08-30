@@ -53,13 +53,14 @@ The server uses both `$SYSON_URL/api/graphql` and the SysML v2 REST surface
 under `$SYSON_URL/api/rest`. There is **no default URL**: an unset `SYSON_URL`
 is a configuration error rather than a guessed port.
 
-> To pin a different SysON build, set `SYSON_IMAGE` (default
-> `eclipsesyson/syson:v2026.7.0`).
+> To run a reviewed alternative, set `SYSON_IMAGE` to its immutable OCI
+> `image@sha256:...` reference. The default is the reviewed SysON v2026.7.0
+> Linux/amd64 manifest, `eclipsesyson/syson@sha256:c1f457ed236757f717ea1c9f79f0c950be8d79db89f3f265a81a7310200bb690`.
 
 ### 2. Start the MCP server
 
-This checkout and its release package are versioned as **0.8.3**. `main` runs
-verification only. A matching immutable `v0.8.3` tag publishes JSR and the
+This checkout and its release package are versioned as **0.8.4**. `main` runs
+verification only. A matching immutable `v0.8.4` tag publishes JSR and the
 dedicated multi-architecture `ghcr.io/casys-ai/mcp-syson` image together, with
 OCI source/revision/version labels, an SBOM, provenance and an HTTP+stdio
 runtime-contract smoke manifest.
@@ -68,22 +69,36 @@ The image contains this MCP provider (including `z3` for constraint solving),
 not SysON or PostgreSQL. The compose instructions above still run the separate
 upstream SysON and PostgreSQL runtime.
 
-**Release status — 0.8.3 is published to JSR and GHCR.** Its immutable
-multi-architecture OCI index is
-`ghcr.io/casys-ai/mcp-syson@sha256:87eee6e35a636124d5ba6911492a245d69edcdf1ba67575676c22a0e9d7ce65e`.
-Run that verified digest with an explicit SysON endpoint:
+After the matching `v0.8.4` tag has published it, run the matching image with
+an explicit SysON endpoint:
 
 ```bash
 docker run --rm --publish 127.0.0.1:3009:3009 \
   --env SYSON_URL=http://host.docker.internal:8180 \
-  ghcr.io/casys-ai/mcp-syson@sha256:87eee6e35a636124d5ba6911492a245d69edcdf1ba67575676c22a0e9d7ce65e
+  ghcr.io/casys-ai/mcp-syson:0.8.4
 ```
 
-The [runtime-contract asset](https://github.com/Casys-AI/mcp-syson/releases/download/v0.8.3/release-runtime-contract.json)
-binds that digest to `v0.8.3`, commit `cf22348`, and matching HTTP/stdio tool
-and UI fingerprints. `SYSON_KROKI_URL` and the `MCP_AUTH_*` settings are the
-only optional deployment settings exposed to the container; see the renderer
-and transport notes below before enabling either.
+For a long-lived deployment, use the immutable image digest recorded in that
+release's evidence assets rather than a tag. `SYSON_KROKI_URL` and the
+`MCP_AUTH_*` settings are the only optional deployment settings exposed to the
+container; see the renderer and transport notes below before enabling either.
+
+### Real SysON release qualification
+
+For each release tag, CI starts a fresh, isolated topology from
+`docker-compose.qualification.yml`: the reviewed SysON v2026.7.0 OCI digest,
+its digest-pinned PostgreSQL database, and the just-published digest-pinned
+`mcp-syson` image. The bounded MCP route creates a project, reads its editing
+context, creates a model and root package, creates a `PartUsage`, and requires
+exact project/root/element read-back. It fails closed if the pinned runtime,
+released image labels, MCP schemas, expected child description, or read-back
+values drift.
+
+The release exposes `release-runtime-qualification.json` as both a workflow
+artifact and release asset. It binds the three image digests, provider source
+revision, package version, and discovery/tool/read-back fingerprints. It is
+provider compatibility evidence only: it is not a Digital Thread seal, MRTR
+approval, or architecture verdict.
 
 From a checkout:
 
@@ -100,7 +115,7 @@ deno task serve:stdio
 The pinned JSR command is:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.8.3/server --stdio
+deno run -A jsr:@casys/mcp-syson@0.8.4/server --stdio
 ```
 
 HTTP remains the default. Its endpoint is `http://127.0.0.1:3009/mcp`; configure
@@ -420,7 +435,7 @@ built viewers without a Node toolchain.
 | Variable      | Required | Description                                                                                                |
 | ------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
 | `SYSON_URL`   | **yes**  | Base URL of the SysON instance, e.g. `http://localhost:8180`. No default — an unset value is a hard error. |
-| `SYSON_IMAGE` | no       | SysON Docker image for `docker-compose.yml` (default `eclipsesyson/syson:v2026.7.0`)                       |
+| `SYSON_IMAGE` | no       | Immutable SysON OCI image for `docker-compose.yml` (default: reviewed v2026.7.0 digest)                     |
 
 ## SysON API boundaries
 
@@ -447,6 +462,7 @@ mod.ts                 # Public API
 server.ts              # HTTP and stdio MCP entry point
 deno.json              # Package config
 docker-compose.yml     # SysON + PostgreSQL for local use
+docker-compose.qualification.yml # Ephemeral pinned SysON + PostgreSQL + released MCP qualification topology
 src/
   api/
     graphql-client.ts  # Zero-dependency GraphQL client over fetch()

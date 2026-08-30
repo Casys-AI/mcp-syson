@@ -9,7 +9,7 @@ import { getCategories, SysonToolsClient } from "./src/client.ts";
 import { loadUiHtml, UI_RESOURCES } from "./src/ui/mod.ts";
 
 const DEFAULT_HTTP_PORT = 3009;
-const PACKAGE_VERSION = "0.8.3";
+const PACKAGE_VERSION = "0.8.4";
 
 const SERVER_INSTRUCTIONS =
   "Use SysON as a provider for explicit model reads and writes. Inspect tools/list " +

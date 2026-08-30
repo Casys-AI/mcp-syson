@@ -42,7 +42,7 @@ export interface GqlStereotype {
 export interface GqlChildCreationDescription {
   id: string;
   label: string;
-  iconURL?: string;
+  iconURL?: string[];
 }
 
 export interface GqlRootObjectCreationDescription {

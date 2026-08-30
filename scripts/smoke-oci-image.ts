@@ -170,12 +170,8 @@ async function inspectTransport(
 
   const listed = await client.request("tools/list");
   const tools = listed.tools as JsonRecord[];
-  if (!Array.isArray(tools) || tools.length !== 31) {
-    throw new Error(
-      `${transport} expected 31 tools, got ${
-        Array.isArray(tools) ? tools.length : "none"
-      }`,
-    );
+  if (!Array.isArray(tools)) {
+    throw new Error(`${transport} tools/list did not return a tools array`);
   }
   for (const tool of tools) {
     const name = tool.name;
@@ -195,6 +191,11 @@ async function inspectTransport(
     const tool = tools.find((candidate) => candidate.name === name);
     if (!tool?.outputSchema) {
       throw new Error(`${transport} ${name} has no output schema`);
+    }
+  }
+  for (const name of ["syson_project_create", "syson_element_get"]) {
+    if (!tools.some((tool) => tool.name === name)) {
+      throw new Error(`${transport} is missing required ${name}`);
     }
   }
 

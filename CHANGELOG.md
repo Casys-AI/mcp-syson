@@ -2,6 +2,23 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.8.4] - 2026-08-30
+
+### Added
+
+- Tag releases now qualify the published, digest-pinned `mcp-syson` image
+  against a fresh topology containing reviewed, digest-pinned SysON v2026.7.0
+  and PostgreSQL runtimes. The downloadable qualification result binds those
+  identities, OCI labels, source revision, package version and bounded-route
+  fingerprints after project/model/element creation and exact read-back.
+
+### Changed
+
+- The qualification workflow discovers its Compose service IDs, gives SysON a
+  240-second healthcheck start period and up to 600 seconds to become ready,
+  and fails the release if cleanup cannot complete.
+- Local SysON and PostgreSQL Compose defaults now use immutable OCI digests.
+
 ## [0.8.3] - 2026-08-28
 
 ### Fixed

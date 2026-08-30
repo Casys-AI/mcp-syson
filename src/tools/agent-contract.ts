@@ -150,7 +150,7 @@ const childTypesOutputSchema = {
         properties: {
           id: { type: "string" },
           label: { type: "string" },
-          iconURL: { type: ["string", "null"] },
+          iconURL: { type: ["array", "null"], items: { type: "string" } },
         },
         required: ["id", "label", "iconURL"],
       },

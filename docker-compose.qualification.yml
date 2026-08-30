@@ -1,0 +1,69 @@
+# Ephemeral release qualification topology. Every image is immutable; callers
+# must provide the released mcp-syson image digest. Use a unique compose project
+# name and tear it down with --volumes after the qualification.
+services:
+  database:
+    image: "${QUALIFICATION_POSTGRES_IMAGE:?Set QUALIFICATION_POSTGRES_IMAGE to postgres@sha256:...}"
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: syson
+      POSTGRES_USER: syson
+      POSTGRES_PASSWORD: syson
+    volumes:
+      - qualification-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syson -d syson"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - qualification
+
+  syson:
+    image: "${QUALIFICATION_SYSON_IMAGE:?Set QUALIFICATION_SYSON_IMAGE to eclipsesyson/syson@sha256:...}"
+    platform: linux/amd64
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database/syson
+      SPRING_DATASOURCE_USERNAME: syson
+      SPRING_DATASOURCE_PASSWORD: syson
+      SIRIUS_COMPONENTS_CORS_ALLOWEDORIGINPATTERNS: "*"
+      SERVER_PORT: 8080
+      MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED: "false"
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: [
+        "CMD",
+        "wget",
+        "-q",
+        "--spider",
+        "http://localhost:8080/actuator/health",
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 240s
+    ports:
+      - "127.0.0.1:${QUALIFICATION_SYSON_PORT:?Set QUALIFICATION_SYSON_PORT}:8080"
+    networks:
+      - qualification
+
+  mcp-syson:
+    image: "${QUALIFICATION_MCP_SYSON_IMAGE:?Set QUALIFICATION_MCP_SYSON_IMAGE to ghcr.io/casys-ai/mcp-syson@sha256:...}"
+    platform: linux/amd64
+    environment:
+      SYSON_URL: http://syson:8080
+    depends_on:
+      syson:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${QUALIFICATION_MCP_PORT:?Set QUALIFICATION_MCP_PORT}:3009"
+    networks:
+      - qualification
+
+networks:
+  qualification:
+
+volumes:
+  qualification-db-data:

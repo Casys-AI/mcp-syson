@@ -67,7 +67,7 @@ Deno.test("syson_model_child_types - returns available types", async () => {
     viewer: {
       editingContext: {
         childCreationDescriptions: [
-          { id: "d1", label: "New PartUsage", iconURL: "/icons/part.svg" },
+          { id: "d1", label: "New PartUsage", iconURL: ["/icons/part.svg"] },
           { id: "d2", label: "New RequirementUsage", iconURL: null },
           { id: "d3", label: "New Package", iconURL: null },
         ],
