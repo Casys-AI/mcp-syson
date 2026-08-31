@@ -2,7 +2,7 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
-## [0.8.5] - Unreleased
+## [0.8.5] - 2026-08-31
 
 ### Added
 
@@ -10,11 +10,21 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
   `./view-app-manifest` package export, declares all six viewer bundles and
   their exact recorded-session compatibility without embedding a session,
   anchor or provider authority.
+- Provider-owned read-only projections for exact Digital Thread architecture,
+  part-definition and requirements captures, verified against their original
+  recorded-session fingerprint before adaptation.
+- Focused MCP App, safety, configuration and provider-development guides, plus
+  a real recorded requirements-viewer capture in the public README.
 
 ### Changed
 
 - Viewer builds now require the audited local `@casys/mcp-view@0.9.1` and
   `@casys/mcp-view-components@0.2.0` split that owns the shared v2 primitives.
+- The public README now presents the provider and quick start concisely while
+  keeping exact contracts and operational detail in `docs/`.
+- The UI build lock now resolves the maintained Vite 6 line and current
+  transitive build dependencies; the committed Apps were rebuilt with no
+  source-contract change.
 
 ## [0.8.4] - 2026-08-30
 

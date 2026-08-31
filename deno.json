@@ -25,6 +25,8 @@
       "server.ts",
       "src/**/*.ts",
       "src/ui/view-app-manifest.json",
+      "docs/**/*.md",
+      "docs/images/*.png",
       "README.md",
       "CHANGELOG.md",
       "SECURITY.md",
