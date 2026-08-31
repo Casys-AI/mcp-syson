@@ -14,7 +14,6 @@ import {
   Toolbar,
 } from "@casys/mcp-view-components/preact/components";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { cx } from "../../components/utils";
 import {
   defaultComponentSurface,
   recordedProjectionDigest,
@@ -148,10 +147,9 @@ function Visual({ data }: { data: DiagramSnapshot }) {
         <div
           ref={containerRef}
           aria-label="Recorded SysON diagram. Drag to pan; use plus, minus, or zero to zoom and fit."
-          className={cx(
-            "syson-diagram-canvas",
-            dragging ? "cursor-grabbing" : "cursor-grab",
-          )}
+          className={`syson-diagram-canvas ${
+            dragging ? "cursor-grabbing" : "cursor-grab"
+          }`}
           role="group"
           tabIndex={0}
           onKeyDown={(event) => {
