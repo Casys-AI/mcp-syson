@@ -5,8 +5,10 @@ import {
   Badge,
   Button,
   Card,
-  DataTable,
-  KeyValueList,
+  ElementIdent,
+  ElementProvenance,
+  ElementReading,
+  SemanticElement,
   StateMessage,
   Toolbar,
 } from "@casys/mcp-view-components/preact/components";
@@ -14,7 +16,10 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { cx } from "../../components/utils";
 import {
   defaultComponentSurface,
+  recordedProjectionDigest,
+  sysmlRef,
   VIEWER_COMPONENT_KEYS,
+  VIEWER_DEFAULT_SURFACE_KEYS,
 } from "../../shared/component-catalog";
 import {
   definePreactComponent,
@@ -44,25 +49,34 @@ interface DiagramSnapshot extends Record<string, unknown> {
 
 function Summary({ data }: { data: DiagramSnapshot }) {
   return (
-    <Card
-      className="syson-hero"
-      eyebrow="SysON"
-      title={data.diagramLabel || "Diagram"}
-      actions={
-        <div className="mcp-view-badges">
-          <Badge tone="info">
-            {data.renderer === "external" ? "Kroki SVG" : "Local SVG"}
-          </Badge>
-          <Badge tone="info">{data.nodeCount} nodes</Badge>
-          <Badge>{data.edgeCount} edges</Badge>
-        </div>
+    <SemanticElement
+      reference={sysmlRef("diagram", data.diagramId)}
+      density="card"
+      ident={
+        <ElementIdent
+          label={data.diagramLabel || "Diagram"}
+          detail={data.diagramId}
+        />
       }
-    >
-      <p className="syson-lede">
-        Recorded semantic topology projected as passive SVG. Pan, zoom, or
-        inspect the exact element list below.
-      </p>
-    </Card>
+      reading={[
+        <ElementReading
+          key="nodes"
+          label="Nodes"
+          value={String(data.nodeCount)}
+        />,
+        <ElementReading
+          key="edges"
+          label="Edges"
+          value={String(data.edgeCount)}
+        />,
+      ]}
+      provenance={
+        <ElementProvenance
+          label="Renderer"
+          value={data.renderer === "external" ? "Kroki SVG" : "Local SVG"}
+        />
+      }
+    />
   );
 }
 
@@ -116,7 +130,7 @@ function Visual({ data }: { data: DiagramSnapshot }) {
       )}
       <Card
         className="syson-diagram-card"
-        title="Diagram canvas"
+        title={data.diagramLabel || "Diagram"}
         actions={
           <Toolbar label="Diagram zoom controls">
             <Button title="Zoom in" onClick={() => zoomBy(1.2)}>
@@ -204,6 +218,7 @@ function Elements(
   },
 ) {
   const [selected, setSelected] = useState<string>();
+  const digest = recordedProjectionDigest(context);
   if (!data.nodes?.length) {
     return (
       <StateMessage title="No elements">
@@ -213,43 +228,49 @@ function Elements(
   }
   return (
     <Card title="Diagram elements" actions={<Badge>{data.nodes.length}</Badge>}>
-      <DataTable
-        label="Diagram elements"
-        rows={data.nodes}
-        rowKey={(node) =>
-          node.id}
-        selected={(node) =>
-          selected === node.id}
-        onSelect={(node) => {
-          setSelected(node.id);
-          publishSelection(
-            context,
-            "select-node",
-            "syson.element.selected",
-            { nodeId: node.id, label: node.label },
-          );
-        }}
-        columns={[{
-          id: "label",
-          label: "Element",
-          render: (node) => node.label || "(unnamed)",
-        }]}
-      />
+      <div aria-label="Diagram elements" className="syson-element-stack">
+        {data.nodes.map((node) => (
+          <SemanticElement
+            key={node.id}
+            className={selected === node.id ? "mcp-view-selected" : undefined}
+            reference={sysmlRef("diagram-node", node.id, digest)}
+            density="row"
+            ident={
+              <ElementIdent
+                label={node.label || "(unnamed)"}
+                detail={node.id}
+              />
+            }
+            activationLabel={`Select ${node.label || node.id}`}
+            onActivate={() => {
+              setSelected(node.id);
+              publishSelection(
+                context,
+                "select-node",
+                "syson.element.selected",
+                { nodeId: node.id, label: node.label },
+              );
+            }}
+          />
+        ))}
+      </div>
     </Card>
   );
 }
 
 function Identity({ data }: { data: DiagramSnapshot }) {
   return (
-    <Card title="Diagram identity">
-      <KeyValueList
-        items={[{
-          id: "diagram-id",
-          label: "Diagram ID",
-          value: <code>{data.diagramId || "unknown"}</code>,
-        }]}
-      />
-    </Card>
+    <SemanticElement
+      reference={sysmlRef("diagram", data.diagramId)}
+      density="card"
+      ident={
+        <ElementIdent
+          label="Diagram identity"
+          detail={data.diagramId || "unknown"}
+        />
+      }
+      provenance={<ElementProvenance label="Renderer" value={data.renderer} />}
+    />
   );
 }
 
@@ -276,7 +297,7 @@ const registry = defineComponentRegistry<
       description: "Stable SysON diagram identifier",
     }, ({ data }) => <Identity data={data} />),
   },
-  defaultSurface: defaultComponentSurface(keys),
+  defaultSurface: defaultComponentSurface(VIEWER_DEFAULT_SURFACE_KEYS.diagram),
 });
 
 void startPreactSurfaceApp({

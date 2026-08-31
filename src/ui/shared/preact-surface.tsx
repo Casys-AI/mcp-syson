@@ -23,8 +23,13 @@ import {
   definePreactComponent as defineSharedPreactComponent,
   type PreactSurfaceComponentProps,
 } from "@casys/mcp-view-components/preact";
-import type { FunctionComponent } from "preact";
+import {
+  Badge,
+  KeyValueList,
+} from "@casys/mcp-view-components/preact/components";
+import { createElement, type FunctionComponent, render } from "preact";
 import { SYSON_VIEW_APP_MANIFEST, type SysonViewKey } from "../app-manifest.ts";
+import { digestFromSha256Prefix } from "./component-catalog.ts";
 import {
   parseSysonRecordedViewSession,
   type SysonRecordedViewSession,
@@ -83,6 +88,7 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
   let mounted: MountedComponentSurface | undefined;
   let pendingMount: Promise<void> | undefined;
   let mountGeneration = 0;
+  let recordedBanner: HTMLElement | undefined;
   let removeHostContextListener: (() => void) | undefined;
   let transitionTail: Promise<void> = Promise.resolve();
 
@@ -119,8 +125,15 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
     return transitionTail;
   };
 
+  const unmountRecordedBanner = (): void => {
+    if (!recordedBanner) return;
+    render(null, recordedBanner);
+    recordedBanner = undefined;
+  };
+
   const disposeSurface = async (): Promise<void> => {
     mountGeneration += 1;
+    unmountRecordedBanner();
     await pendingMount;
     pendingMount = undefined;
     const active = mounted;
@@ -138,15 +151,29 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
       return data;
     },
     render(context, data) {
+      unmountRecordedBanner();
       const shell = document.createElement("div");
       shell.className = "mcp-view-preact-surface syson-component-surface";
       shell.dataset.mode = context.state.mode ?? "direct";
       shell.dataset.displayMode = context.hostContext.displayMode ?? "inline";
       shell.dataset.platform = context.hostContext.platform ?? "unknown";
       shell.setAttribute("aria-label", "SysON recorded model view");
-      const selected = context.state.mode === "recorded"
-        ? options.registry.defaultSurface
-        : activeComponentSurface(options.registry, context.hostContext);
+      let selected;
+      try {
+        selected = context.state.mode === "recorded"
+          ? options.registry.defaultSurface
+          : activeComponentSurface(options.registry, context.hostContext);
+      } catch (error) {
+        shell.replaceChildren(
+          message(
+            `Host-selected component surface rejected: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            "error",
+          ),
+        );
+        return shell;
+      }
       if (!selected) {
         shell.replaceChildren(
           message(
@@ -162,10 +189,8 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
         context.state.mode === "recorded" &&
         context.state.recordedSession
       ) {
-        shell.append(
-          recordedBasisBanner(context.state.recordedSession),
-          componentRoot,
-        );
+        recordedBanner = recordedBasisBanner(context.state.recordedSession);
+        shell.append(recordedBanner, componentRoot);
       } else {
         shell.append(componentRoot);
       }
@@ -310,48 +335,45 @@ function recordedBasisBanner<TData extends ResultData>(
   const banner = document.createElement("aside");
   banner.className = "syson-recorded-basis";
   banner.setAttribute("aria-label", "Recorded Digital Thread basis");
-  const digest = session.projectionFingerprint.slice("sha256:".length, 12);
-
-  const status = document.createElement("div");
-  status.className = "syson-recorded-status";
-  const pulse = document.createElement("span");
-  pulse.className = "syson-recorded-dot";
-  pulse.setAttribute("aria-hidden", "true");
-  const title = document.createElement("strong");
-  title.textContent = "Recorded projection";
-  const mode = document.createElement("span");
-  mode.className = "syson-recorded-mode";
-  mode.textContent = "read-only";
-  status.append(pulse, title, mode);
-
-  const scope = document.createElement("p");
-  scope.className = "syson-recorded-scope";
-  scope.textContent =
-    `${session.basis.projectId} r${session.basis.projectRevision}` +
-    ` · ${session.basis.thread.id} r${session.basis.thread.revision}`;
-
-  const details = document.createElement("details");
-  details.className = "syson-recorded-details";
-  const summary = document.createElement("summary");
-  summary.textContent = "Evidence identity";
-  const identity = document.createElement("dl");
-  for (
-    const [label, value] of [
-      ["Subject", session.basis.subjectId],
-      ["Artifact", session.basis.artifact.id],
-      ["Projection", `${digest}…`],
-    ] as const
-  ) {
-    const row = document.createElement("div");
-    const term = document.createElement("dt");
-    term.textContent = label;
-    const description = document.createElement("dd");
-    description.textContent = value;
-    row.append(term, description);
-    identity.append(row);
-  }
-  details.append(summary, identity);
-  banner.append(status, scope, details);
+  const digest = digestFromSha256Prefix(session.basis.artifact.fingerprint);
+  render(
+    createElement(
+      "div",
+      { className: "syson-recorded-stack" },
+      createElement(
+        "div",
+        { className: "mcp-view-row" },
+        createElement("strong", null, "Recorded projection"),
+        createElement(Badge, { tone: "info" }, "read-only"),
+      ),
+      createElement(
+        "p",
+        { className: "syson-recorded-scope" },
+        `${session.basis.projectId} r${session.basis.projectRevision}` +
+          ` · ${session.basis.thread.id} r${session.basis.thread.revision}` +
+          ` · ${session.basis.subjectId}`,
+      ),
+      createElement(KeyValueList, {
+        items: [
+          {
+            id: "recorded-artifact",
+            label: "Artifact",
+            value: session.basis.artifact.id,
+          },
+          {
+            id: "recorded-artifact-fingerprint",
+            label: "SHA-256",
+            value: createElement(
+              "code",
+              null,
+              digest ?? session.basis.artifact.fingerprint,
+            ),
+          },
+        ],
+      }),
+    ),
+    banner,
+  );
   return banner;
 }
 

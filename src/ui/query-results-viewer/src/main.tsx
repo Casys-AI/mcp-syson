@@ -2,17 +2,22 @@
 
 import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
-  Badge,
   Button,
   Card,
-  DataTable,
-  KeyValueList,
+  ElementIdent,
+  ElementReading,
+  EmptyState,
+  SemanticElement,
   Toolbar,
 } from "@casys/mcp-view-components/preact/components";
 import { useMemo, useState } from "preact/hooks";
 import {
   defaultComponentSurface,
+  recordedProjectionDigest,
+  shortSysmlKind,
+  sysmlRef,
   VIEWER_COMPONENT_KEYS,
+  VIEWER_DEFAULT_SURFACE_KEYS,
 } from "../../shared/component-catalog";
 import {
   definePreactComponent,
@@ -57,39 +62,39 @@ function objectsOf(data: QueryData): ObjectResult[] | undefined {
   return data.type === "object" ? [data.result] : undefined;
 }
 
+function expressionOf(data: QueryData): string | undefined {
+  if ("expression" in data && typeof data.expression === "string") {
+    return data.expression;
+  }
+  if ("query" in data && typeof data.query === "string") {
+    return data.query;
+  }
+  return undefined;
+}
+
 function Summary({ data }: { data: QueryData }) {
   const objects = objectsOf(data);
+  const count = objects ? objects.length : 1;
   return (
-    <Card
-      className="syson-hero"
-      eyebrow="SysON"
-      title="Query result"
-      actions={
-        <Badge tone="info">
-          {objects
-            ? `${objects.length} object${objects.length === 1 ? "" : "s"}`
-            : data.type ?? "unknown"}
-        </Badge>
+    <SemanticElement
+      reference={sysmlRef(data.type ?? "query", expressionOf(data) ?? "result")}
+      density="card"
+      ident={<ElementIdent label="Query result" />}
+      reading={
+        <ElementReading
+          label={objects ? "Objects" : data.type ?? "unknown"}
+          value={objects ? String(count) : data.type ?? "unknown"}
+        />
       }
-    >
-      <p className="syson-lede">
-        Exact AQL or search output. Sorting and filtering stay local to this
-        read-only projection.
-      </p>
-    </Card>
+    />
   );
 }
 
 function Expression({ data }: { data: QueryData }) {
-  const text = "expression" in data
-    ? data.expression
-    : "query" in data
-    ? data.query
-    : undefined;
   return (
     <Card title="Expression">
       <code className="syson-code-block">
-        {text || "No expression supplied"}
+        {expressionOf(data) || "No expression supplied"}
       </code>
     </Card>
   );
@@ -103,6 +108,7 @@ function Values(
   const [sortKey, setSortKey] = useState<"label" | "kind">("label");
   const [descending, setDescending] = useState(false);
   const [selected, setSelected] = useState<string>();
+  const digest = recordedProjectionDigest(context);
   const rows = useMemo(() => {
     if (!objects) return [];
     const needle = filter.toLowerCase();
@@ -119,18 +125,20 @@ function Values(
   if (!objects) {
     const value = "result" in data ? data.result : null;
     return (
-      <Card
-        title="Scalar value"
-        actions={<Badge>{data.type ?? "unknown"}</Badge>}
-      >
-        <KeyValueList
-          items={[{
-            id: "result",
-            label: "Result",
-            value: <code>{value === null ? "null" : String(value)}</code>,
-          }]}
-        />
-      </Card>
+      <SemanticElement
+        reference={sysmlRef(
+          data.type ?? "query",
+          expressionOf(data) ?? "query-result",
+        )}
+        density="card"
+        ident={<ElementIdent label="Scalar value" />}
+        reading={
+          <ElementReading
+            label={data.type ?? "unknown"}
+            value={value === null ? "null" : String(value)}
+          />
+        }
+      />
     );
   }
   const toggleSort = (key: "label" | "kind") => {
@@ -168,40 +176,41 @@ function Values(
         </Toolbar>
       }
     >
-      <DataTable
-        label="Query results"
-        rows={rows}
-        rowKey={(item) => item.id}
-        selected={(item) => selected === item.id}
-        onSelect={(item) => {
-          setSelected(item.id);
-          publishSelection(
-            context,
-            "select-result",
-            "syson.element.selected",
-            { id: item.id, label: item.label, kind: item.kind },
-          );
-        }}
-        emptyLabel="No results"
-        columns={[
-          {
-            id: "label",
-            label: "Label",
-            render: (item) => (
-              <span className="syson-table-detail">
-                <span>{item.label || "(unnamed)"}</span>
-                <code>{item.id}</code>
-              </span>
-            ),
-          },
-          {
-            id: "kind",
-            label: "Kind",
-            align: "right",
-            render: (item) => <Badge>{item.kind.split("::").pop()}</Badge>,
-          },
-        ]}
-      />
+      {rows.length
+        ? (
+          <div aria-label="Query results" className="syson-element-stack">
+            {rows.map((item) => {
+              const kind = shortSysmlKind(item.kind);
+              return (
+                <SemanticElement
+                  key={item.id}
+                  className={selected === item.id
+                    ? "mcp-view-selected"
+                    : undefined}
+                  reference={sysmlRef(kind, item.id, digest)}
+                  density="row"
+                  ident={
+                    <ElementIdent
+                      label={item.label || "(unnamed)"}
+                      detail={`${kind} · ${item.id}`}
+                    />
+                  }
+                  activationLabel={`Select ${item.label || item.id}`}
+                  onActivate={() => {
+                    setSelected(item.id);
+                    publishSelection(
+                      context,
+                      "select-result",
+                      "syson.element.selected",
+                      { id: item.id, label: item.label, kind: item.kind },
+                    );
+                  }}
+                />
+              );
+            })}
+          </div>
+        )
+        : <EmptyState>No results</EmptyState>}
     </Card>
   );
 }
@@ -225,7 +234,9 @@ const registry = defineComponentRegistry<
       description: "Scalar value or selectable object results",
     }, ({ data, context }) => <Values data={data} context={context} />),
   },
-  defaultSurface: defaultComponentSurface(keys),
+  defaultSurface: defaultComponentSurface(
+    VIEWER_DEFAULT_SURFACE_KEYS.queryResults,
+  ),
 });
 
 void startPreactSurfaceApp({

@@ -5,15 +5,27 @@ import {
   Badge,
   Button,
   Card,
-  DataTable,
-  MetricGrid,
+  ElementBody,
+  ElementIdent,
+  ElementProvenance,
+  ElementReading,
+  ElementVerdict,
+  EmptyState,
+  LimitGauge,
+  SemanticElement,
   StateMessage,
   Toolbar,
 } from "@casys/mcp-view-components/preact/components";
 import { useState } from "preact/hooks";
 import {
   defaultComponentSurface,
+  linkCoverageGauge,
+  recordedProjectionDigest,
+  shortSysmlKind,
+  sysmlRef,
+  traceLinkStatus,
   VIEWER_COMPONENT_KEYS,
+  VIEWER_DEFAULT_SURFACE_KEYS,
 } from "../../shared/component-catalog";
 import {
   definePreactComponent,
@@ -34,6 +46,7 @@ interface TraceData extends Record<string, unknown> {
   rootId: string;
   requirementsCount: number;
   traces: TraceEntry[];
+  error?: string;
   coverage: {
     total: number;
     satisfied: number;
@@ -42,150 +55,169 @@ interface TraceData extends Record<string, unknown> {
   };
 }
 
-function Coverage({ data }: { data: TraceData }) {
-  const hasRequirements = data.coverage.total > 0;
-  const tone = data.coverage.unsatisfied > 0 ? "warning" : "info";
+function TraceResultError({ error }: { error: string | undefined }) {
   return (
-    <Card
-      className="syson-hero"
-      eyebrow="SysON trace"
-      title="Satisfaction-link coverage"
-    >
-      <p className="syson-lede">
-        Presence of recorded satisfaction links only. Coverage does not prove
-        that a requirement is met.
-      </p>
-      <MetricGrid
-        items={[
-          {
-            id: "coverage",
-            label: "Link coverage",
-            value: hasRequirements
-              ? Math.round(data.coverage.percentage)
-              : "unavailable",
-            unit: hasRequirements ? "%" : undefined,
-            tone: hasRequirements ? "info" : "warning",
-          },
-          { id: "total", label: "Total", value: data.coverage.total },
-          {
-            id: "covered",
-            label: "Linked",
-            value: data.coverage.satisfied,
-            tone: "info",
-          },
-          {
-            id: "uncovered",
-            label: "Unlinked",
-            value: data.coverage.unsatisfied,
-            tone: data.coverage.unsatisfied ? "warning" : "neutral",
-          },
-        ]}
-      />
-      {hasRequirements
+    <StateMessage tone="danger" title="error">
+      {error || "The requirements trace failed without an error detail."}
+    </StateMessage>
+  );
+}
+
+function Coverage({ data }: { data: TraceData }) {
+  if (data.error !== undefined) return <TraceResultError error={data.error} />;
+  const unresolvedCount =
+    data.traces.filter((trace) => traceLinkStatus(trace) === "unresolved")
+      .length;
+  const gauge = linkCoverageGauge(data.coverage, unresolvedCount);
+  const knownUnlinked = data.coverage.unsatisfied - unresolvedCount;
+  const coverageDetail = [
+    `${data.coverage.satisfied} linked`,
+    knownUnlinked > 0 ? `${knownUnlinked} unlinked` : undefined,
+    unresolvedCount > 0 ? `${unresolvedCount} unresolved` : undefined,
+  ].filter(Boolean).join(" · ");
+  return (
+    <SemanticElement
+      reference={sysmlRef("requirements-trace", data.rootId)}
+      density="card"
+      tone={gauge.available ? gauge.tone : "warning"}
+      ident={
+        <ElementIdent
+          label="Satisfaction-link coverage"
+          detail={data.rootId}
+        />
+      }
+      reading={gauge.available
         ? (
-          <div
-            className="syson-progress"
-            aria-label={`${
-              Math.round(data.coverage.percentage)
-            }% requirements with a recorded satisfaction link`}
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(data.coverage.percentage)}
-          >
-            <div
-              className="syson-progress-value"
-              data-tone={tone}
-              style={{ width: `${Math.min(100, data.coverage.percentage)}%` }}
-            />
-          </div>
+          <ElementReading
+            label="Link coverage"
+            value={String(Math.round(data.coverage.percentage))}
+            unit="%"
+            detail={coverageDetail}
+          />
         )
-        : (
-          <StateMessage tone="warning" title="Trace unavailable">
-            No requirements were returned, so link coverage cannot be assessed.
-          </StateMessage>
-        )}
-    </Card>
+        : undefined}
+      body={
+        <ElementBody>
+          {gauge.available
+            ? (
+              <LimitGauge
+                label={gauge.label}
+                min={gauge.min}
+                max={gauge.max}
+                value={gauge.value}
+                valueLabel={gauge.valueLabel}
+                statusLabel={gauge.statusLabel}
+                tone={gauge.tone}
+              />
+            )
+            : (
+              <StateMessage tone="warning" title="unavailable">
+                No requirements were returned, so link coverage cannot be
+                assessed.
+              </StateMessage>
+            )}
+        </ElementBody>
+      }
+      verdict={<ElementVerdict value={gauge.statusLabel} />}
+      provenance={
+        <ElementProvenance
+          label="Requirements"
+          value={String(data.coverage.total)}
+        />
+      }
+    />
   );
 }
 
 function TraceList(
   { data, context }: { data: TraceData; context: SurfaceAppContext<TraceData> },
 ) {
+  if (data.error !== undefined) return <TraceResultError error={data.error} />;
   const [selected, setSelected] = useState<string>();
-  const [mode, setMode] = useState<"all" | "linked" | "unlinked">("all");
+  const [mode, setMode] = useState<
+    "all" | "linked" | "unlinked" | "unresolved"
+  >("all");
+  const digest = recordedProjectionDigest(context);
   const rows = data.traces.filter((trace) =>
-    mode === "all" || (trace.satisfiedBy.length > 0) === (mode === "linked")
+    mode === "all" || traceLinkStatus(trace) === mode
   );
   return (
     <Card
       title="Requirements"
       actions={
         <Toolbar label="Requirement coverage filter">
-          {(["all", "linked", "unlinked"] as const).map((value) => (
-            <Button
-              key={value}
-              pressed={mode === value}
-              onClick={() => setMode(value)}
-            >
-              {value}
-            </Button>
-          ))}
+          {(["all", "linked", "unlinked", "unresolved"] as const).map(
+            (value) => (
+              <Button
+                key={value}
+                pressed={mode === value}
+                onClick={() => setMode(value)}
+              >
+                {value}
+              </Button>
+            ),
+          )}
         </Toolbar>
       }
     >
-      <DataTable
-        label="Requirement traces"
-        rows={rows}
-        rowKey={(trace) => trace.requirement.id}
-        selected={(trace) => selected === trace.requirement.id}
-        onSelect={(trace) => {
-          const covered = trace.satisfiedBy.length > 0;
-          setSelected(trace.requirement.id);
-          publishSelection(
-            context,
-            "select-requirement",
-            "syson.requirement.selected",
-            {
-              id: trace.requirement.id,
-              label: trace.requirement.label,
-              satisfied: covered,
-            },
-          );
-        }}
-        emptyLabel={`No ${mode} requirements`}
-        columns={[
-          {
-            id: "status",
-            label: "Status",
-            render: (trace) => {
-              const covered = trace.satisfiedBy.length > 0;
+      {rows.length
+        ? (
+          <div aria-label="Requirement traces" className="syson-element-stack">
+            {rows.map((trace) => {
+              const relationStatus = traceLinkStatus(trace);
+              const linked = relationStatus === "linked";
               return (
-                <Badge tone={covered ? "info" : "warning"}>
-                  {covered ? "Linked" : "Unlinked"}
-                </Badge>
+                <SemanticElement
+                  key={trace.requirement.id}
+                  className={selected === trace.requirement.id
+                    ? "mcp-view-selected"
+                    : undefined}
+                  reference={sysmlRef(
+                    "RequirementUsage",
+                    trace.requirement.id,
+                    digest,
+                  )}
+                  density="row"
+                  tone={linked ? "info" : "warning"}
+                  ident={
+                    <ElementIdent
+                      label={trace.requirement.label ||
+                        "(unnamed requirement)"}
+                      detail={trace.error ?? trace.requirement.id}
+                    />
+                  }
+                  verdict={<ElementVerdict value={relationStatus} />}
+                  activationLabel={`Select ${
+                    trace.requirement.label || trace.requirement.id
+                  }`}
+                  onActivate={() => {
+                    setSelected(trace.requirement.id);
+                    publishSelection(
+                      context,
+                      "select-requirement",
+                      "syson.requirement.selected",
+                      {
+                        id: trace.requirement.id,
+                        label: trace.requirement.label,
+                        status: relationStatus,
+                        ...(relationStatus === "unresolved"
+                          ? {}
+                          : { satisfied: linked }),
+                      },
+                    );
+                  }}
+                />
               );
-            },
-          },
-          {
-            id: "requirement",
-            label: "Requirement",
-            render: (trace) => (
-              <span className="syson-table-detail">
-                <span>
-                  {trace.requirement.label || "(unnamed requirement)"}
-                </span>
-                {trace.error && <small>{trace.error}</small>}
-              </span>
-            ),
-          },
-        ]}
-      />
+            })}
+          </div>
+        )
+        : <EmptyState>{`No ${mode} requirements`}</EmptyState>}
     </Card>
   );
 }
 
 function SatisfactionLinks({ data }: { data: TraceData }) {
+  if (data.error !== undefined) return <TraceResultError error={data.error} />;
   const linked = data.traces.filter((trace) =>
     trace.satisfiedBy.length || trace.error
   );
@@ -198,34 +230,33 @@ function SatisfactionLinks({ data }: { data: TraceData }) {
   }
   return (
     <Card title="Satisfaction links" actions={<Badge>{linked.length}</Badge>}>
-      <DataTable
-        label="Satisfaction links"
-        rows={linked}
-        rowKey={(trace) =>
-          trace.requirement.id}
-        columns={[
-          {
-            id: "requirement",
-            label: "Requirement",
-            render: (trace) =>
-              trace.requirement.label || trace.requirement.id,
-          },
-          {
-            id: "targets",
-            label: "Satisfied by",
-            render: (trace) => (
-              <div className="mcp-view-badges">
-                {trace.satisfiedBy.map((target) => (
-                  <Badge key={target.id} tone="info">
-                    {target.label || target.kind.split("::").pop()}
-                  </Badge>
-                ))}
-                {trace.error && <Badge tone="danger">{trace.error}</Badge>}
-              </div>
-            ),
-          },
-        ]}
-      />
+      <div aria-label="Satisfaction links" className="syson-element-stack">
+        {linked.map((trace) => (
+          <SemanticElement
+            key={trace.requirement.id}
+            reference={sysmlRef("RequirementUsage", trace.requirement.id)}
+            density="row"
+            ident={
+              <ElementIdent
+                label={trace.requirement.label || trace.requirement.id}
+                detail={trace.requirement.id}
+              />
+            }
+            body={
+              <ElementBody>
+                <div className="mcp-view-badges">
+                  {trace.satisfiedBy.map((target) => (
+                    <Badge key={target.id} tone="info">
+                      {target.label || shortSysmlKind(target.kind)}
+                    </Badge>
+                  ))}
+                  {trace.error && <Badge tone="danger">{trace.error}</Badge>}
+                </div>
+              </ElementBody>
+            }
+          />
+        ))}
+      </div>
       <p className="syson-provenance">
         Root: <code>{data.rootId}</code>
       </p>
@@ -261,7 +292,9 @@ const registry = defineComponentRegistry<
       ({ data }) => <SatisfactionLinks data={data} />,
     ),
   },
-  defaultSurface: defaultComponentSurface(keys),
+  defaultSurface: defaultComponentSurface(
+    VIEWER_DEFAULT_SURFACE_KEYS.requirementsTrace,
+  ),
 });
 
 void startPreactSurfaceApp({

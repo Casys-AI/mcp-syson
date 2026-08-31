@@ -4,13 +4,18 @@ import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
   Card,
-  KeyValueList,
-  MetricGrid,
+  ElementIdent,
+  ElementProvenance,
+  ElementReading,
+  ElementVerdict,
+  SemanticElement,
   StateMessage,
 } from "@casys/mcp-view-components/preact/components";
 import {
   defaultComponentSurface,
+  sysmlRef,
   VIEWER_COMPONENT_KEYS,
+  VIEWER_DEFAULT_SURFACE_KEYS,
 } from "../../shared/component-catalog";
 import {
   definePreactComponent,
@@ -52,94 +57,83 @@ function readBackMatches(data: SetValueResult): boolean {
 function Readout({ data }: { data: ValueResult }) {
   if (!isSetValue(data)) {
     return (
-      <Card
-        className="syson-hero"
-        eyebrow="SysON value"
-        title="Current value"
-        actions={
-          <div className="mcp-view-badges">
-            <Badge tone="warning">documentary · unverified</Badge>
-            {data.negated && <Badge tone="warning">negated</Badge>}
-          </div>
+      <SemanticElement
+        reference={sysmlRef(data.literal_kind ?? "value", data.element_id)}
+        density="card"
+        tone="warning"
+        ident={
+          <ElementIdent
+            label="Current value"
+            detail={data.element_id}
+            marker={data.negated ? "negated" : undefined}
+          />
         }
-      >
-        <p className="syson-lede">
-          Literal readout only. This surface makes no verification or proof
-          claim.
-        </p>
-        <MetricGrid
-          items={[{
-            id: "value",
-            label: data.literal_kind ?? "Numeric literal",
-            value: formatNumber(data.value),
-            tone: "info",
-          }]}
-        />
-      </Card>
+        reading={
+          <ElementReading
+            label={data.literal_kind ?? "Numeric literal"}
+            value={formatNumber(data.value)}
+          />
+        }
+        verdict={<ElementVerdict value="documentary · unverified" />}
+      />
     );
   }
   const delta = data.new_value - data.old_value;
   const matched = readBackMatches(data);
   const evidenceTone = data.warning ? "warning" : matched ? "info" : "danger";
+  const verdict = data.warning
+    ? "Read-back warning"
+    : matched
+    ? "Read-back matched"
+    : "Write not confirmed";
   return (
-    <Card
-      className="syson-hero"
-      eyebrow="SysON value"
-      title="Value change"
-      actions={
-        <Badge tone={evidenceTone}>
-          {data.warning
-            ? "Read-back warning"
-            : matched
-            ? "Read-back matched"
-            : "Write not confirmed"}
-        </Badge>
-      }
-    >
-      <p className="syson-lede">
-        Immediate literal transition. Read-back is not broader model or
-        engineering verification.
-      </p>
-      <MetricGrid
-        items={[
-          { id: "old", label: "Previous", value: formatNumber(data.old_value) },
-          {
-            id: "new",
-            label: "Requested",
-            value: formatNumber(data.new_value),
-            tone: matched ? "info" : "danger",
-          },
-          {
-            id: "observed",
-            label: "Read-back",
-            value: data.verified_value === undefined
-              ? "unavailable"
-              : formatNumber(data.verified_value),
-            tone: matched ? "info" : "warning",
-          },
-          {
-            id: "delta",
-            label: "Change",
-            value: `${delta >= 0 ? "+" : ""}${formatNumber(delta)}`,
-            tone: "info",
-          },
-        ]}
-      />
-    </Card>
+    <SemanticElement
+      reference={sysmlRef(data.literal_kind ?? "value", data.element_id)}
+      density="card"
+      tone={evidenceTone}
+      ident={<ElementIdent label="Value change" detail={data.element_id} />}
+      reading={[
+        <ElementReading
+          key="old"
+          label="Previous"
+          value={formatNumber(data.old_value)}
+        />,
+        <ElementReading
+          key="new"
+          label="Requested"
+          value={formatNumber(data.new_value)}
+        />,
+        <ElementReading
+          key="observed"
+          label="Read-back"
+          value={data.verified_value === undefined
+            ? "unavailable"
+            : formatNumber(data.verified_value)}
+        />,
+        <ElementReading
+          key="delta"
+          label="Change"
+          value={`${delta >= 0 ? "+" : ""}${formatNumber(delta)}`}
+        />,
+      ]}
+      verdict={<ElementVerdict value={verdict} />}
+    />
   );
 }
 
 function Identity({ data }: { data: ValueResult }) {
   return (
-    <Card title="Element identity">
-      <KeyValueList
-        items={[{
-          id: "element-id",
-          label: "Element ID",
-          value: <code>{data.element_id}</code>,
-        }]}
-      />
-    </Card>
+    <SemanticElement
+      reference={sysmlRef(data.literal_kind ?? "value", data.element_id)}
+      density="card"
+      ident={<ElementIdent label="Element identity" detail={data.element_id} />}
+      provenance={
+        <ElementProvenance
+          label="Literal"
+          value={data.literal_kind ?? "numeric literal"}
+        />
+      }
+    />
   );
 }
 
@@ -181,7 +175,7 @@ function Verification({ data }: { data: ValueResult }) {
       >
         {detail}{" "}
         This confirms only the returned literal value, not model semantics or
-        engineering validity.
+        engineering verification.
       </StateMessage>
     </Card>
   );
@@ -206,7 +200,7 @@ const registry = defineComponentRegistry<
       description: "Literal kind and write verification",
     }, ({ data }) => <Verification data={data} />),
   },
-  defaultSurface: defaultComponentSurface(keys),
+  defaultSurface: defaultComponentSurface(VIEWER_DEFAULT_SURFACE_KEYS.value),
 });
 
 void startPreactSurfaceApp({

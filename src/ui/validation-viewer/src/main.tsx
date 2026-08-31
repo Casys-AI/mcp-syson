@@ -4,15 +4,26 @@ import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
   Card,
-  DataTable,
+  ElementBody,
+  ElementIdent,
+  ElementProvenance,
+  ElementReading,
+  ElementVerdict,
+  EmptyState,
   KeyValueList,
   MetricGrid,
+  SemanticElement,
   StateMessage,
 } from "@casys/mcp-view-components/preact/components";
 import { useState } from "preact/hooks";
 import {
   defaultComponentSurface,
+  recordedProjectionDigest,
+  sysmlRef,
+  validationContractLabel,
+  validationOverallStatus,
   VIEWER_COMPONENT_KEYS,
+  VIEWER_DEFAULT_SURFACE_KEYS,
 } from "../../shared/component-catalog";
 import {
   definePreactComponent,
@@ -54,53 +65,46 @@ interface ValidationReport extends Record<string, unknown> {
 
 type ValidationViewStatus = ConstraintResult["status"] | "empty";
 
-function globalStatus(report: ValidationReport): ValidationViewStatus {
-  if (report.summary.total === 0) return "empty";
-  return report.summary.fail > 0 || report.summary.error > 0
-    ? "fail"
-    : report.summary.unresolved > 0
-    ? "unresolved"
-    : "pass";
-}
-
-function StatusBadge({ status }: { status: ValidationViewStatus }) {
-  const tone = status === "pass"
+function statusTone(
+  status: ValidationViewStatus,
+): "success" | "danger" | "warning" {
+  return status === "pass"
     ? "success"
     : status === "fail" || status === "error"
     ? "danger"
     : "warning";
-  return (
-    <Badge tone={tone}>
-      {status === "unresolved"
-        ? "N/A"
-        : status === "empty"
-        ? "No constraints"
-        : status}
-    </Badge>
-  );
 }
 
 function Status({ data }: { data: ValidationReport }) {
+  const status = validationOverallStatus(data.summary);
   return (
-    <Card
-      className="syson-hero"
-      eyebrow="SysON validation"
-      title={data.elementName || "Validation"}
-      actions={<StatusBadge status={globalStatus(data)} />}
-    >
-      <p className="syson-lede">
-        Constraint evaluation at the recorded editing context. Unresolved
-        references remain explicit.
-      </p>
-      {data.summary.total === 0 && (
-        <StateMessage tone="warning" title="Validation unavailable">
-          No constraints were returned, so this surface cannot claim a pass.
-        </StateMessage>
-      )}
-      <p className="syson-provenance">
-        Validated {new Date(data.validatedAt).toLocaleString()}
-      </p>
-    </Card>
+    <SemanticElement
+      reference={sysmlRef("validation", data.elementId)}
+      density="card"
+      tone={statusTone(status)}
+      ident={
+        <ElementIdent
+          label={data.elementName || "Validation"}
+          detail={data.elementId}
+        />
+      }
+      body={data.summary.total === 0
+        ? (
+          <ElementBody>
+            <StateMessage tone="warning" title="unavailable">
+              No constraints were returned, so this surface cannot claim a pass.
+            </StateMessage>
+          </ElementBody>
+        )
+        : undefined}
+      verdict={<ElementVerdict value={validationContractLabel(status)} />}
+      provenance={
+        <ElementProvenance
+          label="Validated"
+          value={new Date(data.validatedAt).toLocaleString()}
+        />
+      }
+    />
   );
 }
 
@@ -123,7 +127,7 @@ function Summary({ data }: { data: ValidationReport }) {
         },
         {
           id: "unresolved",
-          label: "N/A",
+          label: "unresolved",
           value: data.summary.unresolved,
           tone: data.summary.unresolved ? "warning" : "neutral",
         },
@@ -171,85 +175,89 @@ function Constraints(
   },
 ) {
   const [selected, setSelected] = useState<string>();
+  const digest = recordedProjectionDigest(context);
   return (
     <Card
       title="Constraints"
       actions={<Badge>{data.constraints.length}</Badge>}
     >
-      <DataTable
-        label="Constraint validation results"
-        rows={data.constraints}
-        rowKey={(constraint) => constraint.constraintId}
-        selected={(constraint) => selected === constraint.constraintId}
-        onSelect={(constraint) => {
-          setSelected(constraint.constraintId);
-          publishSelection(
-            context,
-            "select_constraint",
-            "syson.constraint.selected",
-            {
-              constraintId: constraint.constraintId,
-              constraintName: constraint.constraintName,
-              status: constraint.status,
-            },
-          );
-        }}
-        emptyLabel="No constraints found on this element"
-        columns={[
-          {
-            id: "status",
-            label: "Status",
-            render: (constraint) => <StatusBadge status={constraint.status} />,
-          },
-          {
-            id: "constraint",
-            label: "Constraint",
-            render: (constraint) => (
-              <span className="syson-table-detail">
-                <strong>{constraint.constraintName}</strong>
-                {constraint.expression && <code>{constraint.expression}</code>}
-                {constraint.error && <small>{constraint.error}</small>}
-                {!!constraint.unresolvedRefs?.length && (
-                  <small>Missing: {constraint.unresolvedRefs.join(", ")}</small>
-                )}
-              </span>
-            ),
-          },
-          {
-            id: "value",
-            label: "Value",
-            align: "right",
-            render: (constraint) => (
-              <code>{formatValue(constraint.computedValue)}</code>
-            ),
-          },
-          {
-            id: "threshold",
-            label: "Threshold",
-            align: "right",
-            render: (constraint) => (
-              <code>{formatValue(constraint.threshold)}</code>
-            ),
-          },
-          {
-            id: "margin",
-            label: "Margin",
-            align: "right",
-            render: (constraint) =>
-              constraint.margin === undefined
-                ? "−"
-                : (
-                  <Badge tone={constraint.margin < 0 ? "danger" : "success"}>
-                    {constraint.margin >= 0 ? "+" : ""}
-                    {formatValue(constraint.margin, 1)}
-                    {constraint.marginPercent === undefined
-                      ? ""
-                      : ` (${constraint.marginPercent.toFixed(0)}%)`}
-                  </Badge>
-                ),
-          },
-        ]}
-      />
+      {data.constraints.length
+        ? (
+          <div
+            aria-label="Constraint validation results"
+            className="syson-element-stack"
+          >
+            {data.constraints.map((constraint) => {
+              const margin = constraint.margin === undefined
+                ? undefined
+                : `${constraint.margin >= 0 ? "+" : ""}${
+                  formatValue(constraint.margin, 1)
+                }${
+                  constraint.marginPercent === undefined
+                    ? ""
+                    : ` (${constraint.marginPercent.toFixed(0)}%)`
+                }`;
+              return (
+                <SemanticElement
+                  key={constraint.constraintId}
+                  className={selected === constraint.constraintId
+                    ? "mcp-view-selected"
+                    : undefined}
+                  reference={sysmlRef(
+                    "constraint",
+                    constraint.constraintId,
+                    digest,
+                  )}
+                  density="row"
+                  tone={statusTone(constraint.status)}
+                  ident={
+                    <ElementIdent
+                      label={constraint.constraintName}
+                      detail={[
+                        constraint.expression,
+                        constraint.error,
+                        constraint.unresolvedRefs?.length
+                          ? `Missing: ${constraint.unresolvedRefs.join(", ")}`
+                          : undefined,
+                      ].filter(Boolean).join(" · ")}
+                    />
+                  }
+                  reading={
+                    <ElementReading
+                      label="Value"
+                      value={formatValue(constraint.computedValue)}
+                      detail={constraint.threshold === undefined
+                        ? margin
+                        : `threshold ${formatValue(constraint.threshold)}${
+                          margin ? ` · ${margin}` : ""
+                        }`}
+                    />
+                  }
+                  verdict={
+                    <ElementVerdict
+                      value={validationContractLabel(constraint.status)}
+                    />
+                  }
+                  activationLabel={`Select ${constraint.constraintName}`}
+                  onActivate={() => {
+                    setSelected(constraint.constraintId);
+                    publishSelection(
+                      context,
+                      "select_constraint",
+                      "syson.constraint.selected",
+                      {
+                        constraintId: constraint.constraintId,
+                        constraintName: constraint.constraintName,
+                        status: constraint.status,
+                      },
+                    );
+                  }}
+                />
+              );
+            })}
+          </div>
+        )
+        : <EmptyState>No constraints found on this element</EmptyState>}
     </Card>
   );
 }
@@ -277,7 +285,9 @@ const registry = defineComponentRegistry<
       description: "Detailed selectable constraint results",
     }, ({ data, context }) => <Constraints data={data} context={context} />),
   },
-  defaultSurface: defaultComponentSurface(keys),
+  defaultSurface: defaultComponentSurface(
+    VIEWER_DEFAULT_SURFACE_KEYS.validation,
+  ),
 });
 
 void startPreactSurfaceApp({

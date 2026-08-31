@@ -1,74 +1,14 @@
 :root.syson-app {
-  --syson-mono: var(
-    --font-mono,
-    "SFMono-Regular",
-    "Cascadia Code",
-    "Menlo",
-    monospace
-  );
-  --syson-sans: var(
+  color: var(--mcp-view-text, var(--color-text-primary, #101519));
+  font-family: var(
     --font-sans,
-    "Avenir Next",
-    "Helvetica Neue",
     ui-sans-serif,
     system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     sans-serif
   );
-  --syson-canvas: var(--color-background-primary, #f3f6f6);
-  --syson-panel: var(--color-background-secondary, #ffffff);
-  --syson-panel-strong: var(--color-background-tertiary, #e8eeee);
-  --syson-ink: var(--color-text-primary, #182425);
-  --syson-muted: var(--color-text-secondary, #617071);
-  --syson-faint: var(--color-text-tertiary, #879293);
-  --syson-line: var(--color-border-primary, rgba(26, 50, 52, 0.16));
-  --syson-line-soft: var(--color-border-secondary, rgba(26, 50, 52, 0.09));
-  --syson-accent: var(--color-text-info, var(--color-accent, #087f78));
-  --syson-success: var(--color-text-success, var(--color-success, #24724c));
-  --syson-warning: var(--color-text-warning, var(--color-warning, #9a6814));
-  --syson-danger: var(--color-text-danger, var(--color-danger, #b33a3a));
-  --mcp-view-text: var(--syson-ink);
-  --mcp-view-muted: var(--syson-muted);
-  --mcp-view-border: var(--syson-line);
-  --mcp-view-panel: color-mix(in srgb, var(--syson-panel) 96%, transparent);
-  --mcp-view-subtle: color-mix(in srgb, var(--syson-ink) 5%, transparent);
-  --mcp-view-accent: var(--syson-accent);
-  --mcp-view-success: var(--syson-success);
-  --mcp-view-warning: var(--syson-warning);
-  --mcp-view-danger: var(--syson-danger);
-  color: var(--syson-ink);
-  font-family: var(--syson-sans);
-}
-
-:root.syson-app[data-theme="dark"] {
-  --syson-canvas: var(--color-background-primary, #101617);
-  --syson-panel: var(--color-background-secondary, #172021);
-  --syson-panel-strong: var(--color-background-tertiary, #202b2c);
-  --syson-ink: var(--color-text-primary, #edf4f3);
-  --syson-muted: var(--color-text-secondary, #aab8b7);
-  --syson-faint: var(--color-text-tertiary, #798887);
-  --syson-line: var(--color-border-primary, rgba(196, 224, 220, 0.2));
-  --syson-line-soft: var(--color-border-secondary, rgba(196, 224, 220, 0.1));
-  --syson-accent: var(--color-text-info, var(--color-accent, #55d7ca));
-  --syson-success: var(--color-text-success, var(--color-success, #6fdda1));
-  --syson-warning: var(--color-text-warning, var(--color-warning, #f4c464));
-  --syson-danger: var(--color-text-danger, var(--color-danger, #ff8d88));
-}
-
-@media (prefers-color-scheme: dark) {
-  :root.syson-app:not([data-theme="light"]) {
-    --syson-canvas: var(--color-background-primary, #101617);
-    --syson-panel: var(--color-background-secondary, #172021);
-    --syson-panel-strong: var(--color-background-tertiary, #202b2c);
-    --syson-ink: var(--color-text-primary, #edf4f3);
-    --syson-muted: var(--color-text-secondary, #aab8b7);
-    --syson-faint: var(--color-text-tertiary, #798887);
-    --syson-line: var(--color-border-primary, rgba(196, 224, 220, 0.2));
-    --syson-line-soft: var(--color-border-secondary, rgba(196, 224, 220, 0.1));
-    --syson-accent: var(--color-text-info, var(--color-accent, #55d7ca));
-    --syson-success: var(--color-text-success, var(--color-success, #6fdda1));
-    --syson-warning: var(--color-text-warning, var(--color-warning, #f4c464));
-    --syson-danger: var(--color-text-danger, var(--color-danger, #ff8d88));
-  }
 }
 
 html,
@@ -79,7 +19,7 @@ body {
 }
 
 body {
-  font-family: var(--syson-sans);
+  font-family: inherit;
   text-rendering: optimizeLegibility;
 }
 
@@ -89,204 +29,43 @@ input {
 }
 
 code {
-  font-family: var(--syson-mono);
+  font-family: var(
+    --font-mono,
+    "SFMono-Regular",
+    "Cascadia Code",
+    "Menlo",
+    monospace
+  );
 }
 
 .syson-component-surface {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  padding: clamp(0.55rem, 1.8cqi, 1rem);
-  border: 1px solid var(--syson-line-soft);
-  border-radius: 1rem;
-  background:
-    linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--syson-accent) 7%, transparent),
-    transparent 34%
-  ),
-    radial-gradient(
-    circle at 91% 3%,
-    color-mix(in srgb, var(--syson-accent) 9%, transparent),
-    transparent 26%
-  ),
-    var(--syson-canvas);
-}
-
-.syson-component-surface::before {
-  position: absolute;
-  z-index: -1;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 3px;
-  background: linear-gradient(
-    90deg,
-    var(--syson-accent),
-    color-mix(in srgb, var(--syson-accent) 22%, transparent) 55%,
-    transparent
-  );
-  content: "";
+  min-width: 0;
+  padding: clamp(0.45rem, 1.4cqi, 0.75rem);
 }
 
 .syson-component-surface[data-display-mode="fullscreen"] {
   min-height: 100vh;
-  border: 0;
-  border-radius: 0;
+  padding: 0.75rem;
 }
 
-.syson-app .mcp-view-card {
-  padding: clamp(0.8rem, 2.2cqi, 1.15rem);
-  border-color: var(--syson-line-soft);
-  border-radius: 0.78rem;
-  background: color-mix(in srgb, var(--syson-panel) 96%, transparent);
-  box-shadow:
-    var(--shadow-hairline, 0 1px 0 rgba(255, 255, 255, 0.35) inset),
-    0 8px 28px rgba(20, 42, 44, 0.035);
-}
-
-.syson-app .mcp-view-card-header {
-  align-items: center;
-  margin-bottom: 0.85rem;
-}
-
-.syson-app .mcp-view-card-title {
-  color: var(--syson-muted);
-  font-size: 0.72rem;
-  font-weight: var(--font-weight-semibold, 650);
-  letter-spacing: 0.095em;
-}
-
-.syson-app .mcp-view-card-eyebrow {
-  margin-bottom: 0.25rem;
-  color: var(--syson-accent);
-  font-size: 0.64rem;
-  letter-spacing: 0.15em;
-}
-
-.syson-app .mcp-view-card.syson-hero {
-  overflow: hidden;
-  border-color: color-mix(in srgb, var(--syson-accent) 25%, var(--syson-line));
-  background: linear-gradient(
-    112deg,
-    color-mix(in srgb, var(--syson-accent) 9%, var(--syson-panel)),
-    var(--syson-panel) 55%
-  );
-}
-
-.syson-app .syson-hero .mcp-view-card-title {
-  max-width: 24ch;
-  color: var(--syson-ink);
-  font-size: clamp(1.15rem, 4.2cqi, 1.65rem);
-  font-weight: var(--font-weight-semibold, 650);
-  letter-spacing: -0.035em;
-  line-height: 1.08;
-  text-transform: none;
-}
-
-.syson-lede {
-  max-width: 64ch;
-  margin: 0;
-  color: var(--syson-muted);
-  font-size: 0.79rem;
-  line-height: 1.55;
+.syson-recorded-basis,
+.syson-recorded-stack {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
 }
 
 .syson-recorded-basis {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.3rem 0.9rem;
-  margin-bottom: 0.55rem;
-  padding: 0.68rem 0.78rem;
-  border: 1px solid color-mix(in srgb, var(--syson-accent) 28%,
-    var(--syson-line));
-  border-radius: 0.72rem;
-  background: color-mix(in srgb, var(--syson-accent) 7%, var(--syson-panel));
-  color: var(--syson-muted);
-  font-size: 0.7rem;
-  line-height: 1.4;
-}
-
-.syson-recorded-status {
-  display: flex;
-  align-items: center;
-  gap: 0.42rem;
-  min-width: 0;
-  color: var(--syson-ink);
-}
-
-.syson-recorded-dot {
-  width: 0.48rem;
-  height: 0.48rem;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: var(--syson-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--syson-accent) 14%,
-    transparent);
-}
-
-.syson-recorded-mode {
-  margin-left: 0.15rem;
-  padding: 0.08rem 0.34rem;
-  border: 1px solid var(--syson-line);
-  border-radius: 999px;
-  color: var(--syson-muted);
-  font-family: var(--syson-mono);
-  font-size: 0.6rem;
+  margin-bottom: 0.45rem;
 }
 
 .syson-recorded-scope {
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
-  font-family: var(--syson-mono);
-}
-
-.syson-recorded-details {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  min-width: 8rem;
-}
-
-.syson-recorded-details summary {
-  color: var(--syson-accent);
-  cursor: pointer;
-  font-weight: var(--font-weight-semibold, 650);
-  list-style-position: inside;
-  text-align: right;
-}
-
-.syson-recorded-details summary:focus-visible {
-  border-radius: 0.25rem;
-  outline: 2px solid var(--syson-accent);
-  outline-offset: 3px;
-}
-
-.syson-recorded-details dl {
-  display: grid;
-  gap: 0.25rem;
-  min-width: min(18rem, 64cqi);
-  margin: 0.55rem 0 0;
-  font-family: var(--syson-mono);
-}
-
-.syson-recorded-details dl > div {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.65rem;
-}
-
-.syson-recorded-details dt {
-  color: var(--syson-faint);
-}
-
-.syson-recorded-details dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--syson-ink);
-  text-align: right;
+  color: var(--mcp-view-quiet, var(--mcp-view-muted, #7b8894));
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.65rem;
 }
 
 .syson-app .mcp-view-message {
@@ -294,42 +73,37 @@ code {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.65rem;
-  min-height: 5.5rem;
-  padding: 1rem;
-  border: 1px solid var(--syson-line);
-  border-radius: 0.85rem;
-  background: var(--syson-panel);
-  color: var(--syson-muted);
+  gap: 0.55rem;
+  min-height: 3.5rem;
 }
 
 .syson-message-marker {
-  width: 0.62rem;
-  height: 0.62rem;
-  border: 2px solid var(--syson-muted);
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 2px solid var(--mcp-view-muted, #5c6b76);
   border-radius: 999px;
 }
 
 .mcp-view-message-loading .syson-message-marker {
-  border-color: color-mix(in srgb, var(--syson-accent) 35%, transparent);
-  border-top-color: var(--syson-accent);
+  border-color: color-mix(in srgb, var(--mcp-view-accent, #0d7c8a) 35%, transparent);
+  border-top-color: var(--mcp-view-accent, #0d7c8a);
   animation: syson-spin 0.85s linear infinite;
 }
 
 .mcp-view-message-error .syson-message-marker {
-  border-color: var(--syson-danger);
-  background: color-mix(in srgb, var(--syson-danger) 20%, transparent);
+  border-color: var(--mcp-view-danger, #c9453c);
+  background: color-mix(in srgb, var(--mcp-view-danger, #c9453c) 20%, transparent);
 }
 
 .syson-loading-rail {
   position: absolute;
   right: 1rem;
-  bottom: 0.72rem;
+  bottom: 0.55rem;
   left: 1rem;
   height: 2px;
   overflow: hidden;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--syson-accent) 12%, transparent);
+  background: color-mix(in srgb, var(--mcp-view-accent, #0d7c8a) 12%, transparent);
 }
 
 .syson-loading-rail::after {
@@ -337,266 +111,103 @@ code {
   width: 38%;
   height: 100%;
   border-radius: inherit;
-  background: var(--syson-accent);
+  background: var(--mcp-view-accent, #0d7c8a);
   animation: syson-scan 1.25s ease-in-out infinite;
   content: "";
 }
 
-.syson-app .mcp-view-metrics {
-  grid-template-columns: repeat(auto-fit, minmax(min(7.5rem, 100%), 1fr));
-  gap: 0.48rem;
-}
-
-.syson-app .mcp-view-metric {
-  position: relative;
-  gap: 0.2rem;
-  padding: 0.72rem;
-  border: 1px solid transparent;
-  border-radius: 0.62rem;
-  background: color-mix(in srgb, var(--syson-ink) 4%, transparent);
-}
-
-.syson-app .mcp-view-metric::before {
-  position: absolute;
-  top: 0.72rem;
-  bottom: 0.72rem;
-  left: 0;
-  width: 2px;
-  border-radius: 999px;
-  background: var(--syson-line);
-  content: "";
-}
-
-.syson-app .mcp-view-metric[data-tone="info"]::before {
-  background: var(--syson-accent);
-}
-
-.syson-app .mcp-view-metric[data-tone="success"]::before {
-  background: var(--syson-success);
-}
-
-.syson-app .mcp-view-metric[data-tone="warning"]::before {
-  background: var(--syson-warning);
-}
-
-.syson-app .mcp-view-metric[data-tone="danger"]::before {
-  background: var(--syson-danger);
-}
-
-.syson-app .mcp-view-metric-label,
-.syson-app .mcp-view-metric-unit,
-.syson-app .mcp-view-metric-detail {
-  color: var(--syson-muted);
-  font-size: 0.66rem;
-}
-
-.syson-app .mcp-view-metric-value {
-  color: var(--syson-ink);
-  font-family: var(--syson-mono);
-  font-size: clamp(1.05rem, 4cqi, 1.35rem);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.025em;
-}
-
-.syson-app .mcp-view-badge {
-  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-  background: color-mix(in srgb, currentColor 7%, transparent);
-  font-family: var(--syson-mono);
-  font-size: 0.62rem;
-  font-weight: var(--font-weight-semibold, 650);
-  letter-spacing: 0.015em;
-}
-
 .syson-input {
   min-width: 0;
-  min-height: 2rem;
-  padding: 0.4rem 0.68rem;
-  border: 1px solid var(--syson-line);
-  border-radius: 0.52rem;
+  min-height: 1.9rem;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid var(--mcp-view-border, #dbe3e7);
+  border-radius: var(--mcp-view-radius-sm, 0.25rem);
   outline: none;
-  background: color-mix(in srgb, var(--syson-panel) 86%, transparent);
-  color: var(--syson-ink);
+  background: var(--mcp-view-panel, #ffffff);
+  color: var(--mcp-view-text, #101519);
   font-size: 0.75rem;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .syson-input::placeholder {
-  color: var(--syson-faint);
+  color: var(--mcp-view-quiet, #7b8894);
 }
 
 .syson-input:focus-visible {
-  border-color: var(--syson-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--syson-accent) 14%,
-    transparent);
-}
-
-.syson-app .mcp-view-button {
-  min-height: 2rem;
-  border-color: var(--syson-line);
-  border-radius: 0.52rem;
-  background: color-mix(in srgb, var(--syson-panel) 72%, transparent);
-  font-size: 0.7rem;
-  transition: border-color 120ms ease, background 120ms ease, transform 120ms
-    ease;
-}
-
-.syson-app .mcp-view-button:not(:disabled):active {
-  transform: translateY(1px);
-}
-
-.syson-app .mcp-view-table-wrap {
-  border: 1px solid var(--syson-line-soft);
-  border-radius: 0.62rem;
-  background: color-mix(in srgb, var(--syson-panel) 75%, transparent);
-}
-
-.syson-app .mcp-view-table {
-  font-size: 0.75rem;
-}
-
-.syson-app .mcp-view-table th {
-  padding: 0.52rem 0.58rem;
-  background: color-mix(in srgb, var(--syson-ink) 4%, var(--syson-panel));
-  color: var(--syson-muted);
-  font-size: 0.61rem;
-  font-weight: var(--font-weight-semibold, 650);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.syson-app .mcp-view-table td {
-  padding: 0.62rem 0.58rem;
-  border-bottom-color: var(--syson-line-soft);
-}
-
-.syson-app .mcp-view-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.syson-app .mcp-view-table tbody tr[data-interactive="true"]:hover {
-  background: color-mix(in srgb, var(--syson-accent) 7%, transparent);
-}
-
-.syson-app .mcp-view-selected {
-  background: color-mix(in srgb, var(--syson-accent) 12%, transparent);
-  outline-color: color-mix(in srgb, var(--syson-accent) 42%, transparent);
-}
-
-.syson-app .mcp-view-key-value {
-  border: 1px solid var(--syson-line-soft);
-  background: color-mix(in srgb, var(--syson-ink) 3.5%, transparent);
-}
-
-.syson-app .mcp-view-key-value dt {
-  color: var(--syson-muted);
-  letter-spacing: 0.035em;
-}
-
-.syson-app .mcp-view-key-value dd {
-  font-family: var(--syson-mono);
-  font-size: 0.73rem;
+  border-color: var(--mcp-view-accent, #0d7c8a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mcp-view-accent, #0d7c8a) 16%, transparent);
 }
 
 .syson-code-block {
   display: block;
-  max-height: 12rem;
-  padding: 0.8rem;
+  max-height: 10rem;
+  padding: 0.65rem 0.75rem;
   overflow: auto;
-  border: 1px solid var(--syson-line-soft);
-  border-radius: 0.58rem;
-  background:
-    linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--syson-accent) 12%, transparent) 2px,
-    transparent 2px
-  ),
-    color-mix(in srgb, var(--syson-ink) 4%, transparent);
-  color: var(--syson-muted);
-  font-family: var(--syson-mono);
+  border: 1px solid var(--mcp-view-border, #dbe3e7);
+  border-radius: var(--mcp-view-radius-sm, 0.25rem);
+  background: var(--mcp-view-subtle, #f4f7f8);
+  color: var(--mcp-view-muted, #5c6b76);
   font-size: 0.72rem;
-  line-height: 1.55;
+  line-height: 1.5;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
-.syson-element-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
+.syson-element-stack {
+  display: grid;
   min-width: 0;
+  max-height: min(22rem, 65cqi);
+  overflow: auto;
+  border: 1px solid var(--mcp-view-border, #dbe3e7);
+  border-radius: var(--mcp-view-radius, 0.5rem);
+}
+
+.syson-element-stack .mcp-view-semantic-element[data-density="row"]:first-child {
+  border-top: 0;
+}
+
+.syson-element-stack .mcp-view-semantic-element[data-density="row"]:last-child {
+  border-bottom: 0;
 }
 
 .syson-kind-mark {
   display: inline-grid;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.15rem;
+  height: 1.15rem;
   flex: 0 0 auto;
   place-items: center;
   border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-  border-radius: 0.34rem;
+  border-radius: var(--mcp-view-radius-sm, 0.25rem);
   background: color-mix(in srgb, currentColor 8%, transparent);
-  color: var(--syson-muted);
-  font-family: var(--syson-mono);
-  font-size: 0.67rem;
+  color: var(--mcp-view-muted, #5c6b76);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.64rem;
 }
 
 .syson-kind-mark[data-kind-tone="part"],
 .syson-kind-mark[data-kind-tone="item"] {
-  color: var(--syson-accent);
+  color: var(--mcp-view-accent, #0d7c8a);
 }
 
 .syson-kind-mark[data-kind-tone="attribute"],
 .syson-kind-mark[data-kind-tone="action"] {
-  color: var(--syson-success);
+  color: var(--mcp-view-success, #12855f);
 }
 
 .syson-kind-mark[data-kind-tone="requirement"],
 .syson-kind-mark[data-kind-tone="constraint"] {
-  color: var(--syson-warning);
+  color: var(--mcp-view-warning, #d98b1f);
 }
 
 .syson-kind-mark[data-kind-tone="connection"],
 .syson-kind-mark[data-kind-tone="port"] {
-  color: var(--syson-danger);
-}
-
-.syson-table-detail {
-  display: grid;
-  gap: 0.16rem;
-  min-width: 0;
-  white-space: normal;
-}
-
-.syson-table-detail code,
-.syson-table-detail small,
-.syson-provenance,
-.syson-inline-id {
-  color: var(--syson-muted);
-  font-size: 0.66rem;
-}
-
-.syson-inline-id {
-  overflow-wrap: anywhere;
-  font-family: var(--syson-mono);
+  color: var(--mcp-view-danger, #c9453c);
 }
 
 .syson-provenance {
-  margin: 0.7rem 0 0;
+  margin: 0.55rem 0 0;
   overflow-wrap: anywhere;
-}
-
-.syson-app .mcp-view-state {
-  min-height: 5.25rem;
-  border-style: solid;
-  border-color: var(--syson-line-soft);
-  background: color-mix(in srgb, var(--syson-ink) 3.5%, transparent);
-  text-align: left;
-  place-content: center start;
-}
-
-.syson-app .mcp-view-state-detail {
-  max-width: 62ch;
-  line-height: 1.5;
+  color: var(--mcp-view-muted, #5c6b76);
+  font-size: 0.66rem;
 }
 
 .syson-diagram-card {
@@ -606,30 +217,29 @@ code {
 .syson-diagram-canvas {
   position: relative;
   width: 100%;
-  min-height: clamp(300px, 58cqi, 520px);
-  max-height: 680px;
+  min-height: clamp(240px, 48cqi, 420px);
+  max-height: 560px;
   overflow: hidden;
-  border: 1px solid var(--syson-line-soft);
-  border-radius: 0.62rem;
+  border: 1px solid var(--mcp-view-border, #dbe3e7);
+  border-radius: var(--mcp-view-radius, 0.5rem);
   outline: none;
-  background-color: var(--syson-panel);
+  background-color: var(--mcp-view-panel, #ffffff);
   background-image:
-    linear-gradient(var(--syson-line-soft) 1px, transparent 1px),
-    linear-gradient(90deg, var(--syson-line-soft) 1px, transparent 1px);
+    linear-gradient(var(--mcp-view-border, #dbe3e7) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mcp-view-border, #dbe3e7) 1px, transparent 1px);
   background-size: 24px 24px;
   touch-action: none;
 }
 
 .syson-diagram-canvas:focus-visible {
-  border-color: var(--syson-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--syson-accent) 14%,
-    transparent);
+  border-color: var(--mcp-view-accent, #0d7c8a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mcp-view-accent, #0d7c8a) 16%, transparent);
 }
 
 .syson-diagram-stage {
   min-width: 100%;
   min-height: 100%;
-  padding: clamp(0.75rem, 3cqi, 1.5rem);
+  padding: clamp(0.6rem, 2.4cqi, 1.1rem);
   transition: transform 100ms ease-out;
   will-change: transform;
 }
@@ -639,41 +249,22 @@ code {
   width: auto;
   max-width: 100%;
   height: auto;
-  max-height: 610px;
+  max-height: 500px;
   margin: 0 auto;
 }
 
 .syson-diagram-help {
-  margin: 0.55rem 0 0;
-  color: var(--syson-faint);
+  margin: 0.45rem 0 0;
+  color: var(--mcp-view-quiet, #7b8894);
   font-size: 0.65rem;
 }
 
-.syson-progress {
-  height: 0.42rem;
-  margin-top: 0.75rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--syson-ink) 7%, transparent);
+.cursor-grab {
+  cursor: grab;
 }
 
-.syson-progress-value {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--syson-accent);
-  transition: width 280ms ease-out;
-}
-
-.syson-progress-value[data-tone="success"] {
-  background: var(--syson-success);
-}
-
-.syson-progress-value[data-tone="warning"] {
-  background: var(--syson-warning);
-}
-
-.syson-progress-value[data-tone="danger"] {
-  background: var(--syson-danger);
+.cursor-grabbing {
+  cursor: grabbing;
 }
 
 @keyframes syson-spin {
@@ -692,24 +283,6 @@ code {
 }
 
 @container (max-width: 520px) {
-  .syson-recorded-basis {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .syson-recorded-details {
-    grid-column: 1;
-    grid-row: auto;
-    min-width: 0;
-  }
-
-  .syson-recorded-details summary {
-    text-align: left;
-  }
-
-  .syson-recorded-details dl {
-    min-width: 0;
-  }
-
   .syson-app .mcp-view-card-header {
     align-items: stretch;
   }
@@ -725,38 +298,18 @@ code {
     flex-basis: 100%;
   }
 
-  .syson-app .mcp-view-table th,
-  .syson-app .mcp-view-table td {
-    padding-right: 0.48rem;
-    padding-left: 0.48rem;
-  }
-
   .syson-diagram-canvas {
-    min-height: 280px;
+    min-height: 220px;
   }
 }
 
 @container (max-width: 350px) {
   .syson-component-surface {
-    padding: 0.42rem;
-    border-radius: 0.72rem;
+    padding: 0.35rem;
   }
 
-  .syson-app .mcp-view-card {
-    padding: 0.68rem;
-  }
-
-  .syson-app .mcp-view-metrics {
-    grid-template-columns: 1fr;
-  }
-
-  .syson-recorded-details dl > div {
-    grid-template-columns: 1fr;
-    gap: 0.08rem;
-  }
-
-  .syson-recorded-details dd {
-    text-align: left;
+  .syson-diagram-canvas {
+    min-height: 200px;
   }
 }
 

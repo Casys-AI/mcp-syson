@@ -28,9 +28,19 @@ packages.
 
 Every key has one local mount implementation and can appear independently in a
 host-selected stack, row, or grid. Items have stable instance IDs, so the same
-component can eventually appear more than once with different JSON props. Every
-App's default surface is currently a stack containing its complete catalog in
-the table order above.
+component can eventually appear more than once with different JSON props. Each
+App's standalone default surface is a compact stack that foregrounds one bounded
+primary view so it can sit on a Digital Thread whiteboard card. The remaining
+catalog keys stay registered for host-negotiated composition.
+
+| Resource                                   | Default surface               |
+| ------------------------------------------ | ----------------------------- |
+| `ui://mcp-syson/diagram-viewer`            | `syson.diagram.visual`        |
+| `ui://mcp-syson/model-explorer-viewer`     | `syson.model.elements`        |
+| `ui://mcp-syson/query-results-viewer`      | `syson.query.values`          |
+| `ui://mcp-syson/requirements-trace-viewer` | `syson.requirements.coverage` |
+| `ui://mcp-syson/validation-viewer`         | `syson.validation.status`     |
+| `ui://mcp-syson/value-change-viewer`       | `syson.value.readout`         |
 
 Example host context:
 

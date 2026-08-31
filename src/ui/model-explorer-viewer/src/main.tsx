@@ -4,14 +4,20 @@ import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
   Card,
-  DataTable,
+  ElementIdent,
+  ElementReading,
   EmptyState,
   KeyValueList,
+  SemanticElement,
 } from "@casys/mcp-view-components/preact/components";
 import { useMemo, useState } from "preact/hooks";
 import {
   defaultComponentSurface,
+  recordedProjectionDigest,
+  shortSysmlKind,
+  sysmlRef,
   VIEWER_COMPONENT_KEYS,
+  VIEWER_DEFAULT_SURFACE_KEYS,
 } from "../../shared/component-catalog";
 import {
   definePreactComponent,
@@ -47,28 +53,28 @@ const KIND_MAP: Record<string, { icon: string; tone: string }> = {
   ActionUsage: { icon: "▷", tone: "action" },
 };
 
-function shortKind(kind: string): string {
-  const entity = kind.match(/[?&]entity=([^&]+)/)?.[1];
-  return entity ?? (kind.includes("::") ? kind.split("::").pop()! : kind);
+function kindVisual(kind: string): { icon: string; tone: string } {
+  return KIND_MAP[shortSysmlKind(kind)] ?? { icon: "○", tone: "neutral" };
 }
 
 function Summary({ data }: { data: ChildrenData }) {
   return (
-    <Card
-      className="syson-hero"
-      eyebrow="SysON"
-      title="Model elements"
-      actions={
-        <Badge tone="info">
-          {data.count} element{data.count === 1 ? "" : "s"}
-        </Badge>
+    <SemanticElement
+      reference={sysmlRef("model-children", data.parentId)}
+      density="card"
+      ident={
+        <ElementIdent
+          label="Model children"
+          detail={data.parentId || "root"}
+        />
       }
-    >
-      <p className="syson-lede">
-        Children resolved for one exact model parent. Filter locally, then
-        select an element to expose its recorded identity.
-      </p>
-    </Card>
+      reading={
+        <ElementReading
+          label="Elements"
+          value={String(data.count)}
+        />
+      }
+    />
   );
 }
 
@@ -80,6 +86,7 @@ function Elements(
 ) {
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<string>();
+  const digest = recordedProjectionDigest(context);
   const elements = useMemo(() => {
     const needle = filter.trim().toLowerCase();
     return needle
@@ -90,7 +97,8 @@ function Elements(
   }, [data.children, filter]);
   return (
     <Card
-      title="Elements"
+      eyebrow={data.parentId || "root"}
+      title="Children"
       actions={
         <input
           aria-label="Filter model elements"
@@ -102,53 +110,55 @@ function Elements(
         />
       }
     >
-      <DataTable
-        label="Model elements"
-        rows={elements}
-        rowKey={(element) => element.id}
-        selected={(element) => selected === element.id}
-        onSelect={(element) => {
-          setSelected(element.id);
-          publishSelection(
-            context,
-            "select-element",
-            "syson.element.selected",
-            { id: element.id, label: element.label, kind: element.kind },
-          );
-        }}
-        emptyLabel="No matching children"
-        columns={[
-          {
-            id: "label",
-            label: "Element",
-            render: (element) => {
-              const kind = shortKind(element.kind);
-              const visual = KIND_MAP[kind] ??
-                { icon: "○", tone: "neutral" };
+      {elements.length
+        ? (
+          <div aria-label="Model elements" className="syson-element-stack">
+            {elements.map((element) => {
+              const kind = shortSysmlKind(element.kind);
+              const visual = kindVisual(element.kind);
               return (
-                <span className="syson-element-label">
-                  <span
-                    aria-hidden="true"
-                    className="syson-kind-mark"
-                    data-kind-tone={visual.tone}
-                  >
-                    {visual.icon}
-                  </span>
-                  <span className="syson-table-detail">
-                    <span>{element.label || "(unnamed)"}</span>
-                    <code>{element.id}</code>
-                  </span>
-                </span>
+                <SemanticElement
+                  key={element.id}
+                  className={selected === element.id
+                    ? "mcp-view-selected"
+                    : undefined}
+                  reference={sysmlRef(kind, element.id, digest)}
+                  density="row"
+                  ident={
+                    <ElementIdent
+                      marker={
+                        <span
+                          aria-hidden="true"
+                          className="syson-kind-mark"
+                          data-kind-tone={visual.tone}
+                        >
+                          {visual.icon}
+                        </span>
+                      }
+                      label={element.label || "(unnamed)"}
+                      detail={`${kind} · ${element.id}`}
+                    />
+                  }
+                  activationLabel={`Select ${element.label || element.id}`}
+                  onActivate={() => {
+                    setSelected(element.id);
+                    publishSelection(
+                      context,
+                      "select-element",
+                      "syson.element.selected",
+                      {
+                        id: element.id,
+                        label: element.label,
+                        kind: element.kind,
+                      },
+                    );
+                  }}
+                />
               );
-            },
-          },
-          {
-            id: "kind",
-            label: "Kind",
-            render: (element) => <Badge>{shortKind(element.kind)}</Badge>,
-          },
-        ]}
-      />
+            })}
+          </div>
+        )
+        : <EmptyState>No matching children</EmptyState>}
     </Card>
   );
 }
@@ -156,7 +166,7 @@ function Elements(
 function KindBreakdown({ data }: { data: ChildrenData }) {
   const counts = new Map<string, number>();
   data.children.forEach((element) => {
-    const kind = shortKind(element.kind);
+    const kind = shortSysmlKind(element.kind);
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   });
   return (
@@ -208,7 +218,9 @@ const registry = defineComponentRegistry<
       description: "Stable parent element identifier",
     }, ({ data }) => <ParentContext data={data} />),
   },
-  defaultSurface: defaultComponentSurface(keys),
+  defaultSurface: defaultComponentSurface(
+    VIEWER_DEFAULT_SURFACE_KEYS.modelExplorer,
+  ),
 });
 
 void startPreactSurfaceApp({
