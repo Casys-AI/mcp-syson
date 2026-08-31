@@ -1,6 +1,6 @@
 /** Small composable SysON diagram components with a standalone default surface. */
 
-import { defineComponentRegistry } from "@casys/mcp-view";
+import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
   Button,
@@ -9,7 +9,7 @@ import {
   KeyValueList,
   StateMessage,
   Toolbar,
-} from "@casys/mcp-view/preact";
+} from "@casys/mcp-view-components/preact/components";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { cx } from "../../components/utils";
 import {
@@ -22,6 +22,8 @@ import {
   startPreactSurfaceApp,
   type SurfaceAppContext,
 } from "../../shared/preact-surface";
+import { isDiagramSnapshot } from "../../shared/recorded-content";
+import { sanitizeDiagramSvg } from "./sanitize-svg";
 import "../../global.css";
 
 interface DiagramNode {
@@ -36,20 +38,31 @@ interface DiagramSnapshot extends Record<string, unknown> {
   edgeCount: number;
   nodes: DiagramNode[];
   svg: string;
+  renderer: "local" | "external";
+  rendererWarning?: string;
 }
 
 function Summary({ data }: { data: DiagramSnapshot }) {
   return (
     <Card
+      className="syson-hero"
       eyebrow="SysON"
       title={data.diagramLabel || "Diagram"}
       actions={
         <div className="mcp-view-badges">
+          <Badge tone="info">
+            {data.renderer === "external" ? "Kroki SVG" : "Local SVG"}
+          </Badge>
           <Badge tone="info">{data.nodeCount} nodes</Badge>
           <Badge>{data.edgeCount} edges</Badge>
         </div>
       }
-    />
+    >
+      <p className="syson-lede">
+        Recorded semantic topology projected as passive SVG. Pan, zoom, or
+        inspect the exact element list below.
+      </p>
+    </Card>
   );
 }
 
@@ -59,13 +72,21 @@ function Visual({ data }: { data: DiagramSnapshot }) {
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
+  const activePointer = useRef<number>();
+
+  const fit = useCallback(() => {
+    setScale(1);
+    setTranslate({ x: 0, y: 0 });
+  }, []);
+
+  const zoomBy = useCallback((factor: number) => {
+    setScale((value) => Math.min(Math.max(value * factor, 0.1), 5));
+  }, []);
 
   const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
-    setScale((value) =>
-      Math.min(Math.max(value * (event.deltaY > 0 ? 0.9 : 1.1), 0.1), 5)
-    );
-  }, []);
+    zoomBy(event.deltaY > 0 ? 0.9 : 1.1);
+  }, [zoomBy]);
   useEffect(() => {
     const node = containerRef.current;
     if (!node) return;
@@ -78,68 +99,101 @@ function Visual({ data }: { data: DiagramSnapshot }) {
       <StateMessage title="No diagram">Diagram has no SVG content</StateMessage>
     );
   }
+  const admitted = sanitizeDiagramSvg(data.svg);
+  if (admitted.status === "unavailable") {
+    return (
+      <StateMessage tone="warning" title="Diagram unavailable">
+        Recorded SVG rejected: {admitted.reason}
+      </StateMessage>
+    );
+  }
   return (
-    <Card
-      className="syson-diagram-card"
-      title="Diagram canvas"
-      actions={
-        <Toolbar label="Diagram zoom controls">
-          <Button
-            title="Zoom in"
-            onClick={() => setScale((value) => Math.min(value * 1.2, 5))}
-          >
-            +
-          </Button>
-          <Button
-            title="Zoom out"
-            onClick={() => setScale((value) => Math.max(value * 0.8, 0.1))}
-          >
-            −
-          </Button>
-          <Button
-            onClick={() => {
-              setScale(1);
-              setTranslate({ x: 0, y: 0 });
-            }}
-          >
-            Reset
-          </Button>
-          <Badge tone="info">{Math.round(scale * 100)}%</Badge>
-        </Toolbar>
-      }
-    >
-      <div
-        ref={containerRef}
-        className={cx(
-          "syson-diagram-canvas",
-          dragging ? "cursor-grabbing" : "cursor-grab",
-        )}
-        onMouseDown={(event) => {
-          if (event.button !== 0) return;
-          setDragging(true);
-          dragStart.current = {
-            x: event.clientX - translate.x,
-            y: event.clientY - translate.y,
-          };
-        }}
-        onMouseMove={(event) =>
-          dragging && setTranslate({
-            x: event.clientX - dragStart.current.x,
-            y: event.clientY - dragStart.current.y,
-          })}
-        onMouseUp={() => setDragging(false)}
-        onMouseLeave={() => setDragging(false)}
+    <>
+      {data.rendererWarning && (
+        <StateMessage tone="warning" title="Renderer warning">
+          {data.rendererWarning}
+        </StateMessage>
+      )}
+      <Card
+        className="syson-diagram-card"
+        title="Diagram canvas"
+        actions={
+          <Toolbar label="Diagram zoom controls">
+            <Button title="Zoom in" onClick={() => zoomBy(1.2)}>
+              Zoom in
+            </Button>
+            <Button title="Zoom out" onClick={() => zoomBy(0.8)}>
+              Zoom out
+            </Button>
+            <Button title="Fit recorded SVG" onClick={fit}>Fit</Button>
+            <Badge tone="info">{Math.round(scale * 100)}%</Badge>
+          </Toolbar>
+        }
       >
         <div
-          style={{
-            transform:
-              `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-            transformOrigin: "0 0",
+          ref={containerRef}
+          aria-label="Recorded SysON diagram. Drag to pan; use plus, minus, or zero to zoom and fit."
+          className={cx(
+            "syson-diagram-canvas",
+            dragging ? "cursor-grabbing" : "cursor-grab",
+          )}
+          role="group"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "+" || event.key === "=") {
+              event.preventDefault();
+              zoomBy(1.2);
+            } else if (event.key === "-") {
+              event.preventDefault();
+              zoomBy(0.8);
+            } else if (event.key === "0" || event.key.toLowerCase() === "f") {
+              event.preventDefault();
+              fit();
+            }
           }}
-          dangerouslySetInnerHTML={{ __html: data.svg }}
-        />
-      </div>
-    </Card>
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            activePointer.current = event.pointerId;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setDragging(true);
+            dragStart.current = {
+              x: event.clientX - translate.x,
+              y: event.clientY - translate.y,
+            };
+          }}
+          onPointerMove={(event) => {
+            if (!dragging || activePointer.current !== event.pointerId) return;
+            setTranslate({
+              x: event.clientX - dragStart.current.x,
+              y: event.clientY - dragStart.current.y,
+            });
+          }}
+          onPointerUp={(event) => {
+            if (activePointer.current !== event.pointerId) return;
+            activePointer.current = undefined;
+            setDragging(false);
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }}
+          onPointerCancel={() => {
+            activePointer.current = undefined;
+            setDragging(false);
+          }}
+        >
+          <div
+            className="syson-diagram-stage"
+            style={{
+              transform:
+                `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+              transformOrigin: "0 0",
+            }}
+            dangerouslySetInnerHTML={{ __html: admitted.markup }}
+          />
+        </div>
+        <p className="syson-diagram-help">
+          Drag to pan · wheel or +/− to zoom · 0 or F to fit
+        </p>
+      </Card>
+    </>
   );
 }
 
@@ -227,8 +281,8 @@ const registry = defineComponentRegistry<
 
 void startPreactSurfaceApp({
   root: document.getElementById("app")!,
-  info: { name: "Diagram Viewer", version: "2.0.0" },
   registry,
+  recordedSession: { view: "diagram", validateContent: isDiagramSnapshot },
   loadingLabel: "Waiting for diagram data…",
   emptyLabel: "No diagram data received",
 }).catch((error) => console.error("[diagram-viewer] Failed to start", error));

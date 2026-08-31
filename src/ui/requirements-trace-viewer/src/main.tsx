@@ -1,6 +1,6 @@
 /** Composable requirement coverage and trace components. */
 
-import { defineComponentRegistry } from "@casys/mcp-view";
+import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
   Button,
@@ -9,7 +9,7 @@ import {
   MetricGrid,
   StateMessage,
   Toolbar,
-} from "@casys/mcp-view/preact";
+} from "@casys/mcp-view-components/preact/components";
 import { useState } from "preact/hooks";
 import {
   defaultComponentSurface,
@@ -21,6 +21,7 @@ import {
   startPreactSurfaceApp,
   type SurfaceAppContext,
 } from "../../shared/preact-surface";
+import { isRequirementsTrace } from "../../shared/recorded-content";
 import "../../global.css";
 
 interface TraceEntry {
@@ -42,53 +43,68 @@ interface TraceData extends Record<string, unknown> {
 }
 
 function Coverage({ data }: { data: TraceData }) {
-  const tone = data.coverage.percentage >= 80
-    ? "success"
-    : data.coverage.percentage >= 50
-    ? "warning"
-    : "danger";
+  const hasRequirements = data.coverage.total > 0;
+  const tone = data.coverage.unsatisfied > 0 ? "warning" : "info";
   return (
-    <Card eyebrow="SysON" title="Requirements coverage">
+    <Card
+      className="syson-hero"
+      eyebrow="SysON trace"
+      title="Satisfaction-link coverage"
+    >
+      <p className="syson-lede">
+        Presence of recorded satisfaction links only. Coverage does not prove
+        that a requirement is met.
+      </p>
       <MetricGrid
         items={[
           {
             id: "coverage",
-            label: "Coverage",
-            value: Math.round(data.coverage.percentage),
-            unit: "%",
-            tone,
+            label: "Link coverage",
+            value: hasRequirements
+              ? Math.round(data.coverage.percentage)
+              : "unavailable",
+            unit: hasRequirements ? "%" : undefined,
+            tone: hasRequirements ? "info" : "warning",
           },
           { id: "total", label: "Total", value: data.coverage.total },
           {
             id: "covered",
-            label: "Covered",
+            label: "Linked",
             value: data.coverage.satisfied,
-            tone: "success",
+            tone: "info",
           },
           {
             id: "uncovered",
-            label: "Uncovered",
+            label: "Unlinked",
             value: data.coverage.unsatisfied,
-            tone: data.coverage.unsatisfied ? "danger" : "success",
+            tone: data.coverage.unsatisfied ? "warning" : "neutral",
           },
         ]}
       />
-      <div
-        className="syson-progress"
-        aria-label={`${
-          Math.round(data.coverage.percentage)
-        }% requirements coverage`}
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(data.coverage.percentage)}
-      >
-        <div
-          className="syson-progress-value"
-          data-tone={tone}
-          style={{ width: `${Math.min(100, data.coverage.percentage)}%` }}
-        />
-      </div>
+      {hasRequirements
+        ? (
+          <div
+            className="syson-progress"
+            aria-label={`${
+              Math.round(data.coverage.percentage)
+            }% requirements with a recorded satisfaction link`}
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(data.coverage.percentage)}
+          >
+            <div
+              className="syson-progress-value"
+              data-tone={tone}
+              style={{ width: `${Math.min(100, data.coverage.percentage)}%` }}
+            />
+          </div>
+        )
+        : (
+          <StateMessage tone="warning" title="Trace unavailable">
+            No requirements were returned, so link coverage cannot be assessed.
+          </StateMessage>
+        )}
     </Card>
   );
 }
@@ -97,16 +113,16 @@ function TraceList(
   { data, context }: { data: TraceData; context: SurfaceAppContext<TraceData> },
 ) {
   const [selected, setSelected] = useState<string>();
-  const [mode, setMode] = useState<"all" | "covered" | "uncovered">("all");
+  const [mode, setMode] = useState<"all" | "linked" | "unlinked">("all");
   const rows = data.traces.filter((trace) =>
-    mode === "all" || (trace.satisfiedBy.length > 0) === (mode === "covered")
+    mode === "all" || (trace.satisfiedBy.length > 0) === (mode === "linked")
   );
   return (
     <Card
       title="Requirements"
       actions={
         <Toolbar label="Requirement coverage filter">
-          {(["all", "covered", "uncovered"] as const).map((value) => (
+          {(["all", "linked", "unlinked"] as const).map((value) => (
             <Button
               key={value}
               pressed={mode === value}
@@ -145,8 +161,8 @@ function TraceList(
             render: (trace) => {
               const covered = trace.satisfiedBy.length > 0;
               return (
-                <Badge tone={covered ? "success" : "danger"}>
-                  {covered ? "Covered" : "Uncovered"}
+                <Badge tone={covered ? "info" : "warning"}>
+                  {covered ? "Linked" : "Unlinked"}
                 </Badge>
               );
             },
@@ -223,26 +239,38 @@ const registry = defineComponentRegistry<
   SurfaceAppContext<TraceData>
 >({
   components: {
-    [keys[0]]: definePreactComponent({
-      title: "Requirements coverage",
-      description: "Coverage percentage and counters",
-    }, ({ data }) => <Coverage data={data} />),
-    [keys[1]]: definePreactComponent({
-      title: "Requirements trace list",
-      description: "Filterable selectable requirements",
-    }, ({ data, context }) => <TraceList data={data} context={context} />),
-    [keys[2]]: definePreactComponent({
-      title: "Satisfaction links",
-      description: "Requirement-to-element evidence",
-    }, ({ data }) => <SatisfactionLinks data={data} />),
+    [keys[0]]: definePreactComponent(
+      {
+        title: "Requirements coverage",
+        description: "Coverage percentage and counters",
+      },
+      ({ data }) => <Coverage data={data} />,
+    ),
+    [keys[1]]: definePreactComponent(
+      {
+        title: "Requirements trace list",
+        description: "Filterable selectable requirements",
+      },
+      ({ data, context }) => <TraceList data={data} context={context} />,
+    ),
+    [keys[2]]: definePreactComponent(
+      {
+        title: "Satisfaction links",
+        description: "Requirement-to-element evidence",
+      },
+      ({ data }) => <SatisfactionLinks data={data} />,
+    ),
   },
   defaultSurface: defaultComponentSurface(keys),
 });
 
 void startPreactSurfaceApp({
   root: document.getElementById("app")!,
-  info: { name: "Requirements Trace", version: "2.0.0" },
   registry,
+  recordedSession: {
+    view: "requirementsTrace",
+    validateContent: isRequirementsTrace,
+  },
   loadingLabel: "Waiting for requirements trace data…",
 }).catch((error) =>
   console.error("[requirements-trace] Failed to start", error)

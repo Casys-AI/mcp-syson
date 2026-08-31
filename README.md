@@ -419,15 +419,27 @@ navigation and mutation calls also declare closed output schemas: their
 Component contracts and optional Compose events are documented in
 [SysON component surfaces](docs/component-surfaces.md).
 
-The build generates a TypeScript bundle that is statically imported by the
-server, so a JSR/Deno consumer fetches the viewer HTML with its module graph;
-the viewer bundles are registered as MCP resources. Build them before local
-development or test runs:
+The build generates TypeScript modules that are loaded by the server, so a
+JSR/Deno consumer fetches the viewer HTML with its module graph; the viewer
+bundles are registered as MCP resources. Until the coordinated `mcp-view` split
+is published, rebuilding or type-checking is intentionally fail-closed: name the
+audited local core and component-package entry points explicitly. There is no
+fallback to the older monolithic `@casys/mcp-view@0.7` package:
 
 ```bash
-deno task ui:build     # cd src/ui && node build-all.mjs
-deno task ui:verify    # asserts each bundle is readable and registered
+export MCP_VIEW_MODULE=file:///absolute/path/to/mcp-server/packages/view/mod.ts
+export MCP_VIEW_COMPONENTS_MODULE=file:///absolute/path/to/mcp-server/packages/view-components/mod.ts
+deno task ui:build
+deno task ui:check
+deno task ui:verify
 ```
+
+The standard sibling package layout supplies `view-contracts`, the component
+Preact adapter and the pure presentation entry point. Explicit overrides for
+those three modules are documented in
+[SysON component surfaces](docs/component-surfaces.md). The checked-in HTML is
+self-contained and contains only package identity/version provenance, never
+local filesystem paths.
 
 The JSR package ships the generated TypeScript bundle, so registry consumers get
 built viewers without a Node toolchain.

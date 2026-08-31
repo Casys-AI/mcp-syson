@@ -337,6 +337,17 @@ Deno.test("SysON serves stateless HTTP with native structured agent contracts", 
         .additionalProperties,
       undefined,
     );
+    assertEquals(
+      Array.isArray((queryEval?.outputSchema as { oneOf?: unknown[] })?.oneOf),
+      true,
+    );
+    const requirementsTrace = tools.find((tool) =>
+      tool.name === "syson_query_requirements_trace"
+    );
+    assertEquals(
+      (requirementsTrace?.outputSchema as { required?: unknown[] })?.required,
+      ["rootId", "requirementsCount", "traces", "coverage"],
+    );
     for (const tool of tools) {
       if (tool.name === "syson_query_aql" || tool.name === "syson_query_eval") {
         continue;

@@ -233,7 +233,14 @@ function fetchDiagramData(
             label: (e.centerLabel as { text: string } | null)?.text,
           }));
 
-          resolve({ nodes, edges, label: d.metadata.label, childToParent });
+          resolve({
+            nodes,
+            edges,
+            label: typeof d.metadata?.label === "string"
+              ? d.metadata.label
+              : "",
+            childToParent,
+          });
         }
       }
 

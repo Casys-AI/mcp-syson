@@ -1,13 +1,13 @@
 /** Composable model-explorer components for SysON element children. */
 
-import { defineComponentRegistry } from "@casys/mcp-view";
+import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
   Card,
   DataTable,
   EmptyState,
   KeyValueList,
-} from "@casys/mcp-view/preact";
+} from "@casys/mcp-view-components/preact/components";
 import { useMemo, useState } from "preact/hooks";
 import {
   defaultComponentSurface,
@@ -19,6 +19,7 @@ import {
   startPreactSurfaceApp,
   type SurfaceAppContext,
 } from "../../shared/preact-surface";
+import { isModelChildren } from "../../shared/recorded-content";
 import "../../global.css";
 
 interface ModelElement {
@@ -33,17 +34,17 @@ interface ChildrenData extends Record<string, unknown> {
   count: number;
 }
 
-const KIND_MAP: Record<string, { icon: string; color: string }> = {
-  PartUsage: { icon: "■", color: "text-blue-400" },
-  PartDefinition: { icon: "□", color: "text-blue-300" },
-  AttributeUsage: { icon: "◆", color: "text-emerald-400" },
-  RequirementUsage: { icon: "★", color: "text-amber-400" },
-  Package: { icon: "▶", color: "text-purple-400" },
-  ItemUsage: { icon: "●", color: "text-cyan-400" },
-  PortUsage: { icon: "◐", color: "text-orange-400" },
-  ConnectionUsage: { icon: "↔", color: "text-pink-400" },
-  ConstraintUsage: { icon: "⚠", color: "text-yellow-400" },
-  ActionUsage: { icon: "▷", color: "text-teal-400" },
+const KIND_MAP: Record<string, { icon: string; tone: string }> = {
+  PartUsage: { icon: "■", tone: "part" },
+  PartDefinition: { icon: "□", tone: "part" },
+  AttributeUsage: { icon: "◆", tone: "attribute" },
+  RequirementUsage: { icon: "★", tone: "requirement" },
+  Package: { icon: "▶", tone: "package" },
+  ItemUsage: { icon: "●", tone: "item" },
+  PortUsage: { icon: "◐", tone: "port" },
+  ConnectionUsage: { icon: "↔", tone: "connection" },
+  ConstraintUsage: { icon: "!", tone: "constraint" },
+  ActionUsage: { icon: "▷", tone: "action" },
 };
 
 function shortKind(kind: string): string {
@@ -54,6 +55,7 @@ function shortKind(kind: string): string {
 function Summary({ data }: { data: ChildrenData }) {
   return (
     <Card
+      className="syson-hero"
       eyebrow="SysON"
       title="Model elements"
       actions={
@@ -61,7 +63,12 @@ function Summary({ data }: { data: ChildrenData }) {
           {data.count} element{data.count === 1 ? "" : "s"}
         </Badge>
       }
-    />
+    >
+      <p className="syson-lede">
+        Children resolved for one exact model parent. Filter locally, then
+        select an element to expose its recorded identity.
+      </p>
+    </Card>
   );
 }
 
@@ -117,11 +124,20 @@ function Elements(
             render: (element) => {
               const kind = shortKind(element.kind);
               const visual = KIND_MAP[kind] ??
-                { icon: "○", color: "text-fg-muted" };
+                { icon: "○", tone: "neutral" };
               return (
                 <span className="syson-element-label">
-                  <span className={visual.color}>{visual.icon}</span>
-                  <span>{element.label || "(unnamed)"}</span>
+                  <span
+                    aria-hidden="true"
+                    className="syson-kind-mark"
+                    data-kind-tone={visual.tone}
+                  >
+                    {visual.icon}
+                  </span>
+                  <span className="syson-table-detail">
+                    <span>{element.label || "(unnamed)"}</span>
+                    <code>{element.id}</code>
+                  </span>
                 </span>
               );
             },
@@ -197,7 +213,10 @@ const registry = defineComponentRegistry<
 
 void startPreactSurfaceApp({
   root: document.getElementById("app")!,
-  info: { name: "Model Explorer", version: "2.0.0" },
   registry,
+  recordedSession: {
+    view: "modelExplorer",
+    validateContent: isModelChildren,
+  },
   loadingLabel: "Waiting for model elements…",
 }).catch((error) => console.error("[model-explorer] Failed to start", error));

@@ -39,7 +39,7 @@ export const VIEWER_COMPONENT_KEYS = {
 type ComponentKey =
   typeof VIEWER_COMPONENT_KEYS[keyof typeof VIEWER_COMPONENT_KEYS][number];
 
-/** Structural surface shape; @casys/mcp-view validates and freezes it. */
+/** Structural surface shape; @casys/mcp-view-components validates and freezes it. */
 export function defaultComponentSurface(keys: readonly ComponentKey[]) {
   return {
     layout: { type: "stack" as const, gap: "sm" as const },

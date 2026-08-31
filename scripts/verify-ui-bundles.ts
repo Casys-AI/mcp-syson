@@ -1,11 +1,11 @@
 /**
- * Proves that the generated TypeScript module is fresh with the Vite output.
+ * Proves that each generated TypeScript module is fresh with the Vite output.
  *
- * This runs after `deno task ui:build` in CI. It keeps a stale bundles.ts from
+ * This runs after `deno task ui:build` in CI. It keeps a stale App module from
  * becoming a package that serves a different viewer than the checked build.
  */
 
-import { UI_HTML_BY_NAME } from "../src/ui/bundles.ts";
+import { loadBundledUiHtml, UI_BUNDLE_NAMES } from "../src/ui/bundles.ts";
 import { VIEWER_COMPONENT_KEYS } from "../src/ui/shared/component-catalog.ts";
 
 const EXPECTED_VIEWERS = [
@@ -16,6 +16,9 @@ const EXPECTED_VIEWERS = [
   "validation-viewer",
   "value-change-viewer",
 ];
+
+const EXPECTED_SPLIT_PROVENANCE =
+  "@casys/mcp-view@0.8.0 + @casys/mcp-view-contracts@0.1.0 + @casys/mcp-view-components@0.1.0";
 
 const VIEWER_SOURCE_PATHS = EXPECTED_VIEWERS.map((viewer) =>
   new URL(`../src/ui/${viewer}/src/main.tsx`, import.meta.url)
@@ -30,7 +33,7 @@ const COMPONENTS_BY_VIEWER = {
   "value-change-viewer": VIEWER_COMPONENT_KEYS.value,
 } as const;
 
-const bundledViewers = Object.keys(UI_HTML_BY_NAME).sort();
+const bundledViewers = [...UI_BUNDLE_NAMES].sort();
 const expectedViewers = [...EXPECTED_VIEWERS].sort();
 if (JSON.stringify(bundledViewers) !== JSON.stringify(expectedViewers)) {
   throw new Error(
@@ -46,13 +49,30 @@ for (const viewer of EXPECTED_VIEWERS) {
     import.meta.url,
   );
   const distHtml = await Deno.readTextFile(distUrl);
-  const bundledHtml = UI_HTML_BY_NAME[viewer];
+  const bundledHtml = await loadBundledUiHtml(
+    viewer as Parameters<typeof loadBundledUiHtml>[0],
+  );
 
   if (bundledHtml !== distHtml) {
-    throw new Error(`${viewer}: bundles.ts does not match dist/index.html`);
+    throw new Error(
+      `${viewer}: generated bundle does not match dist/index.html`,
+    );
   }
   if (!bundledHtml.includes("<html") || !bundledHtml.includes('id="app"')) {
     throw new Error(`${viewer}: bundle is not a rendered MCP App document`);
+  }
+  if (
+    !bundledHtml.includes(
+      `name="casys-mcp-view-split" content="${EXPECTED_SPLIT_PROVENANCE}"`,
+    )
+  ) {
+    throw new Error(`${viewer}: bundle lacks exact local split provenance`);
+  }
+  if (
+    bundledHtml.includes("file:///Volumes/") ||
+    bundledHtml.includes("/Volumes/DEV/")
+  ) {
+    throw new Error(`${viewer}: bundle leaks a local split module path`);
   }
   if (
     !bundledHtml.includes("io.casys.mcp.view-components/v1") ||
@@ -78,10 +98,20 @@ for (const sourceUrl of VIEWER_SOURCE_PATHS) {
   const source = await Deno.readTextFile(sourceUrl);
   if (
     !source.includes("defineComponentRegistry") ||
-    !source.includes("startPreactSurfaceApp")
+    !source.includes("startPreactSurfaceApp") ||
+    !source.includes('from "@casys/mcp-view-components"') ||
+    !source.includes(
+      'from "@casys/mcp-view-components/preact/components"',
+    ) ||
+    source.includes('from "@casys/mcp-view/preact"')
   ) {
     throw new Error(
-      `${sourceUrl.pathname}: viewer must declare a component registry and start the shared surface app.`,
+      `${sourceUrl.pathname}: viewer presentation must use the optional split component package.`,
+    );
+  }
+  if (source.includes("info:")) {
+    throw new Error(
+      `${sourceUrl.pathname}: viewer must not override the exact manifest appInfo identity.`,
     );
   }
 }
@@ -90,13 +120,64 @@ const adapterSource = await Deno.readTextFile(
   new URL("../src/ui/shared/preact-surface.tsx", import.meta.url),
 );
 if (
-  !adapterSource.includes('from "@casys/mcp-view/preact"') ||
-  !adapterSource.includes("startSharedPreactSurfaceApp") ||
-  adapterSource.includes("createMcpApp") ||
-  adapterSource.includes("mountComponentSurface")
+  !adapterSource.includes('from "@casys/mcp-view"') ||
+  !adapterSource.includes('from "@casys/mcp-view-components"') ||
+  !adapterSource.includes('from "@casys/mcp-view-components/preact"') ||
+  !adapterSource.includes("createMcpApp") ||
+  !adapterSource.includes("mountComponentSurface") ||
+  !adapterSource.includes("viewerSession:") ||
+  !adapterSource.includes("componentCatalogCapabilities") ||
+  !adapterSource.includes("name: SYSON_VIEW_APP_MANIFEST.app.id") ||
+  !adapterSource.includes("version: SYSON_VIEW_APP_MANIFEST.app.version") ||
+  adapterSource.includes("createComposeEventClient") ||
+  adapterSource.includes('from "@casys/mcp-view/preact"') ||
+  adapterSource.includes("defineRecordedPreactComponent")
 ) {
   throw new Error(
-    "SysON must delegate the Preact handshake and component-surface lifecycle to @casys/mcp-view.",
+    "SysON must keep recorded hydration App-level while separating mcp-view core from optional presentation.",
+  );
+}
+
+const packageJson = JSON.parse(
+  await Deno.readTextFile(
+    new URL("../src/ui/package.json", import.meta.url),
+  ),
+);
+const packageLock = await Deno.readTextFile(
+  new URL("../src/ui/package-lock.json", import.meta.url),
+);
+const splitResolver = await Deno.readTextFile(
+  new URL("../src/ui/split-modules.mjs", import.meta.url),
+);
+if (
+  packageJson.dependencies?.["@casys/mcp-view"] !== undefined ||
+  packageJson.dependencies?.["@casys/mcp-view-components"] !== undefined ||
+  packageJson.devDependencies?.["@modelcontextprotocol/ext-apps"] !==
+    "^1.7.4" ||
+  packageJson.devDependencies?.["@modelcontextprotocol/sdk"] !== "^1.29.0" ||
+  packageLock.includes('"node_modules/@casys/mcp-view"') ||
+  packageLock.includes('"node_modules/@casys/mcp-view-components"') ||
+  splitResolver.includes("@casys/mcp-view@0.7") ||
+  !/requiredFileModule\(\s*"MCP_VIEW_MODULE"/.test(splitResolver) ||
+  !/requiredFileModule\(\s*"MCP_VIEW_COMPONENTS_MODULE"/.test(
+    splitResolver,
+  )
+) {
+  throw new Error(
+    "SysON UI must require the audited local split without an npm or 0.7 fallback.",
+  );
+}
+
+const globalCss = await Deno.readTextFile(
+  new URL("../src/ui/global.css", import.meta.url),
+);
+if (
+  globalCss.includes("Compatibility overrides") ||
+  globalCss.includes("font-family: Inter") ||
+  globalCss.includes("html .mcp-view-card")
+) {
+  throw new Error(
+    "SysON CSS must not reintroduce the retired monolith palette or typography overrides.",
   );
 }
 

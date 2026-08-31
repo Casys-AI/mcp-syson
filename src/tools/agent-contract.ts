@@ -292,6 +292,72 @@ const searchOutputSchema = {
   required: ["query", "results", "count"],
 };
 
+const queryEvalOutputSchema = {
+  oneOf: [
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        type: { const: "object" },
+        expression: { type: "string" },
+        result: identitySchema,
+      },
+      required: ["type", "expression", "result"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        type: { const: "objects" },
+        expression: { type: "string" },
+        results: { type: "array", items: identitySchema },
+        count: { type: "integer", minimum: 0 },
+      },
+      required: ["type", "expression", "results", "count"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        type: { const: "string" },
+        expression: { type: "string" },
+        result: { type: "string" },
+      },
+      required: ["type", "expression", "result"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        type: { const: "boolean" },
+        expression: { type: "string" },
+        result: { type: "boolean" },
+      },
+      required: ["type", "expression", "result"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        type: { const: "int" },
+        expression: { type: "string" },
+        result: { type: "integer" },
+      },
+      required: ["type", "expression", "result"],
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        type: { const: "void" },
+        expression: { type: "string" },
+        result: { type: "null" },
+      },
+      required: ["type", "expression", "result"],
+    },
+  ],
+};
+
 const requirementsTraceOutputSchema = {
   type: "object",
   additionalProperties: false,
@@ -329,7 +395,7 @@ const requirementsTraceOutputSchema = {
     },
     error: { type: "string" },
   },
-  required: ["rootId", "requirementsCount", "traces"],
+  required: ["rootId", "requirementsCount", "traces", "coverage"],
 };
 
 const diagramListOutputSchema = {
@@ -499,7 +565,11 @@ const CONTRACTS: Record<string, AgentToolContract> = {
   // expression evaluator read-only merely because many calls are reads.
   syson_query_aql: { annotations: destructive, openInputSchema: true },
   syson_search: { annotations: readOnly, outputSchema: searchOutputSchema },
-  syson_query_eval: { annotations: destructive, openInputSchema: true },
+  syson_query_eval: {
+    annotations: destructive,
+    openInputSchema: true,
+    outputSchema: queryEvalOutputSchema,
+  },
   syson_query_requirements_trace: {
     annotations: readOnly,
     outputSchema: requirementsTraceOutputSchema,

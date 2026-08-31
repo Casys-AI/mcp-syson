@@ -9,14 +9,14 @@
 
 // Re-export client and tools
 export {
-  defaultClient,
-  SysonToolsClient,
-  SysonToolsMCP,
-  sysonToolsMCP,
   allTools,
+  defaultClient,
   getCategories,
   getToolByName,
   getToolsByCategory,
+  SysonToolsClient,
+  SysonToolsMCP,
+  sysonToolsMCP,
   toolsByCategory,
 } from "./src/client.ts";
 
@@ -45,12 +45,12 @@ export type { SysonGraphQLClientOptions } from "./src/client.ts";
 
 // Re-export individual tool arrays
 export {
-  projectTools,
-  modelTools,
-  elementTools,
-  queryTools,
-  diagramTools,
   constraintTools,
+  diagramTools,
+  elementTools,
+  modelTools,
+  projectTools,
+  queryTools,
   valueTools,
 } from "./src/tools/mod.ts";
 
@@ -75,3 +75,20 @@ export {
   getSelf,
 } from "./src/tools/mod.ts";
 export type { ExprResult } from "./src/tools/mod.ts";
+
+// MCP App compatibility declarations for generic read-only hosts.
+export {
+  SYSON_RECORDED_SESSION_SCHEMAS,
+  SYSON_RESULT_SCHEMAS,
+  SYSON_UI_RESOURCE_URIS,
+  SYSON_VIEW_APP_MANIFEST,
+  SYSON_VIEW_APP_MANIFEST_SCHEMA,
+  SYSON_VIEWER_SESSION_ACTION,
+} from "./src/ui/app-manifest.ts";
+export {
+  fingerprintSysonRecordedProjection,
+  parseSysonRecordedViewSession,
+} from "./src/ui/shared/recorded-session.ts";
+export type {
+  SysonRecordedViewSession,
+} from "./src/ui/shared/recorded-session.ts";

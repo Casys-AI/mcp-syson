@@ -2,8 +2,11 @@
  * Tests for SysON query tools
  */
 
-import { assertEquals, assertRejects } from "jsr:@std/assert";
-import { setSysonClient, SysonGraphQLClient } from "../../src/api/graphql-client.ts";
+import { assertEquals, assertRejects } from "@std/assert";
+import {
+  setSysonClient,
+  SysonGraphQLClient,
+} from "../../src/api/graphql-client.ts";
 import { queryTools } from "../../src/tools/query.ts";
 
 function getHandler(name: string) {
@@ -47,7 +50,12 @@ Deno.test("syson_query_aql - returns objects", async () => {
         __typename: "ObjectsExpressionResult",
         objsValue: [
           { id: "c1", kind: "sysml::PartUsage", label: "Engine", iconURLs: [] },
-          { id: "c2", kind: "sysml::RequirementUsage", label: "REQ-001", iconURLs: [] },
+          {
+            id: "c2",
+            kind: "sysml::RequirementUsage",
+            label: "REQ-001",
+            iconURLs: [],
+          },
         ],
       },
     },
@@ -103,7 +111,12 @@ Deno.test("syson_search - returns matches", async () => {
         search: {
           result: {
             matches: [
-              { id: "e1", kind: "sysml::PartUsage", label: "Propulsion", iconURLs: [] },
+              {
+                id: "e1",
+                kind: "sysml::PartUsage",
+                label: "Propulsion",
+                iconURLs: [],
+              },
             ],
           },
         },
@@ -202,12 +215,46 @@ Deno.test("syson_query_eval - throws on error payload", async () => {
   }
 });
 
+Deno.test("requirements trace keeps closed zero coverage on an unexpected result", async () => {
+  const restore = mockFetch([{
+    evaluateExpression: {
+      __typename: "EvaluateExpressionSuccessPayload",
+      result: {
+        __typename: "StringExpressionResult",
+        strValue: "not a requirement collection",
+      },
+    },
+  }]);
+
+  try {
+    const result = await getHandler("syson_query_requirements_trace")({
+      editing_context_id: "ec-1",
+      root_id: "root-1",
+    }) as Record<string, unknown>;
+    assertEquals(result, {
+      rootId: "root-1",
+      requirementsCount: 0,
+      traces: [],
+      coverage: {
+        total: 0,
+        satisfied: 0,
+        unsatisfied: 0,
+        percentage: 0,
+      },
+      error: "Unexpected result type: StringExpressionResult",
+    });
+  } finally {
+    restore();
+  }
+});
+
 Deno.test("queryTools - has correct tool count and categories", () => {
   assertEquals(queryTools.length, 5);
   for (const tool of queryTools) {
     assertEquals(tool.category, "query");
     assertEquals(
-      tool.name.startsWith("syson_query_") || tool.name.startsWith("syson_search") ||
+      tool.name.startsWith("syson_query_") ||
+        tool.name.startsWith("syson_search") ||
         tool.name === "syson_part_structure",
       true,
     );

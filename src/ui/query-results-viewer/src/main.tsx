@@ -1,6 +1,6 @@
 /** Composable AQL/search result components. */
 
-import { defineComponentRegistry } from "@casys/mcp-view";
+import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
   Button,
@@ -8,7 +8,7 @@ import {
   DataTable,
   KeyValueList,
   Toolbar,
-} from "@casys/mcp-view/preact";
+} from "@casys/mcp-view-components/preact/components";
 import { useMemo, useState } from "preact/hooks";
 import {
   defaultComponentSurface,
@@ -20,6 +20,7 @@ import {
   startPreactSurfaceApp,
   type SurfaceAppContext,
 } from "../../shared/preact-surface";
+import { isQueryResult } from "../../shared/recorded-content";
 import "../../global.css";
 
 interface ObjectResult {
@@ -60,6 +61,7 @@ function Summary({ data }: { data: QueryData }) {
   const objects = objectsOf(data);
   return (
     <Card
+      className="syson-hero"
       eyebrow="SysON"
       title="Query result"
       actions={
@@ -69,7 +71,12 @@ function Summary({ data }: { data: QueryData }) {
             : data.type ?? "unknown"}
         </Badge>
       }
-    />
+    >
+      <p className="syson-lede">
+        Exact AQL or search output. Sorting and filtering stay local to this
+        read-only projection.
+      </p>
+    </Card>
   );
 }
 
@@ -180,7 +187,12 @@ function Values(
           {
             id: "label",
             label: "Label",
-            render: (item) => item.label || "(unnamed)",
+            render: (item) => (
+              <span className="syson-table-detail">
+                <span>{item.label || "(unnamed)"}</span>
+                <code>{item.id}</code>
+              </span>
+            ),
           },
           {
             id: "kind",
@@ -218,7 +230,7 @@ const registry = defineComponentRegistry<
 
 void startPreactSurfaceApp({
   root: document.getElementById("app")!,
-  info: { name: "Query Results", version: "2.0.0" },
   registry,
+  recordedSession: { view: "queryResults", validateContent: isQueryResult },
   loadingLabel: "Waiting for query results…",
 }).catch((error) => console.error("[query-results] Failed to start", error));

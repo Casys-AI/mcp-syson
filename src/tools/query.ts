@@ -50,7 +50,10 @@ interface TraversalState {
   maxDepthReached: boolean;
 }
 
-const DEFAULT_MULTIPLICITY = { quantity: 1, quantitySource: "sysml-default" as const };
+const DEFAULT_MULTIPLICITY = {
+  quantity: 1,
+  quantitySource: "sysml-default" as const,
+};
 
 /**
  * Read a PartUsage's multiplicity as a plain count.
@@ -68,15 +71,21 @@ async function readMultiplicity(
   elementId: string,
 ): Promise<{ quantity: number; quantitySource: "model" | "sysml-default" }> {
   try {
-    const multResult = await evalAql(ecId, "aql:self.multiplicity", [elementId]);
-    if (multResult.__typename !== "ObjectExpressionResult") return DEFAULT_MULTIPLICITY;
+    const multResult = await evalAql(ecId, "aql:self.multiplicity", [
+      elementId,
+    ]);
+    if (multResult.__typename !== "ObjectExpressionResult") {
+      return DEFAULT_MULTIPLICITY;
+    }
 
     const literalResult = await evalAql(
       ecId,
       "aql:self.eAllContents()->select(e | e.oclIsKindOf(sysml::LiteralInteger))->first()",
       [multResult.objValue.id],
     );
-    if (literalResult.__typename !== "ObjectExpressionResult") return DEFAULT_MULTIPLICITY;
+    if (literalResult.__typename !== "ObjectExpressionResult") {
+      return DEFAULT_MULTIPLICITY;
+    }
 
     const valueResult = await evalAql(
       ecId,
@@ -86,7 +95,9 @@ async function readMultiplicity(
 
     if (valueResult.__typename === "StringExpressionResult") {
       const parsed = parseInt(valueResult.strValue, 10);
-      return isNaN(parsed) ? DEFAULT_MULTIPLICITY : { quantity: parsed, quantitySource: "model" };
+      return isNaN(parsed)
+        ? DEFAULT_MULTIPLICITY
+        : { quantity: parsed, quantitySource: "model" };
     }
     if (valueResult.__typename === "IntExpressionResult") {
       return { quantity: valueResult.intValue, quantitySource: "model" };
@@ -107,7 +118,9 @@ async function readPartAttributes(
   ecId: string,
   kids: GqlObject[],
 ): Promise<PartAttribute[] | undefined> {
-  const attributeKids = kids.filter((k) => normalizeKind(k.kind).includes("AttributeUsage"));
+  const attributeKids = kids.filter((k) =>
+    normalizeKind(k.kind).includes("AttributeUsage")
+  );
   if (attributeKids.length === 0) return undefined;
 
   const attributes: PartAttribute[] = [];
@@ -151,12 +164,21 @@ async function buildPartNode(
     if (attributes) node.attributes = attributes;
   }
 
-  const partKids = kids.filter((k) => normalizeKind(k.kind).includes("PartUsage"));
+  const partKids = kids.filter((k) =>
+    normalizeKind(k.kind).includes("PartUsage")
+  );
 
   if (depth < maxDepth) {
     for (const kid of partKids) {
       node.children.push(
-        await buildPartNode(ecId, kid, depth + 1, maxDepth, includeAttributes, state),
+        await buildPartNode(
+          ecId,
+          kid,
+          depth + 1,
+          maxDepth,
+          includeAttributes,
+          state,
+        ),
       );
     }
   } else if (partKids.length > 0) {
@@ -253,23 +275,47 @@ export const queryTools: SysonTool[] = [
             count: exprResult.objsValue.length,
           };
         case "StringExpressionResult":
-          return { objectId: objId, expression: expr, type: "string", result: exprResult.strValue };
+          return {
+            objectId: objId,
+            expression: expr,
+            type: "string",
+            result: exprResult.strValue,
+          };
         case "BooleanExpressionResult":
-          return { objectId: objId, expression: expr, type: "boolean", result: exprResult.boolValue };
+          return {
+            objectId: objId,
+            expression: expr,
+            type: "boolean",
+            result: exprResult.boolValue,
+          };
         case "IntExpressionResult":
-          return { objectId: objId, expression: expr, type: "int", result: exprResult.intValue };
+          return {
+            objectId: objId,
+            expression: expr,
+            type: "int",
+            result: exprResult.intValue,
+          };
         case "VoidExpressionResult":
-          return { objectId: objId, expression: expr, type: "void", result: null };
+          return {
+            objectId: objId,
+            expression: expr,
+            type: "void",
+            result: null,
+          };
         default:
-          return { objectId: objId, expression: expr, type: "unknown", result: exprResult };
+          return {
+            objectId: objId,
+            expression: expr,
+            type: "unknown",
+            result: exprResult,
+          };
       }
     },
   },
 
   {
     name: "syson_search",
-    description:
-      "Full-text search across all elements in a project. " +
+    description: "Full-text search across all elements in a project. " +
       "Find elements by name or content. Supports regex.",
     category: "query",
     inputSchema: {
@@ -304,7 +350,9 @@ export const queryTools: SysonTool[] = [
         emits: ["syson.element.selected"],
       },
     },
-    handler: async ({ editing_context_id, text, match_case, whole_word, use_regex }) => {
+    handler: async (
+      { editing_context_id, text, match_case, whole_word, use_regex },
+    ) => {
       const client = getSysonClient();
 
       const data = await client.query<SearchResult>(SEARCH_ELEMENTS, {
@@ -343,8 +391,7 @@ export const queryTools: SysonTool[] = [
 
   {
     name: "syson_query_eval",
-    description:
-      "Evaluate an AQL expression on multiple elements at once. " +
+    description: "Evaluate an AQL expression on multiple elements at once. " +
       "Like syson_query_aql but accepts an array of object IDs as context. " +
       "Use when you need to query across multiple elements simultaneously.",
     category: "query",
@@ -373,7 +420,9 @@ export const queryTools: SysonTool[] = [
         emits: ["syson.element.selected"],
       },
     },
-    handler: async ({ editing_context_id, expression, selected_object_ids }) => {
+    handler: async (
+      { editing_context_id, expression, selected_object_ids },
+    ) => {
       const exprResult = await evalAql(
         editing_context_id as string,
         expression as string,
@@ -404,23 +453,28 @@ export const queryTools: SysonTool[] = [
             count: exprResult.objsValue.length,
           };
         case "StringExpressionResult":
-          return { type: "string", expression: expr, result: exprResult.strValue };
+          return {
+            type: "string",
+            expression: expr,
+            result: exprResult.strValue,
+          };
         case "BooleanExpressionResult":
-          return { type: "boolean", expression: expr, result: exprResult.boolValue };
+          return {
+            type: "boolean",
+            expression: expr,
+            result: exprResult.boolValue,
+          };
         case "IntExpressionResult":
           return { type: "int", expression: expr, result: exprResult.intValue };
         case "VoidExpressionResult":
           return { type: "void", expression: expr, result: null };
-        default:
-          return { type: "unknown", expression: expr, raw: exprResult };
       }
     },
   },
 
   {
     name: "syson_query_requirements_trace",
-    description:
-      "Trace requirements to their satisfying elements. " +
+    description: "Trace requirements to their satisfying elements. " +
       "Shows which parts satisfy which requirements, with coverage metrics.",
     category: "query",
     inputSchema: {
@@ -459,6 +513,12 @@ export const queryTools: SysonTool[] = [
           rootId,
           requirementsCount: 0,
           traces: [],
+          coverage: {
+            total: 0,
+            satisfied: 0,
+            unsatisfied: 0,
+            percentage: 0,
+          },
           error: `Unexpected result type: ${reqResult.__typename}`,
         };
       }
@@ -475,13 +535,14 @@ export const queryTools: SysonTool[] = [
             [req.id],
           );
 
-          const satisfiedBy = satisfyResult.__typename === "ObjectsExpressionResult"
-            ? satisfyResult.objsValue.map((s) => ({
-              id: s.id,
-              label: s.label,
-              kind: s.kind,
-            }))
-            : [];
+          const satisfiedBy =
+            satisfyResult.__typename === "ObjectsExpressionResult"
+              ? satisfyResult.objsValue.map((s) => ({
+                id: s.id,
+                label: s.label,
+                kind: s.kind,
+              }))
+              : [];
 
           traces.push({
             requirement: { id: req.id, label: req.label },
@@ -497,7 +558,8 @@ export const queryTools: SysonTool[] = [
       }
 
       const satisfied = traces.filter((t) => t.satisfiedBy.length > 0).length;
-      const unsatisfied = traces.filter((t) => t.satisfiedBy.length === 0).length;
+      const unsatisfied =
+        traces.filter((t) => t.satisfiedBy.length === 0).length;
       const total = requirements.length;
 
       return {
@@ -531,7 +593,8 @@ export const queryTools: SysonTool[] = [
         },
         root_element_id: {
           type: "string",
-          description: "Root element ID to derive the structure from (a package or a part)",
+          description:
+            "Root element ID to derive the structure from (a package or a part)",
         },
         max_depth: {
           type: "number",
@@ -556,7 +619,8 @@ export const queryTools: SysonTool[] = [
       const ecId = args.editing_context_id as string;
       const rootId = args.root_element_id as string;
       const maxDepth = (args.max_depth as number | undefined) ?? 10;
-      const includeAttributes = (args.include_attributes as boolean | undefined) ?? true;
+      const includeAttributes =
+        (args.include_attributes as boolean | undefined) ?? true;
       const flatten = (args.flatten as boolean | undefined) ?? false;
 
       const rootObj = await getSelf(ecId, rootId);
@@ -567,14 +631,25 @@ export const queryTools: SysonTool[] = [
       }
 
       const rootChildren = await getChildren(ecId, rootId);
-      const partChildren = rootChildren.filter((c) => normalizeKind(c.kind).includes("PartUsage"));
+      const partChildren = rootChildren.filter((c) =>
+        normalizeKind(c.kind).includes("PartUsage")
+      );
 
       const state: TraversalState = { partCount: 0, maxDepthReached: false };
       const tree: PartNode[] = [];
 
       if (maxDepth >= 1) {
         for (const child of partChildren) {
-          tree.push(await buildPartNode(ecId, child, 1, maxDepth, includeAttributes, state));
+          tree.push(
+            await buildPartNode(
+              ecId,
+              child,
+              1,
+              maxDepth,
+              includeAttributes,
+              state,
+            ),
+          );
         }
       } else if (partChildren.length > 0) {
         state.maxDepthReached = true;

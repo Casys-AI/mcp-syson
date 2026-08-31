@@ -1,13 +1,12 @@
 /**
  * Bundled MCP App resources for mcp-syson.
  *
- * The generated TypeScript bundle must remain a static import. A JSR package
- * is fetched as a Deno module graph, so a later Deno.readTextFile() of a
- * dynamically discovered HTML asset cannot retrieve a file never imported
- * into that graph.
+ * Each generated TypeScript bundle is reached through a literal dynamic import.
+ * Literal imports keep every App in the published Deno module graph while
+ * avoiding evaluation of the five unrelated HTML documents on each read.
  */
 
-import { UI_HTML_BY_NAME } from "./bundles.ts";
+import { loadBundledUiHtml } from "./bundles.ts";
 
 export interface UIResourceMeta {
   name: string;
@@ -19,37 +18,37 @@ const NAMESPACE = "mcp-syson";
 
 const UI_BUNDLES = {
   "ui://mcp-syson/diagram-viewer": {
-    html: UI_HTML_BY_NAME["diagram-viewer"],
+    bundle: "diagram-viewer",
     name: "Diagram Viewer",
     description: "SysON UI: diagram-viewer",
     tools: ["syson_diagram_snapshot"],
   },
   "ui://mcp-syson/model-explorer-viewer": {
-    html: UI_HTML_BY_NAME["model-explorer-viewer"],
+    bundle: "model-explorer-viewer",
     name: "Model Explorer Viewer",
     description: "SysON UI: model-explorer-viewer",
     tools: ["syson_element_children"],
   },
   "ui://mcp-syson/query-results-viewer": {
-    html: UI_HTML_BY_NAME["query-results-viewer"],
+    bundle: "query-results-viewer",
     name: "Query Results Viewer",
     description: "SysON UI: query-results-viewer",
     tools: ["syson_search", "syson_query_eval"],
   },
   "ui://mcp-syson/requirements-trace-viewer": {
-    html: UI_HTML_BY_NAME["requirements-trace-viewer"],
+    bundle: "requirements-trace-viewer",
     name: "Requirements Trace Viewer",
     description: "SysON UI: requirements-trace-viewer",
     tools: ["syson_query_requirements_trace"],
   },
   "ui://mcp-syson/validation-viewer": {
-    html: UI_HTML_BY_NAME["validation-viewer"],
+    bundle: "validation-viewer",
     name: "Validation Viewer",
     description: "SysON UI: validation-viewer",
     tools: ["syson_constraint_validate"],
   },
   "ui://mcp-syson/value-change-viewer": {
-    html: UI_HTML_BY_NAME["value-change-viewer"],
+    bundle: "value-change-viewer",
     name: "Value Change Viewer",
     description: "SysON UI: value-change-viewer",
     tools: ["syson_value_read", "syson_value_set"],
@@ -79,5 +78,5 @@ export async function loadUiHtml(uri: string): Promise<string> {
     throw new Error(`[mcp-syson] UI resource not found: ${uri}`);
   }
 
-  return bundle.html;
+  return await loadBundledUiHtml(bundle.bundle);
 }

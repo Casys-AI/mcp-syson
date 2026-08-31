@@ -6,11 +6,14 @@ components under `io.casys.mcp.view-components/v1`. A compatible host selects a
 live layout through `io.casys.mcp.surface/v1`; without that context, the App
 mounts its declared standalone default surface.
 
-The surface runtime and the shared Preact presentation primitives come from
-`@casys/mcp-view`. The thin adapter in `src/ui/shared/preact-surface.tsx` keeps
-SysON event semantics while delegating component mounting, full
-`structuredContent`, explicit JSON-text fallback, pre-connect notification
-registration, and deterministic teardown to the official adapter.
+The renderer-neutral lifecycle, router, result parsing and recorded-session
+listener come from `@casys/mcp-view`. The catalog, surface runtime, shared
+theme, Preact adapter and presentation primitives are an explicit opt-in through
+`@casys/mcp-view-components`. The thin adapter in
+`src/ui/shared/preact-surface.tsx` keeps SysON event semantics while delegating
+full `structuredContent`, explicit JSON-text fallback, pre-connect notification
+registration, component mounting and deterministic teardown to those split
+packages.
 
 ## Component catalog
 
@@ -53,17 +56,31 @@ Example host context:
 Unknown component keys are rejected by the shared runtime. A missing or
 non-ready surface context safely falls back to the standalone default.
 
-## Package prerequisite
+## Local split prerequisite
 
-The component API is implemented by the `@casys/mcp-view` 0.7 line. Install and
-build SysON normally:
+The coordinated split has not been published as a dependency of this server.
+`npm install` installs the ordinary UI toolchain, Preact and upstream MCP SDK
+build dependencies; it deliberately does not install any Casys viewer package or
+an older monolithic `@casys/mcp-view` fallback. Build and type check must name
+the two audited local package entry points explicitly:
 
 ```sh
 cd src/ui
 npm install
 cd ../..
+export MCP_VIEW_MODULE=file:///absolute/path/to/mcp-server/packages/view/mod.ts
+export MCP_VIEW_COMPONENTS_MODULE=file:///absolute/path/to/mcp-server/packages/view-components/mod.ts
 deno task ui:build
+deno task ui:check
 ```
+
+For that standard sibling layout, the build verifies and derives the exact
+`view-contracts`, Preact adapter and pure presentation entry points. Alternate
+layouts may additionally set `MCP_VIEW_CONTRACTS_MODULE`,
+`MCP_VIEW_COMPONENTS_PREACT_MODULE` and `MCP_VIEW_PRESENTATION_MODULE`; every
+value must be a local `file:` URL exported by the expected split package. A
+missing module, an old monolith, a package-name/version mismatch, or a remote
+registry URL fails before Vite or the type checker starts.
 
 ## Verification
 

@@ -1,13 +1,14 @@
 /** Composable constraint-validation components. */
 
-import { defineComponentRegistry } from "@casys/mcp-view";
+import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
   Card,
   DataTable,
   KeyValueList,
   MetricGrid,
-} from "@casys/mcp-view/preact";
+  StateMessage,
+} from "@casys/mcp-view-components/preact/components";
 import { useState } from "preact/hooks";
 import {
   defaultComponentSurface,
@@ -19,6 +20,7 @@ import {
   startPreactSurfaceApp,
   type SurfaceAppContext,
 } from "../../shared/preact-surface";
+import { isValidationReport } from "../../shared/recorded-content";
 import "../../global.css";
 
 interface ConstraintResult {
@@ -50,7 +52,10 @@ interface ValidationReport extends Record<string, unknown> {
   validatedAt: string;
 }
 
-function globalStatus(report: ValidationReport): ConstraintResult["status"] {
+type ValidationViewStatus = ConstraintResult["status"] | "empty";
+
+function globalStatus(report: ValidationReport): ValidationViewStatus {
+  if (report.summary.total === 0) return "empty";
   return report.summary.fail > 0 || report.summary.error > 0
     ? "fail"
     : report.summary.unresolved > 0
@@ -58,7 +63,7 @@ function globalStatus(report: ValidationReport): ConstraintResult["status"] {
     : "pass";
 }
 
-function StatusBadge({ status }: { status: ConstraintResult["status"] }) {
+function StatusBadge({ status }: { status: ValidationViewStatus }) {
   const tone = status === "pass"
     ? "success"
     : status === "fail" || status === "error"
@@ -66,7 +71,11 @@ function StatusBadge({ status }: { status: ConstraintResult["status"] }) {
     : "warning";
   return (
     <Badge tone={tone}>
-      {status === "unresolved" ? "N/A" : status}
+      {status === "unresolved"
+        ? "N/A"
+        : status === "empty"
+        ? "No constraints"
+        : status}
     </Badge>
   );
 }
@@ -74,10 +83,20 @@ function StatusBadge({ status }: { status: ConstraintResult["status"] }) {
 function Status({ data }: { data: ValidationReport }) {
   return (
     <Card
+      className="syson-hero"
       eyebrow="SysON validation"
       title={data.elementName || "Validation"}
       actions={<StatusBadge status={globalStatus(data)} />}
     >
+      <p className="syson-lede">
+        Constraint evaluation at the recorded editing context. Unresolved
+        references remain explicit.
+      </p>
+      {data.summary.total === 0 && (
+        <StateMessage tone="warning" title="Validation unavailable">
+          No constraints were returned, so this surface cannot claim a pass.
+        </StateMessage>
+      )}
       <p className="syson-provenance">
         Validated {new Date(data.validatedAt).toLocaleString()}
       </p>
@@ -263,8 +282,8 @@ const registry = defineComponentRegistry<
 
 void startPreactSurfaceApp({
   root: document.getElementById("app")!,
-  info: { name: "Validation Viewer", version: "2.0.0" },
   registry,
+  recordedSession: { view: "validation", validateContent: isValidationReport },
   loadingLabel: "Validating constraints…",
 }).catch((error) =>
   console.error("[validation-viewer] Failed to start", error)
