@@ -212,6 +212,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(diagram.includes("LimitGauge"), false);
 
   assertEquals(explorer.includes("SemanticElement"), true);
+  assertEquals(explorer.includes("BadgeGroup"), true);
   assertEquals(explorer.includes("SemanticList"), true);
   assertEquals(explorer.includes("TextInput"), true);
   assertEquals(explorer.includes("PathBar"), false);
@@ -228,6 +229,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(query.includes("ElementVerdict"), false);
 
   assertEquals(requirements.includes("LimitGauge"), true);
+  assertEquals(requirements.includes("BadgeGroup"), true);
   assertEquals(requirements.includes("SemanticElement"), true);
   assertEquals(requirements.includes("SemanticList"), true);
   assertEquals(requirements.includes("KeyValueList"), true);
@@ -270,4 +272,6 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(query.includes("syson-input"), false);
   assertEquals(query.includes("syson-code-block"), false);
   assertEquals(requirements.includes("syson-provenance"), false);
+  assertEquals(explorer.includes('className="mcp-view-badges"'), false);
+  assertEquals(requirements.includes('className="mcp-view-badges"'), false);
 });

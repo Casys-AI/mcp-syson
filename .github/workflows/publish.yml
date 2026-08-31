@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: Casys-AI/mcp-server
-          ref: 01679244e8335964925c19492a1d98c34f6ce310
+          ref: f27f3f429a8cebba5f9bae486a118b5aa6296fbf
           path: .deps/mcp-server
           persist-credentials: false
 
@@ -79,7 +79,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: Casys-AI/mcp-server
-          ref: 01679244e8335964925c19492a1d98c34f6ce310
+          ref: f27f3f429a8cebba5f9bae486a118b5aa6296fbf
           path: .deps/mcp-server
           persist-credentials: false
 

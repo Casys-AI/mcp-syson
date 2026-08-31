@@ -3,6 +3,7 @@
 import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
+  BadgeGroup,
   Button,
   Card,
   ElementBody,
@@ -246,14 +247,14 @@ function SatisfactionLinks({ data }: { data: TraceData }) {
             }
             body={
               <ElementBody>
-                <div className="mcp-view-badges">
+                <BadgeGroup label="Satisfied-by elements">
                   {trace.satisfiedBy.map((target) => (
                     <Badge key={target.id} tone="info">
                       {target.label || shortSysmlKind(target.kind)}
                     </Badge>
                   ))}
                   {trace.error && <Badge tone="danger">{trace.error}</Badge>}
-                </div>
+                </BadgeGroup>
               </ElementBody>
             }
           />

@@ -3,6 +3,7 @@
 import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
+  BadgeGroup,
   Card,
   ElementIdent,
   ElementReading,
@@ -171,12 +172,12 @@ function KindBreakdown({ data }: { data: ChildrenData }) {
   });
   return (
     <Card title="Kinds">
-      <div className="mcp-view-badges">
+      <BadgeGroup label="Element kind counts">
         {[...counts.entries()].map(([kind, count]) => (
           <Badge key={kind}>{kind}: {count}</Badge>
         ))}
         {!counts.size && <EmptyState>No kinds</EmptyState>}
-      </div>
+      </BadgeGroup>
     </Card>
   );
 }
