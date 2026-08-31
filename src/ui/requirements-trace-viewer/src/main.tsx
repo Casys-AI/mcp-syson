@@ -12,6 +12,7 @@ import {
   ElementReading,
   ElementVerdict,
   EmptyState,
+  InlineCode,
   KeyValueList,
   LimitGauge,
   SemanticElement,
@@ -172,15 +173,13 @@ function TraceList(
               return (
                 <SemanticElement
                   key={trace.requirement.id}
-                  className={selected === trace.requirement.id
-                    ? "mcp-view-selected"
-                    : undefined}
                   reference={sysmlRef(
                     "RequirementUsage",
                     trace.requirement.id,
                     digest,
                   )}
                   density="row"
+                  selected={selected === trace.requirement.id}
                   tone={linked ? "info" : "warning"}
                   ident={
                     <ElementIdent
@@ -264,7 +263,7 @@ function SatisfactionLinks({ data }: { data: TraceData }) {
         items={[{
           id: "root",
           label: "Root",
-          value: <code>{data.rootId}</code>,
+          value: <InlineCode>{data.rootId}</InlineCode>,
         }]}
       />
     </Card>

@@ -185,11 +185,9 @@ function Values(
               return (
                 <SemanticElement
                   key={item.id}
-                  className={selected === item.id
-                    ? "mcp-view-selected"
-                    : undefined}
                   reference={sysmlRef(kind, item.id, digest)}
                   density="row"
+                  selected={selected === item.id}
                   ident={
                     <ElementIdent
                       label={item.label || "(unnamed)"}

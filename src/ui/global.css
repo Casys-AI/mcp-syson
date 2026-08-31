@@ -28,16 +28,6 @@ input {
   font-family: inherit;
 }
 
-code {
-  font-family: var(
-    --font-mono,
-    "SFMono-Regular",
-    "Cascadia Code",
-    "Menlo",
-    monospace
-  );
-}
-
 .syson-component-surface {
   min-width: 0;
   padding: clamp(0.45rem, 1.4cqi, 0.75rem);

@@ -10,6 +10,7 @@ import {
   ElementReading,
   ElementVerdict,
   EmptyState,
+  InlineCode,
   KeyValueList,
   MetricGrid,
   SemanticElement,
@@ -155,7 +156,7 @@ function ResolvedValues({ data }: { data: ValidationReport }) {
         items={values.map(([name, value]) => ({
           id: name,
           label: name,
-          value: <code>{formatResolved(value)}</code>,
+          value: <InlineCode>{formatResolved(value)}</InlineCode>,
         }))}
       />
       {!values.length && <EmptyState>No resolved model values</EmptyState>}
@@ -196,15 +197,13 @@ function Constraints(
               return (
                 <SemanticElement
                   key={constraint.constraintId}
-                  className={selected === constraint.constraintId
-                    ? "mcp-view-selected"
-                    : undefined}
                   reference={sysmlRef(
                     "constraint",
                     constraint.constraintId,
                     digest,
                   )}
                   density="row"
+                  selected={selected === constraint.constraintId}
                   tone={statusTone(constraint.status)}
                   ident={
                     <ElementIdent

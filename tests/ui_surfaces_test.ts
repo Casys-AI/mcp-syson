@@ -204,6 +204,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
 
   assertEquals(diagram.includes("SemanticElement"), true);
   assertEquals(diagram.includes("SemanticList"), true);
+  assertEquals(diagram.includes("selected={"), true);
   assertEquals(diagram.includes("sanitizeDiagramSvg"), true);
   assertEquals(diagram.includes("setTranslate"), true);
   assertEquals(diagram.includes("zoomBy"), true);
@@ -215,6 +216,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(explorer.includes("BadgeGroup"), true);
   assertEquals(explorer.includes("SemanticList"), true);
   assertEquals(explorer.includes("TextInput"), true);
+  assertEquals(explorer.includes("InlineCode"), true);
   assertEquals(explorer.includes("PathBar"), false);
   assertEquals(explorer.includes("TreeList"), false);
   assertEquals(explorer.includes("aria-expanded"), false);
@@ -233,6 +235,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(requirements.includes("SemanticElement"), true);
   assertEquals(requirements.includes("SemanticList"), true);
   assertEquals(requirements.includes("KeyValueList"), true);
+  assertEquals(requirements.includes("InlineCode"), true);
   assertEquals(requirements.includes("linkCoverageGauge"), true);
   assertEquals(requirements.includes('title="error"'), true);
   assertEquals(requirements.includes("data.error !== undefined"), true);
@@ -241,6 +244,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(validation.includes("validationContractLabel"), true);
   assertEquals(validation.includes("SemanticElement"), true);
   assertEquals(validation.includes("SemanticList"), true);
+  assertEquals(validation.includes("InlineCode"), true);
   assertEquals(validation.includes('? "N/A"'), false);
   assertEquals(validation.includes('label: "N/A"'), false);
   assertEquals(validation.includes("LimitGauge"), false);
@@ -274,4 +278,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(requirements.includes("syson-provenance"), false);
   assertEquals(explorer.includes('className="mcp-view-badges"'), false);
   assertEquals(requirements.includes('className="mcp-view-badges"'), false);
+  for (const source of [diagram, explorer, query, requirements, validation]) {
+    assertEquals(source.includes("mcp-view-selected"), false);
+  }
 });

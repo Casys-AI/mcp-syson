@@ -26,6 +26,7 @@ import {
 import {
   Badge,
   Card,
+  InlineCode,
   KeyValueList,
   StateMessage,
 } from "@casys/mcp-view-components/preact/components";
@@ -377,7 +378,7 @@ function recordedBasisBanner<TData extends ResultData>(
             id: "recorded-artifact-fingerprint",
             label: "SHA-256",
             value: createElement(
-              "code",
+              InlineCode,
               null,
               digest ?? session.basis.artifact.fingerprint,
             ),

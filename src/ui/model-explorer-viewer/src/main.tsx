@@ -8,6 +8,7 @@ import {
   ElementIdent,
   ElementReading,
   EmptyState,
+  InlineCode,
   KeyValueList,
   SemanticElement,
   SemanticList,
@@ -120,11 +121,9 @@ function Elements(
               return (
                 <SemanticElement
                   key={element.id}
-                  className={selected === element.id
-                    ? "mcp-view-selected"
-                    : undefined}
                   reference={sysmlRef(kind, element.id, digest)}
                   density="row"
+                  selected={selected === element.id}
                   ident={
                     <ElementIdent
                       marker={
@@ -189,7 +188,7 @@ function ParentContext({ data }: { data: ChildrenData }) {
         items={[{
           id: "parent-id",
           label: "Parent",
-          value: <code>{data.parentId || "root"}</code>,
+          value: <InlineCode>{data.parentId || "root"}</InlineCode>,
         }]}
       />
     </Card>

@@ -231,9 +231,9 @@ function Elements(
         {data.nodes.map((node) => (
           <SemanticElement
             key={node.id}
-            className={selected === node.id ? "mcp-view-selected" : undefined}
             reference={sysmlRef("diagram-node", node.id, digest)}
             density="row"
+            selected={selected === node.id}
             ident={
               <ElementIdent
                 label={node.label || "(unnamed)"}
