@@ -23,7 +23,9 @@
       "uri": "ui://mcp-syson/model-explorer-viewer",
       "ownership": "whole-view",
       "resultSchemas": [
-        "io.casys.mcp-syson.model-children-result/1.0"
+        "io.casys.mcp-syson.model-children-result/1.0",
+        "architecture-capture/4.0",
+        "part-definitions-capture/1.0"
       ],
       "acceptedActions": [
         "viewer.session.apply"
@@ -49,7 +51,8 @@
       "uri": "ui://mcp-syson/requirements-trace-viewer",
       "ownership": "whole-view",
       "resultSchemas": [
-        "io.casys.mcp-syson.requirements-trace-result/1.0"
+        "io.casys.mcp-syson.requirements-trace-result/1.0",
+        "requirements-capture/3.0"
       ],
       "acceptedActions": [
         "viewer.session.apply"

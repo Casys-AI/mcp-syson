@@ -259,8 +259,9 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
 
   assertEquals(adapter.includes("ArtifactRow"), false);
   assertEquals(adapter.includes("StateMessage"), true);
-  assertEquals(adapter.includes("Card"), true);
-  assertEquals(adapter.includes("KeyValueList"), true);
+  assertEquals(adapter.includes("Card"), false);
+  assertEquals(adapter.includes("KeyValueList"), false);
+  assertEquals(adapter.includes("Recorded projection"), false);
   assertEquals(adapter.includes("PathBar"), false);
   assertEquals(adapter.includes("syson-message-marker"), false);
   assertEquals(adapter.includes("syson-recorded-stack"), false);

@@ -4,6 +4,7 @@ import {
   SYSON_RECORDED_SESSION_SCHEMAS,
   SYSON_RESULT_SCHEMAS,
   SYSON_UI_RESOURCE_URIS,
+  SYSON_VIEW_APP_MANIFEST,
   SYSON_VIEWER_SESSION_ACTION,
   type SysonViewKey,
 } from "../app-manifest.ts";
@@ -18,8 +19,7 @@ export interface SysonRecordedViewSession<
   ];
   readonly resourceUri:
     typeof SYSON_UI_RESOURCE_URIS[keyof typeof SYSON_UI_RESOURCE_URIS];
-  readonly resultSchema:
-    typeof SYSON_RESULT_SCHEMAS[keyof typeof SYSON_RESULT_SCHEMAS];
+  readonly resultSchema: string;
   readonly readOnly: true;
   readonly basis: {
     readonly projectId: string;
@@ -32,33 +32,29 @@ export interface SysonRecordedViewSession<
   readonly structuredContent: TData;
 }
 
+export type SysonRecordedContentAdapter<
+  TData extends Record<string, unknown>,
+> = (resultSchema: string, value: unknown) => TData | undefined;
+
 export async function parseSysonRecordedViewSession<
   TData extends Record<string, unknown>,
 >(
   view: SysonViewKey,
   value: unknown,
   validateContent: (value: unknown) => boolean,
+  adaptContent?: SysonRecordedContentAdapter<TData>,
 ): Promise<SysonRecordedViewSession<TData> | undefined> {
-  if (
-    !isExactRecord(value, [
-      "schemaVersion",
-      "resourceUri",
-      "resultSchema",
-      "readOnly",
-      "basis",
-      "projectionFingerprint",
-      "structuredContent",
-    ]) ||
-    value.schemaVersion !== SYSON_RECORDED_SESSION_SCHEMAS[view] ||
-    value.resourceUri !== SYSON_UI_RESOURCE_URIS[view] ||
-    value.resultSchema !== SYSON_RESULT_SCHEMAS[view] ||
-    value.readOnly !== true ||
-    !isSha256Fingerprint(value.projectionFingerprint) ||
-    !isRecordedBasis(value.basis) ||
-    !validateContent(value.structuredContent)
-  ) return undefined;
+  const content = parseSysonRecordedContent(
+    view,
+    value,
+    validateContent,
+    adaptContent,
+  );
+  if (!content || !isRecord(value)) return undefined;
 
-  const admitted = value as unknown as SysonRecordedViewSession<TData>;
+  const admitted = value as unknown as SysonRecordedViewSession<
+    Record<string, unknown>
+  >;
   let projectionFingerprint: string;
   try {
     projectionFingerprint = await fingerprintSysonRecordedProjection({
@@ -74,9 +70,68 @@ export async function parseSysonRecordedViewSession<
   }
   if (projectionFingerprint !== value.projectionFingerprint) return undefined;
 
-  return deepFreeze(
-    structuredClone(value),
-  ) as unknown as SysonRecordedViewSession<TData>;
+  const normalized = structuredClone(value) as Record<string, unknown>;
+  normalized.structuredContent = structuredClone(content);
+  return deepFreeze(normalized) as unknown as SysonRecordedViewSession<TData>;
+}
+
+/** Synchronous ingress guard; the asynchronous parser still verifies the digest. */
+export function isSysonRecordedViewSessionEnvelope<
+  TData extends Record<string, unknown>,
+>(
+  view: SysonViewKey,
+  value: unknown,
+  validateContent: (value: unknown) => boolean,
+  adaptContent?: SysonRecordedContentAdapter<TData>,
+): boolean {
+  return parseSysonRecordedContent(
+    view,
+    value,
+    validateContent,
+    adaptContent,
+  ) !== undefined;
+}
+
+function parseSysonRecordedContent<
+  TData extends Record<string, unknown>,
+>(
+  view: SysonViewKey,
+  value: unknown,
+  validateContent: (value: unknown) => boolean,
+  adaptContent?: SysonRecordedContentAdapter<TData>,
+): TData | undefined {
+  if (
+    !isExactRecord(value, [
+      "schemaVersion",
+      "resourceUri",
+      "resultSchema",
+      "readOnly",
+      "basis",
+      "projectionFingerprint",
+      "structuredContent",
+    ]) ||
+    value.schemaVersion !== SYSON_RECORDED_SESSION_SCHEMAS[view] ||
+    value.resourceUri !== SYSON_UI_RESOURCE_URIS[view] ||
+    typeof value.resultSchema !== "string" ||
+    !allowedResultSchemas(view).includes(value.resultSchema) ||
+    value.readOnly !== true ||
+    !isSha256Fingerprint(value.projectionFingerprint) ||
+    !isRecordedBasis(value.basis)
+  ) return undefined;
+
+  if (
+    value.resultSchema === SYSON_RESULT_SCHEMAS[view] &&
+    validateContent(value.structuredContent)
+  ) {
+    return value.structuredContent as TData;
+  }
+  return adaptContent?.(value.resultSchema, value.structuredContent);
+}
+
+function allowedResultSchemas(view: SysonViewKey): readonly string[] {
+  return SYSON_VIEW_APP_MANIFEST.resources.find((resource) =>
+    resource.uri === SYSON_UI_RESOURCE_URIS[view]
+  )?.resultSchemas ?? [];
 }
 
 /** Digest the complete read model, excluding only the digest field itself. */

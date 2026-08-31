@@ -23,18 +23,13 @@ import {
   definePreactComponent as defineSharedPreactComponent,
   type PreactSurfaceComponentProps,
 } from "@casys/mcp-view-components/preact";
-import {
-  Badge,
-  Card,
-  InlineCode,
-  KeyValueList,
-  StateMessage,
-} from "@casys/mcp-view-components/preact/components";
+import { StateMessage } from "@casys/mcp-view-components/preact/components";
 import { createElement, type FunctionComponent, render } from "preact";
 import { SYSON_VIEW_APP_MANIFEST, type SysonViewKey } from "../app-manifest.ts";
-import { digestFromSha256Prefix } from "./component-catalog.ts";
 import {
+  isSysonRecordedViewSessionEnvelope,
   parseSysonRecordedViewSession,
+  type SysonRecordedContentAdapter,
   type SysonRecordedViewSession,
 } from "./recorded-session.ts";
 
@@ -60,9 +55,10 @@ export function definePreactComponent<TData extends ResultData>(
   >(descriptor, component);
 }
 
-interface RecordedSessionOptions {
+interface RecordedSessionOptions<TData extends ResultData> {
   readonly view: SysonViewKey;
   readonly validateContent: (value: unknown) => boolean;
+  readonly adaptContent?: SysonRecordedContentAdapter<TData>;
 }
 
 interface SysonPreactSurfaceAppOptions<TData extends ResultData> {
@@ -71,7 +67,7 @@ interface SysonPreactSurfaceAppOptions<TData extends ResultData> {
     TData,
     SurfaceAppContext<TData>
   >;
-  readonly recordedSession: RecordedSessionOptions;
+  readonly recordedSession: RecordedSessionOptions<TData>;
   readonly loadingLabel?: string;
   readonly emptyLabel?: string;
 }
@@ -91,7 +87,6 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
   let mounted: MountedComponentSurface | undefined;
   let pendingMount: Promise<void> | undefined;
   let mountGeneration = 0;
-  let recordedBanner: HTMLElement | undefined;
   let removeHostContextListener: (() => void) | undefined;
   let transitionTail: Promise<void> = Promise.resolve();
 
@@ -132,15 +127,8 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
     return transitionTail;
   };
 
-  const unmountRecordedBanner = (): void => {
-    if (!recordedBanner) return;
-    render(null, recordedBanner);
-    recordedBanner = undefined;
-  };
-
   const disposeSurface = async (): Promise<void> => {
     mountGeneration += 1;
-    unmountRecordedBanner();
     await pendingMount;
     pendingMount = undefined;
     const active = mounted;
@@ -158,7 +146,6 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
       return data;
     },
     render(context, data) {
-      unmountRecordedBanner();
       const shell = document.createElement("div");
       shell.className = "mcp-view-preact-surface syson-component-surface";
       shell.dataset.mode = context.state.mode ?? "direct";
@@ -192,15 +179,7 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
       }
 
       const componentRoot = document.createElement("div");
-      if (
-        context.state.mode === "recorded" &&
-        context.state.recordedSession
-      ) {
-        recordedBanner = recordedBasisBanner(context.state.recordedSession);
-        shell.append(recordedBanner, componentRoot);
-      } else {
-        shell.append(componentRoot);
-      }
+      shell.append(componentRoot);
 
       const generation = ++mountGeneration;
       pendingMount = mountComponentSurface({
@@ -269,16 +248,20 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
       experimental: componentCatalogCapabilities(options.registry),
     },
     viewerSession: {
-      // Keep the historical behavior: every action reaches the App-owned
-      // parser, which performs the exact schema/content/fingerprint checks
-      // and renders a visible rejection for invalid recorded evidence.
-      validate: (_value): _value is unknown => true,
+      validate: (value): value is unknown =>
+        isSysonRecordedViewSessionEnvelope(
+          options.recordedSession.view,
+          value,
+          options.recordedSession.validateContent,
+          options.recordedSession.adaptContent,
+        ),
       onSession: (value, _payload, app) =>
         schedule(async () => {
           const session = await parseSysonRecordedViewSession<TData>(
             options.recordedSession.view,
             value,
             options.recordedSession.validateContent,
+            options.recordedSession.adaptContent,
           );
           if (!session) {
             await app.navigate(
@@ -334,61 +317,6 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
       "hostcontextchanged",
       onHostContextChanged,
     );
-}
-
-function recordedBasisBanner<TData extends ResultData>(
-  session: SysonRecordedViewSession<TData>,
-): HTMLElement {
-  const banner = document.createElement("aside");
-  banner.className = "syson-recorded-basis";
-  banner.setAttribute("aria-label", "Recorded Digital Thread basis");
-  const digest = digestFromSha256Prefix(session.basis.artifact.fingerprint);
-  render(
-    createElement(
-      Card,
-      {
-        title: "Recorded projection",
-        actions: createElement(Badge, { tone: "info" }, "read-only"),
-      },
-      createElement(KeyValueList, {
-        items: [
-          {
-            id: "recorded-project",
-            label: "Project",
-            value:
-              `${session.basis.projectId} r${session.basis.projectRevision}`,
-          },
-          {
-            id: "recorded-thread",
-            label: "Thread",
-            value:
-              `${session.basis.thread.id} r${session.basis.thread.revision}`,
-          },
-          {
-            id: "recorded-subject",
-            label: "Subject",
-            value: session.basis.subjectId,
-          },
-          {
-            id: "recorded-artifact",
-            label: "Artifact",
-            value: session.basis.artifact.id,
-          },
-          {
-            id: "recorded-artifact-fingerprint",
-            label: "SHA-256",
-            value: createElement(
-              InlineCode,
-              null,
-              digest ?? session.basis.artifact.fingerprint,
-            ),
-          },
-        ],
-      }),
-    ),
-    banner,
-  );
-  return banner;
 }
 
 /** Preserve model context and emit the optional routed Compose event. */

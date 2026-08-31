@@ -22,6 +22,13 @@ export const SYSON_RESULT_SCHEMAS = {
   value: "io.casys.mcp-syson.value-result/1.0",
 } as const;
 
+/** Exact Digital Thread captures that this provider-owned App can project. */
+export const SYSON_DIGITAL_THREAD_RESULT_SCHEMAS = {
+  architecture: "architecture-capture/4.0",
+  partDefinitions: "part-definitions-capture/1.0",
+  requirements: "requirements-capture/3.0",
+} as const;
+
 export const SYSON_RECORDED_SESSION_SCHEMAS = {
   diagram: "io.casys.mcp-syson.recorded-diagram-session/1.0",
   modelExplorer: "io.casys.mcp-syson.recorded-model-children-session/1.0",
@@ -58,7 +65,17 @@ const resources: SysonViewAppResource[] = (
   (key) => ({
     uri: SYSON_UI_RESOURCE_URIS[key],
     ownership: "whole-view" as const,
-    resultSchemas: [SYSON_RESULT_SCHEMAS[key]],
+    resultSchemas: [
+      SYSON_RESULT_SCHEMAS[key],
+      ...(key === "modelExplorer"
+        ? [
+          SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.architecture,
+          SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.partDefinitions,
+        ]
+        : key === "requirementsTrace"
+        ? [SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.requirements]
+        : []),
+    ],
     acceptedActions: [SYSON_VIEWER_SESSION_ACTION],
     sessionSchemas: [SYSON_RECORDED_SESSION_SCHEMAS[key]],
   }),

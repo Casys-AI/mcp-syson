@@ -1,5 +1,6 @@
 /** App-owned structural guards for recorded SysON structuredContent. */
 
+import { SYSON_DIGITAL_THREAD_RESULT_SCHEMAS } from "../app-manifest.ts";
 import {
   hasExactKeys,
   isDenseJsonArray,
@@ -7,6 +8,96 @@ import {
   isNonEmptyString,
   isRecord,
 } from "./recorded-session.ts";
+
+export interface ModelChildrenReadModel extends Record<string, unknown> {
+  readonly parentId: string;
+  readonly children: Array<{
+    readonly id: string;
+    readonly kind: string;
+    readonly label: string;
+  }>;
+  readonly count: number;
+}
+
+export interface RequirementsCaptureReadModel extends Record<string, unknown> {
+  readonly kind: "recorded-requirements-capture";
+  readonly rootId: string;
+  readonly target: {
+    readonly id: string;
+    readonly kind: string;
+    readonly label: string;
+  };
+  readonly requirements: Array<{
+    readonly id: string;
+    readonly name: string;
+    readonly metric: string;
+    readonly operator: string;
+    readonly limit: { readonly value: number; readonly unit: string };
+  }>;
+  readonly count: number;
+}
+
+/** Project the provider's exact persisted DT captures into its own small view. */
+export function adaptModelExplorerRecordedContent(
+  resultSchema: string,
+  value: unknown,
+): ModelChildrenReadModel | undefined {
+  if (
+    resultSchema === SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.architecture &&
+    isArchitectureCapture(value)
+  ) {
+    const children = value.partDefinitions.map(identityFromPartDefinition);
+    return {
+      parentId: value.scopeRoot.id,
+      children,
+      count: children.length,
+    };
+  }
+  if (
+    resultSchema === SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.partDefinitions &&
+    isPartDefinitionsCapture(value)
+  ) {
+    const children = value.partDefinitions.map(identityFromPartDefinition);
+    return {
+      parentId: value.architecture.semanticRoot.id,
+      children,
+      count: children.length,
+    };
+  }
+  return undefined;
+}
+
+/** Keep authored requirement limits documentary; do not infer satisfaction. */
+export function adaptRequirementsRecordedContent(
+  resultSchema: string,
+  value: unknown,
+): RequirementsCaptureReadModel | undefined {
+  if (
+    resultSchema !== SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.requirements ||
+    !isRequirementsCapture(value)
+  ) return undefined;
+  const requirements = value.requirements.map((requirement) => ({
+    id: requirement.id,
+    name: requirement.name,
+    metric: requirement.metric,
+    operator: requirement.operator,
+    limit: {
+      value: requirement.limit.value,
+      unit: requirement.limit.unit,
+    },
+  }));
+  return {
+    kind: "recorded-requirements-capture",
+    rootId: value.requirementsElementId,
+    target: {
+      id: value.target.elementId,
+      kind: value.target.kind,
+      label: value.target.label,
+    },
+    requirements,
+    count: requirements.length,
+  };
+}
 
 export function isDiagramSnapshot(
   value: unknown,
@@ -203,6 +294,245 @@ function isIdentity(value: unknown): boolean {
     isNonEmptyString(value.id) &&
     isNonEmptyString(value.kind) &&
     typeof value.label === "string";
+}
+
+interface CapturedIdentity {
+  readonly id: string;
+  readonly kind: string;
+  readonly label: string;
+}
+
+interface CapturedPartDefinition extends CapturedIdentity {
+  readonly usages: unknown[];
+  readonly attributes?: unknown[];
+}
+
+interface ArchitectureCapture extends Record<string, unknown> {
+  readonly schemaVersion:
+    typeof SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.architecture;
+  readonly scopeRoot: CapturedIdentity;
+  readonly semanticRoot: CapturedIdentity;
+  readonly partDefinitions: CapturedPartDefinition[];
+}
+
+interface PartDefinitionsCapture extends Record<string, unknown> {
+  readonly schemaVersion:
+    typeof SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.partDefinitions;
+  readonly architecture: {
+    readonly semanticRoot: CapturedIdentity;
+  };
+  readonly partDefinitions: CapturedPartDefinition[];
+}
+
+interface RequirementsCapture extends Record<string, unknown> {
+  readonly schemaVersion:
+    typeof SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.requirements;
+  readonly requirementsElementId: string;
+  readonly target: {
+    readonly elementId: string;
+    readonly kind: string;
+    readonly label: string;
+  };
+  readonly requirements: Array<{
+    readonly id: string;
+    readonly name: string;
+    readonly metric: string;
+    readonly operator: string;
+    readonly limit: { readonly value: number; readonly unit: string };
+  }>;
+}
+
+function isArchitectureCapture(
+  value: unknown,
+): value is ArchitectureCapture {
+  return isExactRecord(value, [
+    "insertedAt",
+    "operation",
+    "packageName",
+    "partDefinitions",
+    "schemaVersion",
+    "scopeRoot",
+    "seed",
+    "semanticRoot",
+    "sourceAnalyses",
+    "systemName",
+    "trustedRunId",
+  ]) &&
+    value.schemaVersion ===
+      SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.architecture &&
+    isTimestamp(value.insertedAt) && isOperation(value.operation) &&
+    isNonEmptyString(value.packageName) &&
+    isNonEmptyString(value.systemName) &&
+    isNonEmptyString(value.trustedRunId) && isRecord(value.seed) &&
+    isCapturedIdentity(value.scopeRoot) &&
+    isCapturedIdentity(value.semanticRoot) &&
+    isDenseJsonArray(value.sourceAnalyses) &&
+    isDenseJsonArray(value.partDefinitions) &&
+    value.partDefinitions.every(isCapturedPartDefinition);
+}
+
+function isPartDefinitionsCapture(
+  value: unknown,
+): value is PartDefinitionsCapture {
+  return isExactRecord(value, [
+    "architecture",
+    "capturedAt",
+    "kind",
+    "operation",
+    "partDefinitions",
+    "schemaVersion",
+    "scope",
+    "seed",
+    "statement",
+    "trustedRunId",
+  ]) &&
+    value.schemaVersion ===
+      SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.partDefinitions &&
+    value.kind === "part-definitions" &&
+    value.scope === "sealed-architecture-subgraph" &&
+    isTimestamp(value.capturedAt) && isOperation(value.operation) &&
+    typeof value.statement === "string" &&
+    isNonEmptyString(value.trustedRunId) && isRecord(value.seed) &&
+    isArchitectureReference(value.architecture) &&
+    isDenseJsonArray(value.partDefinitions) &&
+    value.partDefinitions.every(isCapturedPartDefinition);
+}
+
+function isRequirementsCapture(
+  value: unknown,
+): value is RequirementsCapture {
+  return isExactRecord(value, [
+    "architecture",
+    "architectureBasis",
+    "constraintUsages",
+    "containerComponent",
+    "insertedAt",
+    "operation",
+    "partDefName",
+    "requirementUsage",
+    "requirements",
+    "requirementsElementId",
+    "schemaVersion",
+    "seed",
+    "target",
+    "trustedRunId",
+  ]) &&
+    value.schemaVersion === SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.requirements &&
+    isTimestamp(value.insertedAt) && isOperation(value.operation) &&
+    isNonEmptyString(value.containerComponent) &&
+    isNonEmptyString(value.partDefName) &&
+    isNonEmptyString(value.requirementsElementId) &&
+    isNonEmptyString(value.trustedRunId) && isRecord(value.seed) &&
+    isRecord(value.architecture) && isRecord(value.architectureBasis) &&
+    isRequirementUsage(value.requirementUsage) && isTarget(value.target) &&
+    isDenseJsonArray(value.constraintUsages) &&
+    value.constraintUsages.every(isConstraintUsageCapture) &&
+    isDenseJsonArray(value.requirements) &&
+    value.requirements.every(isCapturedRequirement);
+}
+
+function identityFromPartDefinition(
+  value: CapturedPartDefinition,
+): CapturedIdentity {
+  return { id: value.id, kind: value.kind, label: value.label };
+}
+
+function isCapturedIdentity(value: unknown): value is CapturedIdentity {
+  return isExactRecord(value, ["id", "kind", "label"]) &&
+    isNonEmptyString(value.id) && isNonEmptyString(value.kind) &&
+    typeof value.label === "string";
+}
+
+function isCapturedPartDefinition(
+  value: unknown,
+): value is CapturedPartDefinition {
+  return hasRequiredAndOptionalKeys(
+    value,
+    ["id", "kind", "label", "usages"],
+    ["attributes"],
+  ) && isNonEmptyString(value.id) && isNonEmptyString(value.kind) &&
+    typeof value.label === "string" &&
+    isDenseJsonArray(value.usages) && value.usages.every(isCapturedUsage) &&
+    (value.attributes === undefined ||
+      (isDenseJsonArray(value.attributes) &&
+        value.attributes.every(isCapturedIdentity)));
+}
+
+function isCapturedUsage(value: unknown): boolean {
+  return isExactRecord(value, [
+    "id",
+    "kind",
+    "label",
+    "targetId",
+    "targetKind",
+    "targetLabel",
+  ]) && isNonEmptyString(value.id) && isNonEmptyString(value.kind) &&
+    typeof value.label === "string" && isNonEmptyString(value.targetId) &&
+    isNonEmptyString(value.targetKind) && typeof value.targetLabel === "string";
+}
+
+function isArchitectureReference(value: unknown): value is {
+  semanticRoot: CapturedIdentity;
+} {
+  return isExactRecord(value, [
+    "artifactId",
+    "fingerprint",
+    "packageName",
+    "producerRunId",
+    "schemaVersion",
+    "scopeRoot",
+    "semanticRoot",
+    "systemName",
+    "uri",
+  ]) && isNonEmptyString(value.artifactId) && isRecord(value.fingerprint) &&
+    isNonEmptyString(value.packageName) &&
+    isNonEmptyString(value.producerRunId) &&
+    value.schemaVersion === SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.architecture &&
+    isCapturedIdentity(value.scopeRoot) &&
+    isCapturedIdentity(value.semanticRoot) &&
+    isNonEmptyString(value.systemName) && isNonEmptyString(value.uri);
+}
+
+function isTarget(value: unknown): value is RequirementsCapture["target"] {
+  return isExactRecord(value, ["elementId", "kind", "label"]) &&
+    isNonEmptyString(value.elementId) && isNonEmptyString(value.kind) &&
+    typeof value.label === "string";
+}
+
+function isRequirementUsage(value: unknown): boolean {
+  return isExactRecord(value, ["id", "kind"]) &&
+    isNonEmptyString(value.id) && isNonEmptyString(value.kind);
+}
+
+function isConstraintUsageCapture(value: unknown): boolean {
+  return isExactRecord(value, ["id", "kind", "requirementId", "sourceId"]) &&
+    isNonEmptyString(value.id) && isNonEmptyString(value.kind) &&
+    isNonEmptyString(value.requirementId) && isNonEmptyString(value.sourceId);
+}
+
+function isCapturedRequirement(
+  value: unknown,
+): value is RequirementsCapture["requirements"][number] {
+  return isExactRecord(value, [
+    "id",
+    "limit",
+    "metric",
+    "name",
+    "operator",
+  ]) && isNonEmptyString(value.id) && isRecord(value.limit) &&
+    isExactRecord(value.limit, ["unit", "value"]) &&
+    isFiniteNumber(value.limit.value) && isNonEmptyString(value.limit.unit) &&
+    isNonEmptyString(value.metric) && isNonEmptyString(value.name) &&
+    isNonEmptyString(value.operator);
+}
+
+function isOperation(value: unknown): boolean {
+  return isExactRecord(value, ["id", "version"]) &&
+    isNonEmptyString(value.id) && isNonEmptyString(value.version);
+}
+
+function isTimestamp(value: unknown): boolean {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
 function isSearchIdentity(value: unknown): boolean {

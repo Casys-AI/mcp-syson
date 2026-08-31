@@ -1,11 +1,14 @@
 import { assertEquals, assertGreater } from "@std/assert";
 import {
+  SYSON_DIGITAL_THREAD_RESULT_SCHEMAS,
   SYSON_RECORDED_SESSION_SCHEMAS,
   SYSON_RESULT_SCHEMAS,
   SYSON_UI_RESOURCE_URIS,
   SYSON_VIEW_APP_MANIFEST,
 } from "../src/ui/app-manifest.ts";
 import {
+  adaptModelExplorerRecordedContent,
+  adaptRequirementsRecordedContent,
   isDiagramSnapshot,
   isModelChildren,
   isQueryResult,
@@ -15,6 +18,7 @@ import {
 } from "../src/ui/shared/recorded-content.ts";
 import {
   fingerprintSysonRecordedProjection,
+  isSysonRecordedViewSessionEnvelope,
   parseSysonRecordedViewSession,
 } from "../src/ui/shared/recorded-session.ts";
 
@@ -154,6 +158,128 @@ Deno.test("recorded SysON sessions are exact, read-only and App-validated", asyn
       isDiagramSnapshot,
     ),
     undefined,
+  );
+});
+
+Deno.test("provider-owned adapters project exact Digital Thread captures", async () => {
+  const partDefinitions = [{
+    id: "part-1",
+    kind: "PartDefinition",
+    label: "Frame",
+    usages: [],
+  }];
+  const architecture = {
+    insertedAt: "2026-08-31T00:00:00.000Z",
+    operation: { id: "model.write-architecture", version: "1" },
+    packageName: "ProductPackage",
+    partDefinitions,
+    schemaVersion: SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.architecture,
+    scopeRoot: { id: "package-1", kind: "Package", label: "ProductPackage" },
+    seed: {},
+    semanticRoot: { id: "part-1", kind: "PartDefinition", label: "Frame" },
+    sourceAnalyses: [],
+    systemName: "Product",
+    trustedRunId: "run:architecture-1",
+  };
+  const projection = {
+    schemaVersion: SYSON_RECORDED_SESSION_SCHEMAS.modelExplorer,
+    resourceUri: SYSON_UI_RESOURCE_URIS.modelExplorer,
+    resultSchema: SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.architecture,
+    readOnly: true as const,
+    basis: {
+      projectId: "project-1",
+      projectRevision: 7,
+      subjectId: "product-1",
+      thread: { id: "thread-1", revision: 12 },
+      artifact: { id: "architecture-1", fingerprint: SHA },
+    },
+    structuredContent: architecture,
+  };
+  const session = {
+    ...projection,
+    projectionFingerprint: await fingerprintSysonRecordedProjection(
+      projection,
+    ),
+  };
+
+  assertEquals(
+    isSysonRecordedViewSessionEnvelope(
+      "modelExplorer",
+      session,
+      isModelChildren,
+      adaptModelExplorerRecordedContent,
+    ),
+    true,
+  );
+  const parsed = await parseSysonRecordedViewSession(
+    "modelExplorer",
+    session,
+    isModelChildren,
+    adaptModelExplorerRecordedContent,
+  );
+  assertEquals(parsed?.structuredContent, {
+    parentId: "package-1",
+    children: [{ id: "part-1", kind: "PartDefinition", label: "Frame" }],
+    count: 1,
+  });
+  assertEquals(
+    await parseSysonRecordedViewSession(
+      "modelExplorer",
+      {
+        ...session,
+        structuredContent: { ...architecture, systemName: "Tampered" },
+      },
+      isModelChildren,
+      adaptModelExplorerRecordedContent,
+    ),
+    undefined,
+  );
+
+  const requirements = {
+    architecture: {},
+    architectureBasis: {},
+    constraintUsages: [{
+      id: "constraint-1",
+      kind: "ConstraintUsage",
+      requirementId: "mass",
+      sourceId: "constraint-1",
+    }],
+    containerComponent: "Frame",
+    insertedAt: "2026-08-31T00:00:00.000Z",
+    operation: { id: "model.write-requirements", version: "1" },
+    partDefName: "Frame",
+    requirementUsage: { id: "requirements-1", kind: "RequirementUsage" },
+    requirements: [{
+      id: "mass",
+      limit: { unit: "kg", value: 3 },
+      metric: "mass",
+      name: "Maximum mass",
+      operator: "<=",
+    }],
+    requirementsElementId: "requirements-1",
+    schemaVersion: SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.requirements,
+    seed: {},
+    target: { elementId: "part-1", kind: "part-definition", label: "Frame" },
+    trustedRunId: "run:requirements-1",
+  };
+  assertEquals(
+    adaptRequirementsRecordedContent(
+      SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.requirements,
+      requirements,
+    ),
+    {
+      kind: "recorded-requirements-capture",
+      rootId: "requirements-1",
+      target: { id: "part-1", kind: "part-definition", label: "Frame" },
+      requirements: [{
+        id: "mass",
+        name: "Maximum mass",
+        metric: "mass",
+        operator: "<=",
+        limit: { value: 3, unit: "kg" },
+      }],
+      count: 1,
+    },
   );
 });
 
@@ -314,6 +440,7 @@ Deno.test("recorded session receiver is App-level and delegated to split core", 
   assertGreater(viewerSession, connect);
   assertEquals(source.includes("createComposeEventClient("), false);
   assertEquals(source.includes("defineRecordedPreactComponent"), false);
+  assertEquals(source.includes("Recorded projection"), false);
   assertEquals(
     source.includes('context.state.mode === "recorded"') &&
       source.includes("options.registry.defaultSurface"),

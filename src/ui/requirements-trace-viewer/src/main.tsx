@@ -37,7 +37,11 @@ import {
   startPreactSurfaceApp,
   type SurfaceAppContext,
 } from "../../shared/preact-surface";
-import { isRequirementsTrace } from "../../shared/recorded-content";
+import {
+  adaptRequirementsRecordedContent,
+  isRequirementsTrace,
+  type RequirementsCaptureReadModel,
+} from "../../shared/recorded-content";
 import "../../global.css";
 
 interface TraceEntry {
@@ -59,6 +63,14 @@ interface TraceData extends Record<string, unknown> {
   };
 }
 
+type RequirementsData = TraceData | RequirementsCaptureReadModel;
+
+function isRecordedRequirementsCapture(
+  data: RequirementsData,
+): data is RequirementsCaptureReadModel {
+  return data.kind === "recorded-requirements-capture";
+}
+
 function TraceResultError({ error }: { error: string | undefined }) {
   return (
     <StateMessage tone="danger" title="error">
@@ -67,7 +79,63 @@ function TraceResultError({ error }: { error: string | undefined }) {
   );
 }
 
-function Coverage({ data }: { data: TraceData }) {
+function RequirementSet({ data }: { data: RequirementsCaptureReadModel }) {
+  return (
+    <SemanticElement
+      reference={sysmlRef("RequirementUsage", data.rootId)}
+      density="card"
+      ident={
+        <ElementIdent
+          label="Requirements"
+          detail={data.target.label || data.target.id}
+        />
+      }
+      reading={
+        <ElementReading
+          label="Authored limits"
+          value={String(data.count)}
+        />
+      }
+      body={
+        <ElementBody>
+          <SemanticList label="Authored requirements">
+            {data.requirements.map((requirement) => (
+              <SemanticElement
+                key={requirement.id}
+                reference={sysmlRef("Requirement", requirement.id)}
+                density="row"
+                ident={
+                  <ElementIdent
+                    label={requirement.name}
+                    detail={requirement.metric}
+                  />
+                }
+                reading={
+                  <ElementReading
+                    label="Limit"
+                    value={`${requirement.operator} ${requirement.limit.value}`}
+                    unit={requirement.limit.unit}
+                  />
+                }
+              />
+            ))}
+          </SemanticList>
+        </ElementBody>
+      }
+      provenance={
+        <ElementProvenance
+          label="Target"
+          value={data.target.label || data.target.id}
+        />
+      }
+    />
+  );
+}
+
+function Coverage({ data }: { data: RequirementsData }) {
+  if (isRecordedRequirementsCapture(data)) {
+    return <RequirementSet data={data} />;
+  }
   if (data.error !== undefined) return <TraceResultError error={data.error} />;
   const unresolvedCount =
     data.traces.filter((trace) => traceLinkStatus(trace) === "unresolved")
@@ -134,8 +202,18 @@ function Coverage({ data }: { data: TraceData }) {
 }
 
 function TraceList(
-  { data, context }: { data: TraceData; context: SurfaceAppContext<TraceData> },
+  { data, context }: {
+    data: RequirementsData;
+    context: SurfaceAppContext<RequirementsData>;
+  },
 ) {
+  if (isRecordedRequirementsCapture(data)) {
+    return (
+      <StateMessage title="unavailable">
+        Satisfaction links were not part of this requirements capture.
+      </StateMessage>
+    );
+  }
   if (data.error !== undefined) return <TraceResultError error={data.error} />;
   const [selected, setSelected] = useState<string>();
   const [mode, setMode] = useState<
@@ -218,7 +296,14 @@ function TraceList(
   );
 }
 
-function SatisfactionLinks({ data }: { data: TraceData }) {
+function SatisfactionLinks({ data }: { data: RequirementsData }) {
+  if (isRecordedRequirementsCapture(data)) {
+    return (
+      <StateMessage title="unavailable">
+        Satisfaction links were not part of this requirements capture.
+      </StateMessage>
+    );
+  }
   if (data.error !== undefined) return <TraceResultError error={data.error} />;
   const linked = data.traces.filter((trace) =>
     trace.satisfiedBy.length || trace.error
@@ -272,8 +357,8 @@ function SatisfactionLinks({ data }: { data: TraceData }) {
 
 const keys = VIEWER_COMPONENT_KEYS.requirementsTrace;
 const registry = defineComponentRegistry<
-  TraceData,
-  SurfaceAppContext<TraceData>
+  RequirementsData,
+  SurfaceAppContext<RequirementsData>
 >({
   components: {
     [keys[0]]: definePreactComponent(
@@ -309,6 +394,7 @@ void startPreactSurfaceApp({
   recordedSession: {
     view: "requirementsTrace",
     validateContent: isRequirementsTrace,
+    adaptContent: adaptRequirementsRecordedContent,
   },
   loadingLabel: "Waiting for requirements trace data…",
 }).catch((error) =>

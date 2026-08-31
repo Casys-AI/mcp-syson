@@ -29,7 +29,10 @@ import {
   startPreactSurfaceApp,
   type SurfaceAppContext,
 } from "../../shared/preact-surface";
-import { isModelChildren } from "../../shared/recorded-content";
+import {
+  adaptModelExplorerRecordedContent,
+  isModelChildren,
+} from "../../shared/recorded-content";
 import "../../global.css";
 
 interface ModelElement {
@@ -229,6 +232,7 @@ void startPreactSurfaceApp({
   recordedSession: {
     view: "modelExplorer",
     validateContent: isModelChildren,
+    adaptContent: adaptModelExplorerRecordedContent,
   },
   loadingLabel: "Waiting for model elements…",
 }).catch((error) => console.error("[model-explorer] Failed to start", error));
