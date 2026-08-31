@@ -25,7 +25,9 @@ import {
 } from "@casys/mcp-view-components/preact";
 import {
   Badge,
+  Card,
   KeyValueList,
+  StateMessage,
 } from "@casys/mcp-view-components/preact/components";
 import { createElement, type FunctionComponent, render } from "preact";
 import { SYSON_VIEW_APP_MANIFEST, type SysonViewKey } from "../app-manifest.ts";
@@ -94,24 +96,28 @@ export async function startPreactSurfaceApp<TData extends ResultData>(
 
   const message = (label: string, kind: string): HTMLElement => {
     const node = document.createElement("div");
-    node.className = `mcp-view-message mcp-view-message-${kind}`;
-    node.setAttribute("role", kind === "error" ? "alert" : "status");
-    node.setAttribute("aria-live", kind === "error" ? "assertive" : "polite");
-
-    const marker = document.createElement("span");
-    marker.className = "syson-message-marker";
-    marker.setAttribute("aria-hidden", "true");
-    const text = document.createElement("span");
-    text.textContent = label;
-    node.append(marker, text);
-
-    if (kind === "loading") {
-      node.setAttribute("aria-busy", "true");
-      const rail = document.createElement("span");
-      rail.className = "syson-loading-rail";
-      rail.setAttribute("aria-hidden", "true");
-      node.append(rail);
-    }
+    const tone = kind === "error"
+      ? "danger"
+      : kind === "loading"
+      ? "info"
+      : kind === "surface-required"
+      ? "warning"
+      : "neutral";
+    const title = kind === "error"
+      ? "error"
+      : kind === "loading"
+      ? "Loading"
+      : kind === "surface-required"
+      ? "unavailable"
+      : "Empty";
+    render(
+      createElement(
+        StateMessage,
+        { busy: kind === "loading", title, tone },
+        label,
+      ),
+      node,
+    );
     return node;
   };
 
@@ -338,23 +344,30 @@ function recordedBasisBanner<TData extends ResultData>(
   const digest = digestFromSha256Prefix(session.basis.artifact.fingerprint);
   render(
     createElement(
-      "div",
-      { className: "syson-recorded-stack" },
-      createElement(
-        "div",
-        { className: "mcp-view-row" },
-        createElement("strong", null, "Recorded projection"),
-        createElement(Badge, { tone: "info" }, "read-only"),
-      ),
-      createElement(
-        "p",
-        { className: "syson-recorded-scope" },
-        `${session.basis.projectId} r${session.basis.projectRevision}` +
-          ` · ${session.basis.thread.id} r${session.basis.thread.revision}` +
-          ` · ${session.basis.subjectId}`,
-      ),
+      Card,
+      {
+        title: "Recorded projection",
+        actions: createElement(Badge, { tone: "info" }, "read-only"),
+      },
       createElement(KeyValueList, {
         items: [
+          {
+            id: "recorded-project",
+            label: "Project",
+            value:
+              `${session.basis.projectId} r${session.basis.projectRevision}`,
+          },
+          {
+            id: "recorded-thread",
+            label: "Thread",
+            value:
+              `${session.basis.thread.id} r${session.basis.thread.revision}`,
+          },
+          {
+            id: "recorded-subject",
+            label: "Subject",
+            value: session.basis.subjectId,
+          },
           {
             id: "recorded-artifact",
             label: "Artifact",

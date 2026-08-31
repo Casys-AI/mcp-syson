@@ -9,6 +9,7 @@ import {
   ElementProvenance,
   ElementReading,
   SemanticElement,
+  SemanticList,
   StateMessage,
   Toolbar,
 } from "@casys/mcp-view-components/preact/components";
@@ -228,7 +229,7 @@ function Elements(
   }
   return (
     <Card title="Diagram elements" actions={<Badge>{data.nodes.length}</Badge>}>
-      <div aria-label="Diagram elements" className="syson-element-stack">
+      <SemanticList label="Diagram elements" scrollable>
         {data.nodes.map((node) => (
           <SemanticElement
             key={node.id}
@@ -253,7 +254,7 @@ function Elements(
             }}
           />
         ))}
-      </div>
+      </SemanticList>
     </Card>
   );
 }

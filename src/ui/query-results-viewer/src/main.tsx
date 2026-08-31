@@ -4,10 +4,13 @@ import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Button,
   Card,
+  CodeBlock,
   ElementIdent,
   ElementReading,
   EmptyState,
   SemanticElement,
+  SemanticList,
+  TextInput,
   Toolbar,
 } from "@casys/mcp-view-components/preact/components";
 import { useMemo, useState } from "preact/hooks";
@@ -93,9 +96,9 @@ function Summary({ data }: { data: QueryData }) {
 function Expression({ data }: { data: QueryData }) {
   return (
     <Card title="Expression">
-      <code className="syson-code-block">
+      <CodeBlock label="Query expression">
         {expressionOf(data) || "No expression supplied"}
-      </code>
+      </CodeBlock>
     </Card>
   );
 }
@@ -153,13 +156,11 @@ function Values(
       title="Object results"
       actions={
         <Toolbar label="Query result controls">
-          <input
-            aria-label="Filter query results"
-            className="syson-input"
+          <TextInput
+            label="Filter query results"
             placeholder="Filter query results…"
             value={filter}
-            onInput={(event) =>
-              setFilter((event.target as HTMLInputElement).value)}
+            onValueInput={setFilter}
           />
           <Button
             pressed={sortKey === "label"}
@@ -178,7 +179,7 @@ function Values(
     >
       {rows.length
         ? (
-          <div aria-label="Query results" className="syson-element-stack">
+          <SemanticList label="Query results" scrollable>
             {rows.map((item) => {
               const kind = shortSysmlKind(item.kind);
               return (
@@ -208,7 +209,7 @@ function Values(
                 />
               );
             })}
-          </div>
+          </SemanticList>
         )
         : <EmptyState>No results</EmptyState>}
     </Card>

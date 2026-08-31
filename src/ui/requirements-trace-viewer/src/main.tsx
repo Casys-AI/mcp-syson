@@ -11,8 +11,10 @@ import {
   ElementReading,
   ElementVerdict,
   EmptyState,
+  KeyValueList,
   LimitGauge,
   SemanticElement,
+  SemanticList,
   StateMessage,
   Toolbar,
 } from "@casys/mcp-view-components/preact/components";
@@ -162,7 +164,7 @@ function TraceList(
     >
       {rows.length
         ? (
-          <div aria-label="Requirement traces" className="syson-element-stack">
+          <SemanticList label="Requirement traces" scrollable>
             {rows.map((trace) => {
               const relationStatus = traceLinkStatus(trace);
               const linked = relationStatus === "linked";
@@ -209,7 +211,7 @@ function TraceList(
                 />
               );
             })}
-          </div>
+          </SemanticList>
         )
         : <EmptyState>{`No ${mode} requirements`}</EmptyState>}
     </Card>
@@ -230,7 +232,7 @@ function SatisfactionLinks({ data }: { data: TraceData }) {
   }
   return (
     <Card title="Satisfaction links" actions={<Badge>{linked.length}</Badge>}>
-      <div aria-label="Satisfaction links" className="syson-element-stack">
+      <SemanticList label="Satisfaction links" scrollable>
         {linked.map((trace) => (
           <SemanticElement
             key={trace.requirement.id}
@@ -256,10 +258,14 @@ function SatisfactionLinks({ data }: { data: TraceData }) {
             }
           />
         ))}
-      </div>
-      <p className="syson-provenance">
-        Root: <code>{data.rootId}</code>
-      </p>
+      </SemanticList>
+      <KeyValueList
+        items={[{
+          id: "root",
+          label: "Root",
+          value: <code>{data.rootId}</code>,
+        }]}
+      />
     </Card>
   );
 }

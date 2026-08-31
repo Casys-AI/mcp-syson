@@ -13,6 +13,7 @@ import {
   KeyValueList,
   MetricGrid,
   SemanticElement,
+  SemanticList,
   StateMessage,
 } from "@casys/mcp-view-components/preact/components";
 import { useState } from "preact/hooks";
@@ -157,9 +158,7 @@ function ResolvedValues({ data }: { data: ValidationReport }) {
           value: <code>{formatResolved(value)}</code>,
         }))}
       />
-      {!values.length && (
-        <p className="mcp-view-empty">No resolved model values</p>
-      )}
+      {!values.length && <EmptyState>No resolved model values</EmptyState>}
     </Card>
   );
 }
@@ -183,10 +182,7 @@ function Constraints(
     >
       {data.constraints.length
         ? (
-          <div
-            aria-label="Constraint validation results"
-            className="syson-element-stack"
-          >
+          <SemanticList label="Constraint validation results" scrollable>
             {data.constraints.map((constraint) => {
               const margin = constraint.margin === undefined
                 ? undefined
@@ -255,7 +251,7 @@ function Constraints(
                 />
               );
             })}
-          </div>
+          </SemanticList>
         )
         : <EmptyState>No constraints found on this element</EmptyState>}
     </Card>

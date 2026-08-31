@@ -203,6 +203,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   );
 
   assertEquals(diagram.includes("SemanticElement"), true);
+  assertEquals(diagram.includes("SemanticList"), true);
   assertEquals(diagram.includes("sanitizeDiagramSvg"), true);
   assertEquals(diagram.includes("setTranslate"), true);
   assertEquals(diagram.includes("zoomBy"), true);
@@ -211,18 +212,25 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(diagram.includes("LimitGauge"), false);
 
   assertEquals(explorer.includes("SemanticElement"), true);
+  assertEquals(explorer.includes("SemanticList"), true);
+  assertEquals(explorer.includes("TextInput"), true);
   assertEquals(explorer.includes("PathBar"), false);
   assertEquals(explorer.includes("TreeList"), false);
   assertEquals(explorer.includes("aria-expanded"), false);
   assertEquals(explorer.includes("ElementVerdict"), false);
 
   assertEquals(query.includes("SemanticElement"), true);
+  assertEquals(query.includes("SemanticList"), true);
+  assertEquals(query.includes("TextInput"), true);
+  assertEquals(query.includes("CodeBlock"), true);
   assertEquals(query.includes("PathBar"), false);
   assertEquals(query.includes("LimitGauge"), false);
   assertEquals(query.includes("ElementVerdict"), false);
 
   assertEquals(requirements.includes("LimitGauge"), true);
   assertEquals(requirements.includes("SemanticElement"), true);
+  assertEquals(requirements.includes("SemanticList"), true);
+  assertEquals(requirements.includes("KeyValueList"), true);
   assertEquals(requirements.includes("linkCoverageGauge"), true);
   assertEquals(requirements.includes('title="error"'), true);
   assertEquals(requirements.includes("data.error !== undefined"), true);
@@ -230,6 +238,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
 
   assertEquals(validation.includes("validationContractLabel"), true);
   assertEquals(validation.includes("SemanticElement"), true);
+  assertEquals(validation.includes("SemanticList"), true);
   assertEquals(validation.includes('? "N/A"'), false);
   assertEquals(validation.includes('label: "N/A"'), false);
   assertEquals(validation.includes("LimitGauge"), false);
@@ -243,10 +252,22 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(value.includes("engineering verification"), true);
 
   assertEquals(adapter.includes("ArtifactRow"), false);
+  assertEquals(adapter.includes("StateMessage"), true);
+  assertEquals(adapter.includes("Card"), true);
   assertEquals(adapter.includes("KeyValueList"), true);
   assertEquals(adapter.includes("PathBar"), false);
+  assertEquals(adapter.includes("syson-message-marker"), false);
+  assertEquals(adapter.includes("syson-recorded-stack"), false);
   assertEquals(
     adapter.includes("Host-selected component surface rejected"),
     true,
   );
+
+  for (const source of [diagram, explorer, query, requirements, validation]) {
+    assertEquals(source.includes("syson-element-stack"), false);
+  }
+  assertEquals(explorer.includes("syson-input"), false);
+  assertEquals(query.includes("syson-input"), false);
+  assertEquals(query.includes("syson-code-block"), false);
+  assertEquals(requirements.includes("syson-provenance"), false);
 });

@@ -48,125 +48,8 @@ code {
   padding: 0.75rem;
 }
 
-.syson-recorded-basis,
-.syson-recorded-stack {
-  display: grid;
-  gap: 0.4rem;
-  min-width: 0;
-}
-
 .syson-recorded-basis {
   margin-bottom: 0.45rem;
-}
-
-.syson-recorded-scope {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--mcp-view-quiet, var(--mcp-view-muted, #7b8894));
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.65rem;
-}
-
-.syson-app .mcp-view-message {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 3.5rem;
-}
-
-.syson-message-marker {
-  width: 0.55rem;
-  height: 0.55rem;
-  border: 2px solid var(--mcp-view-muted, #5c6b76);
-  border-radius: 999px;
-}
-
-.mcp-view-message-loading .syson-message-marker {
-  border-color: color-mix(in srgb, var(--mcp-view-accent, #0d7c8a) 35%, transparent);
-  border-top-color: var(--mcp-view-accent, #0d7c8a);
-  animation: syson-spin 0.85s linear infinite;
-}
-
-.mcp-view-message-error .syson-message-marker {
-  border-color: var(--mcp-view-danger, #c9453c);
-  background: color-mix(in srgb, var(--mcp-view-danger, #c9453c) 20%, transparent);
-}
-
-.syson-loading-rail {
-  position: absolute;
-  right: 1rem;
-  bottom: 0.55rem;
-  left: 1rem;
-  height: 2px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--mcp-view-accent, #0d7c8a) 12%, transparent);
-}
-
-.syson-loading-rail::after {
-  display: block;
-  width: 38%;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--mcp-view-accent, #0d7c8a);
-  animation: syson-scan 1.25s ease-in-out infinite;
-  content: "";
-}
-
-.syson-input {
-  min-width: 0;
-  min-height: 1.9rem;
-  padding: 0.32rem 0.55rem;
-  border: 1px solid var(--mcp-view-border, #dbe3e7);
-  border-radius: var(--mcp-view-radius-sm, 0.25rem);
-  outline: none;
-  background: var(--mcp-view-panel, #ffffff);
-  color: var(--mcp-view-text, #101519);
-  font-size: 0.75rem;
-}
-
-.syson-input::placeholder {
-  color: var(--mcp-view-quiet, #7b8894);
-}
-
-.syson-input:focus-visible {
-  border-color: var(--mcp-view-accent, #0d7c8a);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mcp-view-accent, #0d7c8a) 16%, transparent);
-}
-
-.syson-code-block {
-  display: block;
-  max-height: 10rem;
-  padding: 0.65rem 0.75rem;
-  overflow: auto;
-  border: 1px solid var(--mcp-view-border, #dbe3e7);
-  border-radius: var(--mcp-view-radius-sm, 0.25rem);
-  background: var(--mcp-view-subtle, #f4f7f8);
-  color: var(--mcp-view-muted, #5c6b76);
-  font-size: 0.72rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.syson-element-stack {
-  display: grid;
-  min-width: 0;
-  max-height: min(22rem, 65cqi);
-  overflow: auto;
-  border: 1px solid var(--mcp-view-border, #dbe3e7);
-  border-radius: var(--mcp-view-radius, 0.5rem);
-}
-
-.syson-element-stack .mcp-view-semantic-element[data-density="row"]:first-child {
-  border-top: 0;
-}
-
-.syson-element-stack .mcp-view-semantic-element[data-density="row"]:last-child {
-  border-bottom: 0;
 }
 
 .syson-kind-mark {
@@ -201,13 +84,6 @@ code {
 .syson-kind-mark[data-kind-tone="connection"],
 .syson-kind-mark[data-kind-tone="port"] {
   color: var(--mcp-view-danger, #c9453c);
-}
-
-.syson-provenance {
-  margin: 0.55rem 0 0;
-  overflow-wrap: anywhere;
-  color: var(--mcp-view-muted, #5c6b76);
-  font-size: 0.66rem;
 }
 
 .syson-diagram-card {
@@ -267,21 +143,6 @@ code {
   cursor: grabbing;
 }
 
-@keyframes syson-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes syson-scan {
-  from {
-    transform: translateX(-105%);
-  }
-  to {
-    transform: translateX(265%);
-  }
-}
-
 @container (max-width: 520px) {
   .syson-app .mcp-view-card-header {
     align-items: stretch;
@@ -290,12 +151,6 @@ code {
   .syson-app .mcp-view-card-actions,
   .syson-app .mcp-view-toolbar {
     justify-content: flex-start;
-  }
-
-  .syson-app .mcp-view-card-actions > .syson-input,
-  .syson-app .mcp-view-toolbar > .syson-input {
-    width: 100%;
-    flex-basis: 100%;
   }
 
   .syson-diagram-canvas {

@@ -9,6 +9,8 @@ import {
   EmptyState,
   KeyValueList,
   SemanticElement,
+  SemanticList,
+  TextInput,
 } from "@casys/mcp-view-components/preact/components";
 import { useMemo, useState } from "preact/hooks";
 import {
@@ -100,19 +102,17 @@ function Elements(
       eyebrow={data.parentId || "root"}
       title="Children"
       actions={
-        <input
-          aria-label="Filter model elements"
-          className="syson-input"
+        <TextInput
+          label="Filter model elements"
           placeholder="Filter elements…"
           value={filter}
-          onInput={(event) =>
-            setFilter((event.target as HTMLInputElement).value)}
+          onValueInput={setFilter}
         />
       }
     >
       {elements.length
         ? (
-          <div aria-label="Model elements" className="syson-element-stack">
+          <SemanticList label="Model elements" scrollable>
             {elements.map((element) => {
               const kind = shortSysmlKind(element.kind);
               const visual = kindVisual(element.kind);
@@ -156,7 +156,7 @@ function Elements(
                 />
               );
             })}
-          </div>
+          </SemanticList>
         )
         : <EmptyState>No matching children</EmptyState>}
     </Card>
