@@ -14,8 +14,19 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      MCP_VIEW_MODULE: file://${{ github.workspace }}/.deps/mcp-server/packages/view/mod.ts
+      MCP_VIEW_COMPONENTS_MODULE: file://${{ github.workspace }}/.deps/mcp-server/packages/view-components/mod.ts
     steps:
       - uses: actions/checkout@v5
+
+      - name: Checkout the exact split mcp-view source
+        uses: actions/checkout@v5
+        with:
+          repository: Casys-AI/mcp-server
+          ref: 6bcb4ae88121e9320d24972ee30e0b098dfb4f47
+          path: .deps/mcp-server
+          persist-credentials: false
 
       - uses: denoland/setup-deno@v2
         with:
@@ -53,6 +64,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: check
     runs-on: ubuntu-latest
+    env:
+      MCP_VIEW_MODULE: file://${{ github.workspace }}/.deps/mcp-server/packages/view/mod.ts
+      MCP_VIEW_COMPONENTS_MODULE: file://${{ github.workspace }}/.deps/mcp-server/packages/view-components/mod.ts
     permissions:
       contents: write
       id-token: write
@@ -60,6 +74,14 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@v5
+
+      - name: Checkout the exact split mcp-view source
+        uses: actions/checkout@v5
+        with:
+          repository: Casys-AI/mcp-server
+          ref: 6bcb4ae88121e9320d24972ee30e0b098dfb4f47
+          path: .deps/mcp-server
+          persist-credentials: false
 
       - uses: denoland/setup-deno@v2
         with:

@@ -5,7 +5,7 @@ import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const PACKAGE_EXPECTATIONS = Object.freeze({
-  core: Object.freeze({ name: "@casys/mcp-view", version: "0.8.0" }),
+  core: Object.freeze({ name: "@casys/mcp-view", version: "0.9.0" }),
   contracts: Object.freeze({
     name: "@casys/mcp-view-contracts",
     version: "0.1.0",
