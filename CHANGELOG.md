@@ -2,6 +2,20 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.8.5] - Unreleased
+
+### Added
+
+- A provider-owned serialized View App manifest, published through the
+  `./view-app-manifest` package export, declares all six viewer bundles and
+  their exact recorded-session compatibility without embedding a session,
+  anchor or provider authority.
+
+### Changed
+
+- Viewer builds now require the audited local `@casys/mcp-view@0.9.1` and
+  `@casys/mcp-view-components@0.2.0` split that owns the shared v2 primitives.
+
 ## [0.8.4] - 2026-08-30
 
 ### Added

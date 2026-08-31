@@ -6,10 +6,11 @@
 
 import { MCP_APP_MIME_TYPE, McpApp } from "@casys/mcp-server";
 import { getCategories, SysonToolsClient } from "./src/client.ts";
+import { SYSON_VIEW_APP_MANIFEST } from "./src/ui/app-manifest.ts";
 import { loadUiHtml, UI_RESOURCES } from "./src/ui/mod.ts";
 
 const DEFAULT_HTTP_PORT = 3009;
-const PACKAGE_VERSION = "0.8.4";
+const PACKAGE_VERSION = SYSON_VIEW_APP_MANIFEST.app.version;
 
 const SERVER_INSTRUCTIONS =
   "Use SysON as a provider for explicit model reads and writes. Inspect tools/list " +

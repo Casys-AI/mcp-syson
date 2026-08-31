@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "io.casys.mcp.view-app-manifest/1.0",
+  "app": {
+    "id": "io.casys.mcp-syson",
+    "title": "SysON Views",
+    "version": "0.8.5"
+  },
+  "resources": [
+    {
+      "uri": "ui://mcp-syson/diagram-viewer",
+      "ownership": "whole-view",
+      "resultSchemas": [
+        "io.casys.mcp-syson.diagram-snapshot-result/1.0"
+      ],
+      "acceptedActions": [
+        "viewer.session.apply"
+      ],
+      "sessionSchemas": [
+        "io.casys.mcp-syson.recorded-diagram-session/1.0"
+      ]
+    },
+    {
+      "uri": "ui://mcp-syson/model-explorer-viewer",
+      "ownership": "whole-view",
+      "resultSchemas": [
+        "io.casys.mcp-syson.model-children-result/1.0"
+      ],
+      "acceptedActions": [
+        "viewer.session.apply"
+      ],
+      "sessionSchemas": [
+        "io.casys.mcp-syson.recorded-model-children-session/1.0"
+      ]
+    },
+    {
+      "uri": "ui://mcp-syson/query-results-viewer",
+      "ownership": "whole-view",
+      "resultSchemas": [
+        "io.casys.mcp-syson.query-result/1.0"
+      ],
+      "acceptedActions": [
+        "viewer.session.apply"
+      ],
+      "sessionSchemas": [
+        "io.casys.mcp-syson.recorded-query-session/1.0"
+      ]
+    },
+    {
+      "uri": "ui://mcp-syson/requirements-trace-viewer",
+      "ownership": "whole-view",
+      "resultSchemas": [
+        "io.casys.mcp-syson.requirements-trace-result/1.0"
+      ],
+      "acceptedActions": [
+        "viewer.session.apply"
+      ],
+      "sessionSchemas": [
+        "io.casys.mcp-syson.recorded-requirements-trace-session/1.0"
+      ]
+    },
+    {
+      "uri": "ui://mcp-syson/validation-viewer",
+      "ownership": "whole-view",
+      "resultSchemas": [
+        "io.casys.mcp-syson.validation-result/1.0"
+      ],
+      "acceptedActions": [
+        "viewer.session.apply"
+      ],
+      "sessionSchemas": [
+        "io.casys.mcp-syson.recorded-validation-session/1.0"
+      ]
+    },
+    {
+      "uri": "ui://mcp-syson/value-change-viewer",
+      "ownership": "whole-view",
+      "resultSchemas": [
+        "io.casys.mcp-syson.value-result/1.0"
+      ],
+      "acceptedActions": [
+        "viewer.session.apply"
+      ],
+      "sessionSchemas": [
+        "io.casys.mcp-syson.recorded-value-session/1.0"
+      ]
+    }
+  ]
+}

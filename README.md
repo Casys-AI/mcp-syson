@@ -419,6 +419,13 @@ navigation and mutation calls also declare closed output schemas: their
 Component contracts and optional Compose events are documented in
 [SysON component surfaces](docs/component-surfaces.md).
 
+The provider-owned compatibility manifest is tracked as
+[`src/ui/view-app-manifest.json`](src/ui/view-app-manifest.json) and exported by
+the package as `./view-app-manifest`. It serializes the exact six resource URIs,
+result schemas, `viewer.session.apply` action and recorded-session schemas used
+by the shipped Apps. It contains no Digital Thread session, anchor, provider
+endpoint, credentials or live-tool policy.
+
 The build generates TypeScript modules that are loaded by the server, so a
 JSR/Deno consumer fetches the viewer HTML with its module graph; the viewer
 bundles are registered as MCP resources. Until the coordinated `mcp-view` split

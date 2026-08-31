@@ -18,7 +18,7 @@ const EXPECTED_VIEWERS = [
 ];
 
 const EXPECTED_SPLIT_PROVENANCE =
-  "@casys/mcp-view@0.9.0 + @casys/mcp-view-contracts@0.1.0 + @casys/mcp-view-components@0.1.0";
+  "@casys/mcp-view@0.9.1 + @casys/mcp-view-contracts@0.1.0 + @casys/mcp-view-components@0.2.0";
 
 const VIEWER_SOURCE_PATHS = EXPECTED_VIEWERS.map((viewer) =>
   new URL(`../src/ui/${viewer}/src/main.tsx`, import.meta.url)
