@@ -3,7 +3,7 @@
   "app": {
     "id": "io.casys.mcp-syson",
     "title": "SysON Views",
-    "version": "0.8.5"
+    "version": "0.8.6"
   },
   "resources": [
     {

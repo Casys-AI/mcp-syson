@@ -213,7 +213,7 @@ Deno.test("SysON serves stateless HTTP with native structured agent contracts", 
       version?: unknown;
     };
     assertEquals(serverInfo.name, "mcp-syson");
-    assertEquals(serverInfo.version, "0.8.5");
+    assertEquals(serverInfo.version, "0.8.6");
     assertEquals(
       String(discovered.result.instructions).includes("syson_project_list"),
       true,

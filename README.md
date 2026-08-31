@@ -39,14 +39,14 @@ export SYSON_URL=http://localhost:8180
 Run the published package over HTTP:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.8.5/server
+deno run -A jsr:@casys/mcp-syson@0.8.6/server
 ```
 
 The MCP endpoint is <http://127.0.0.1:3009/mcp>. For a client that launches one
 local process, use stdio instead:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.8.5/server --stdio
+deno run -A jsr:@casys/mcp-syson@0.8.6/server --stdio
 ```
 
 An existing SysON deployment works too; point `SYSON_URL` at its base URL. The

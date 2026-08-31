@@ -2,6 +2,13 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [0.8.6] - 2026-08-31
+
+### Fixed
+
+- The CI-only audited MCP View checkout is ignored by Git, so the JSR
+  cleanliness gate can run without weakening its dirty-worktree protection.
+
 ## [0.8.5] - 2026-08-31
 
 ### Added
