@@ -1,8 +1,11 @@
 /** App-owned compatibility declaration for standalone and recorded SysON views. */
 
-export const SYSON_VIEW_APP_MANIFEST_SCHEMA =
-  "io.casys.mcp.view-app-manifest/1.0" as const;
-export const SYSON_VIEWER_SESSION_ACTION = "viewer.session.apply" as const;
+import {
+  VIEW_APP_MANIFEST_SCHEMA,
+  VIEWER_SESSION_APPLY_ACTION,
+} from "@casys/mcp-view-contracts";
+export const SYSON_VIEW_APP_MANIFEST_SCHEMA = VIEW_APP_MANIFEST_SCHEMA;
+export const SYSON_VIEWER_SESSION_ACTION = VIEWER_SESSION_APPLY_ACTION;
 
 export const SYSON_UI_RESOURCE_URIS = {
   diagram: "ui://mcp-syson/diagram-viewer",

@@ -40,9 +40,17 @@
       "!src/ui/bundles.ts"
     ]
   },
+  "minimumDependencyAge": {
+    "age": "P1D",
+    "exclude": [
+      "jsr:@casys/mcp-server",
+      "jsr:@casys/mcp-view-contracts"
+    ]
+  },
   "imports": {
     "@std/assert": "jsr:@std/assert@1",
     "@casys/mcp-server": "jsr:@casys/mcp-server@0.26.1",
+    "@casys/mcp-view-contracts": "jsr:@casys/mcp-view-contracts@0.1.0",
     "@casys/constraint-solver": "jsr:@casys/constraint-solver@0.1.0",
     "ajv": "npm:ajv@^8.17.1",
     "hono": "npm:hono@^4",
