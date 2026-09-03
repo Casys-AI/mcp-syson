@@ -24,8 +24,9 @@ import {
 import {
   definePreactComponent,
   publishSelection,
-  startPreactSurfaceApp,
+  startSysonViewerApp,
   type SurfaceAppContext,
+  type SysonViewData,
 } from "../../shared/preact-surface";
 import { isDiagramSnapshot } from "../../shared/recorded-content";
 import { sanitizeDiagramSvg } from "./sanitize-svg";
@@ -275,7 +276,7 @@ function Identity({ data }: { data: DiagramSnapshot }) {
 
 const keys = VIEWER_COMPONENT_KEYS.diagram;
 const registry = defineComponentRegistry<
-  DiagramSnapshot,
+  SysonViewData<DiagramSnapshot>,
   SurfaceAppContext<DiagramSnapshot>
 >({
   components: {
@@ -299,7 +300,7 @@ const registry = defineComponentRegistry<
   defaultSurface: defaultComponentSurface(VIEWER_DEFAULT_SURFACE_KEYS.diagram),
 });
 
-void startPreactSurfaceApp({
+void startSysonViewerApp({
   root: document.getElementById("app")!,
   registry,
   recordedSession: { view: "diagram", validateContent: isDiagramSnapshot },

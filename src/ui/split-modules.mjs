@@ -5,14 +5,14 @@ import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const PACKAGE_EXPECTATIONS = Object.freeze({
-  core: Object.freeze({ name: "@casys/mcp-view", version: "0.9.1" }),
+  core: Object.freeze({ name: "@casys/mcp-view", version: "0.9.2" }),
   contracts: Object.freeze({
     name: "@casys/mcp-view-contracts",
     version: "0.1.0",
   }),
   components: Object.freeze({
     name: "@casys/mcp-view-components",
-    version: "0.2.0",
+    version: "0.6.0",
   }),
 });
 
@@ -37,6 +37,11 @@ export function resolveSplitModules(environment = process.env) {
     environment,
     new URL("./preact-components.ts", components.href).href,
   );
+  const fonts = optionalFileModule(
+    "MCP_VIEW_COMPONENTS_FONTS_MODULE",
+    environment,
+    new URL("./fonts.ts", components.href).href,
+  );
 
   const corePackage = verifyPackage(core, PACKAGE_EXPECTATIONS.core, ".");
   const contractsPackage = verifyPackage(
@@ -55,6 +60,7 @@ export function resolveSplitModules(environment = process.env) {
     componentsPackage.root,
     "./preact/components",
   );
+  verifyPackageMember(fonts, componentsPackage.root, "./fonts");
 
   if (corePackage.root === componentsPackage.root) {
     throw new Error(
@@ -79,6 +85,7 @@ export function resolveSplitModules(environment = process.env) {
     components,
     componentsPreact,
     presentation,
+    fonts,
     provenance,
     environment: Object.freeze({
       MCP_VIEW_MODULE: core.href,
@@ -86,6 +93,7 @@ export function resolveSplitModules(environment = process.env) {
       MCP_VIEW_COMPONENTS_MODULE: components.href,
       MCP_VIEW_COMPONENTS_PREACT_MODULE: componentsPreact.href,
       MCP_VIEW_PRESENTATION_MODULE: presentation.href,
+      MCP_VIEW_COMPONENTS_FONTS_MODULE: fonts.href,
     }),
   });
 }

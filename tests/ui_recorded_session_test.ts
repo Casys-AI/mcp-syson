@@ -1,4 +1,4 @@
-import { assertEquals, assertGreater } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import {
   SYSON_DIGITAL_THREAD_RESULT_SCHEMAS,
   SYSON_RECORDED_SESSION_SCHEMAS,
@@ -430,29 +430,28 @@ Deno.test("value readout stays documentary and never claims verification", async
   assertEquals(source.includes('title={verified ? "Verified"'), false);
 });
 
-Deno.test("recorded session receiver is App-level and delegated to split core", async () => {
+Deno.test("kit startPreactSurfaceApp owns the lifecycle; facade delegates recorded sessions and fonts", async () => {
   const source = await Deno.readTextFile(
     new URL("../src/ui/shared/preact-surface.tsx", import.meta.url),
   );
-  const connect = source.indexOf("await createMcpApp<");
-  const viewerSession = source.indexOf("viewerSession:");
-  assertGreater(connect, -1);
-  assertGreater(viewerSession, connect);
+  assertEquals(
+    source.includes('from "@casys/mcp-view-components/preact"') &&
+      source.includes("startPreactSurfaceApp("),
+    true,
+  );
+  assertEquals(source.includes("viewerSession:"), true);
+  assertEquals(source.includes("toState"), true);
+  assertEquals(source.includes("isSysonRecordedViewSessionEnvelope("), true);
+  assertEquals(source.includes("parseSysonRecordedViewSession<"), true);
+  assertEquals(source.includes("recorded: session"), true);
+  assertEquals(source.includes('code: "session-rejected"'), true);
+  assertEquals(source.includes("installMcpViewFonts("), true);
+  assertEquals(source.includes("createMcpApp"), false);
+  assertEquals(source.includes("defineView"), false);
+  assertEquals(source.includes("mountComponentSurface"), false);
+  assertEquals(source.includes("activeComponentSurface"), false);
   assertEquals(source.includes("createComposeEventClient("), false);
   assertEquals(source.includes("defineRecordedPreactComponent"), false);
   assertEquals(source.includes("Recorded projection"), false);
-  assertEquals(
-    source.includes('context.state.mode === "recorded"') &&
-      source.includes("options.registry.defaultSurface"),
-    true,
-  );
-  const hostContextHandler = source.slice(
-    source.indexOf("const onHostContextChanged"),
-    source.indexOf('handle.ctx.app.addEventListener("hostcontextchanged"'),
-  );
-  assertEquals(
-    hostContextHandler.indexOf("schedule(async") <
-      hostContextHandler.indexOf("const data = state.currentData"),
-    true,
-  );
+  assertEquals(source.includes("hostcontextchanged"), false);
 });

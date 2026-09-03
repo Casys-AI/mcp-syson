@@ -52,6 +52,7 @@ export default defineConfig({
     alias: {
       "@casys/mcp-view-components/preact/components": split.presentation.path,
       "@casys/mcp-view-components/preact": split.componentsPreact.path,
+      "@casys/mcp-view-components/fonts": split.fonts.path,
       "@casys/mcp-view-components": split.components.path,
       "@casys/mcp-view-contracts": split.contracts.path,
       "@casys/mcp-view": split.core.path,

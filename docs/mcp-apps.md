@@ -79,6 +79,20 @@ identities. Requirements become authored limits. The adapter deliberately does
 not infer requirement satisfaction from a limit, and recorded mode does not gain
 live mutation or provider credentials.
 
+The requirements-trace viewer ships a committed fixture and a documentation
+harness for reproducible README captures.
+`docs/fixtures/requirements-trace-session.json` is a fully fingerprinted
+recorded session for the TPS03 StandBackrest capture, built deterministically by
+`deno task docs:viewer-fixtures` (`scripts/build-viewer-fixtures.ts`).
+`docs/fixtures/viewer-preview.html` is a minimal host harness that loads the
+fixture and drives the App through the standard MCP UI handshake.
+`deno task docs:viewer-screenshot` (`scripts/capture-viewer-doc.ts`) serves both
+through a loopback server, captures a 900×720 headless-Chrome screenshot at 2×
+scale, and writes `docs/images/mcp-syson-requirements-viewer.png`. Re-running
+the two tasks after any viewer change produces a fresh PNG with the same layout
+and text without manual intervention (Chrome's rasterizer drifts by one luma
+level on a few anti-aliased pixels, so the bytes are not bit-identical).
+
 ## Component catalog
 
 Components are advertised under `io.casys.mcp.view-components/v1` and selected
@@ -95,8 +109,11 @@ through the host context `io.casys.mcp.surface/v1`.
 
 Every key has one local mount implementation and a stable component instance ID.
 A host may arrange known keys in a stack, row or grid. Unknown keys, malformed
-layouts and non-JSON props fail closed. In recorded mode, the App always selects
-its own bounded standalone surface.
+layouts and non-JSON props fail closed. The kit's surface lifecycle
+(`startPreactSurfaceApp`) selects the host-negotiated surface when the host
+context is ready and falls back to the App's bounded standalone surface
+otherwise, in direct and recorded mode alike. Recorded sessions are still
+verified against their fingerprint before any component mounts.
 
 Example negotiated context:
 
@@ -137,9 +154,9 @@ rebuilding leaves the served bundle stale.
 The viewer build intentionally has no fallback to the retired monolithic viewer
 package. It requires local file URLs for the audited split:
 
-- `@casys/mcp-view@0.9.1` for the renderer-neutral lifecycle and router;
+- `@casys/mcp-view@0.9.2` for the renderer-neutral lifecycle and router;
 - `@casys/mcp-view-contracts@0.1.0` for wire contracts;
-- `@casys/mcp-view-components@0.2.0` for catalogs, surfaces, theme and Preact
+- `@casys/mcp-view-components@0.6.0` for catalogs, surfaces, theme and Preact
   presentation.
 
 For a standard sibling `mcp-server` checkout:
