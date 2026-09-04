@@ -19,8 +19,9 @@ import {
 } from "../../shared/component-catalog";
 import {
   definePreactComponent,
-  startPreactSurfaceApp,
+  startSysonViewerApp,
   type SurfaceAppContext,
+  type SysonViewData,
 } from "../../shared/preact-surface";
 import { isValueResult } from "../../shared/recorded-content";
 import "../../global.css";
@@ -183,7 +184,7 @@ function Verification({ data }: { data: ValueResult }) {
 
 const keys = VIEWER_COMPONENT_KEYS.value;
 const registry = defineComponentRegistry<
-  ValueResult,
+  SysonViewData<ValueResult>,
   SurfaceAppContext<ValueResult>
 >({
   components: {
@@ -203,7 +204,7 @@ const registry = defineComponentRegistry<
   defaultSurface: defaultComponentSurface(VIEWER_DEFAULT_SURFACE_KEYS.value),
 });
 
-void startPreactSurfaceApp({
+void startSysonViewerApp({
   root: document.getElementById("app")!,
   registry,
   recordedSession: { view: "value", validateContent: isValueResult },

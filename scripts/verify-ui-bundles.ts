@@ -18,7 +18,7 @@ const EXPECTED_VIEWERS = [
 ];
 
 const EXPECTED_SPLIT_PROVENANCE =
-  "@casys/mcp-view@0.9.1 + @casys/mcp-view-contracts@0.1.0 + @casys/mcp-view-components@0.2.0";
+  "@casys/mcp-view@0.9.2 + @casys/mcp-view-contracts@0.1.0 + @casys/mcp-view-components@0.6.0";
 
 const VIEWER_SOURCE_PATHS = EXPECTED_VIEWERS.map((viewer) =>
   new URL(`../src/ui/${viewer}/src/main.tsx`, import.meta.url)
@@ -98,7 +98,7 @@ for (const sourceUrl of VIEWER_SOURCE_PATHS) {
   const source = await Deno.readTextFile(sourceUrl);
   if (
     !source.includes("defineComponentRegistry") ||
-    !source.includes("startPreactSurfaceApp") ||
+    !source.includes("startSysonViewerApp") ||
     !source.includes('from "@casys/mcp-view-components"') ||
     !source.includes(
       'from "@casys/mcp-view-components/preact/components"',
@@ -123,12 +123,14 @@ if (
   !adapterSource.includes('from "@casys/mcp-view"') ||
   !adapterSource.includes('from "@casys/mcp-view-components"') ||
   !adapterSource.includes('from "@casys/mcp-view-components/preact"') ||
-  !adapterSource.includes("createMcpApp") ||
-  !adapterSource.includes("mountComponentSurface") ||
+  !adapterSource.includes('from "@casys/mcp-view-components/fonts"') ||
+  !adapterSource.includes("startPreactSurfaceApp(") ||
   !adapterSource.includes("viewerSession:") ||
-  !adapterSource.includes("componentCatalogCapabilities") ||
+  !adapterSource.includes("toState") ||
   !adapterSource.includes("name: SYSON_VIEW_APP_MANIFEST.app.id") ||
   !adapterSource.includes("version: SYSON_VIEW_APP_MANIFEST.app.version") ||
+  adapterSource.includes("createMcpApp") ||
+  adapterSource.includes("mountComponentSurface") ||
   adapterSource.includes("createComposeEventClient") ||
   adapterSource.includes('from "@casys/mcp-view/preact"') ||
   adapterSource.includes("defineRecordedPreactComponent")

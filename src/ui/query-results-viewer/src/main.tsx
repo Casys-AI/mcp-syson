@@ -25,8 +25,9 @@ import {
 import {
   definePreactComponent,
   publishSelection,
-  startPreactSurfaceApp,
+  startSysonViewerApp,
   type SurfaceAppContext,
+  type SysonViewData,
 } from "../../shared/preact-surface";
 import { isQueryResult } from "../../shared/recorded-content";
 import "../../global.css";
@@ -75,18 +76,39 @@ function expressionOf(data: QueryData): string | undefined {
   return undefined;
 }
 
-function Summary({ data }: { data: QueryData }) {
+function formatScalar(value: unknown, locale: string | undefined): string {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "number") {
+    return new Intl.NumberFormat(locale).format(value);
+  }
+  return String(value);
+}
+
+function Summary(
+  { data, context }: {
+    data: QueryData;
+    context: SurfaceAppContext<QueryData>;
+  },
+) {
   const objects = objectsOf(data);
-  const count = objects ? objects.length : 1;
+  const locale = context.hostContext.locale;
+  const scalarValue = "result" in data ? data.result : null;
   return (
     <SemanticElement
       reference={sysmlRef(data.type ?? "query", expressionOf(data) ?? "result")}
       density="card"
-      ident={<ElementIdent label="Query result" />}
+      ident={
+        <ElementIdent
+          label={data.type ?? "Query result"}
+          detail={expressionOf(data)}
+        />
+      }
       reading={
         <ElementReading
-          label={objects ? "Objects" : data.type ?? "unknown"}
-          value={objects ? String(count) : data.type ?? "unknown"}
+          label={objects ? "Objects" : "Value"}
+          value={objects
+            ? String(objects.length)
+            : formatScalar(scalarValue, locale)}
         />
       }
     />
@@ -126,7 +148,8 @@ function Values(
   }, [objects, filter, sortKey, descending]);
 
   if (!objects) {
-    const value = "result" in data ? data.result : null;
+    const raw = "result" in data ? data.result : null;
+    const locale = context.hostContext.locale;
     return (
       <SemanticElement
         reference={sysmlRef(
@@ -134,11 +157,16 @@ function Values(
           expressionOf(data) ?? "query-result",
         )}
         density="card"
-        ident={<ElementIdent label="Scalar value" />}
+        ident={
+          <ElementIdent
+            label={data.type ?? "unknown"}
+            detail={expressionOf(data)}
+          />
+        }
         reading={
           <ElementReading
-            label={data.type ?? "unknown"}
-            value={value === null ? "null" : String(value)}
+            label="Value"
+            value={formatScalar(raw, locale)}
           />
         }
       />
@@ -216,14 +244,14 @@ function Values(
 
 const keys = VIEWER_COMPONENT_KEYS.queryResults;
 const registry = defineComponentRegistry<
-  QueryData,
+  SysonViewData<QueryData>,
   SurfaceAppContext<QueryData>
 >({
   components: {
     [keys[0]]: definePreactComponent({
       title: "Query summary",
       description: "Result type and count",
-    }, ({ data }) => <Summary data={data} />),
+    }, ({ data, context }) => <Summary data={data} context={context} />),
     [keys[1]]: definePreactComponent({
       title: "Query expression",
       description: "AQL expression or search text",
@@ -238,7 +266,7 @@ const registry = defineComponentRegistry<
   ),
 });
 
-void startPreactSurfaceApp({
+void startSysonViewerApp({
   root: document.getElementById("app")!,
   registry,
   recordedSession: { view: "queryResults", validateContent: isQueryResult },

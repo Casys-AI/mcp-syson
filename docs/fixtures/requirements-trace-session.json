@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "io.casys.mcp-syson.recorded-requirements-trace-session/1.0",
+  "resourceUri": "ui://mcp-syson/requirements-trace-viewer",
+  "resultSchema": "requirements-capture/3.0",
+  "readOnly": true,
+  "basis": {
+    "projectId": "tps03-stand-assembly",
+    "projectRevision": 15,
+    "subjectId": "20e71742-390d-4c6d-a91c-120debab5aa8",
+    "thread": {
+      "id": "tps03",
+      "revision": 15
+    },
+    "artifact": {
+      "id": "requirements-StandBackrest-5aff4cc54e119dfdb6b85cbb6d5f6a49921d5abcb2845bff8e034a16d3d99f1d",
+      "fingerprint": "sha256:5aff4cc54e119dfdb6b85cbb6d5f6a49921d5abcb2845bff8e034a16d3d99f1d"
+    }
+  },
+  "structuredContent": {
+    "schemaVersion": "requirements-capture/3.0",
+    "operation": {
+      "id": "model.write-requirements",
+      "version": "1"
+    },
+    "trustedRunId": "run:requirements-tps03-r15",
+    "containerComponent": "StandBackrest",
+    "partDefName": "StandBackrestRequirements",
+    "target": {
+      "elementId": "20e71742-390d-4c6d-a91c-120debab5aa8",
+      "kind": "part-definition",
+      "label": "StandBackrest"
+    },
+    "architectureBasis": {
+      "snapshotId": "thread:tps03:r15",
+      "revision": 15,
+      "fingerprint": "fc8299b704744492c2d11bea7a2a92eb9e1d64c68f649c61ab65856a315a6f52"
+    },
+    "requirements": [
+      {
+        "id": "maxDisplacement",
+        "name": "Maximum displacement",
+        "metric": "maxDisplacement",
+        "operator": "<=",
+        "limit": {
+          "value": 1,
+          "unit": "mm"
+        }
+      },
+      {
+        "id": "maxVonMises",
+        "name": "Maximum von Mises stress",
+        "metric": "maxVonMises",
+        "operator": "<=",
+        "limit": {
+          "value": 55000000,
+          "unit": "Pa"
+        }
+      }
+    ],
+    "seed": {
+      "artifactId": "artifact:seed-tps03",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "digest": "4eae68c8e400be80d9ffbea84deeba4acbcb2aebdc340a824f1cffbf763af9f4"
+      },
+      "producerRunId": "run:seed-tps03"
+    },
+    "architecture": {
+      "artifactId": "architecture-fc8299b704744492c2d11bea7a2a92eb9e1d64c68f649c61ab65856a315a6f52",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "digest": "fc8299b704744492c2d11bea7a2a92eb9e1d64c68f649c61ab65856a315a6f52"
+      },
+      "producerRunId": "run:architecture-tps03-r15"
+    },
+    "requirementsElementId": "122501cd-54d6-4aa9-b6a6-50b361ee2168",
+    "requirementUsage": {
+      "id": "122501cd-54d6-4aa9-b6a6-50b361ee2168",
+      "kind": "RequirementUsage"
+    },
+    "constraintUsages": [
+      {
+        "id": "constraint-usage:maxDisplacement",
+        "kind": "ConstraintUsage",
+        "requirementId": "maxDisplacement",
+        "sourceId": "constraint-usage:maxDisplacement"
+      },
+      {
+        "id": "constraint-usage:maxVonMises",
+        "kind": "ConstraintUsage",
+        "requirementId": "maxVonMises",
+        "sourceId": "constraint-usage:maxVonMises"
+      }
+    ],
+    "insertedAt": "2026-08-26T00:00:00.000Z"
+  },
+  "projectionFingerprint": "sha256:5093f51aab2980bbc9efb2b68fedb43bbbf2deb3d782fef10bd771074b6d0f92"
+}

@@ -3,6 +3,7 @@ import {
   defaultComponentSurface,
   digestFromSha256Prefix,
   linkCoverageGauge,
+  recordedBasis,
   recordedProjectionDigest,
   shortSysmlKind,
   sysmlRef,
@@ -82,10 +83,26 @@ Deno.test("semantic helpers stay literal and do not invent a parent chain", () =
   assertEquals(digestFromSha256Prefix("sha256:deadbeef"), undefined);
   assertEquals(
     recordedProjectionDigest({
-      state: { recordedSession: { projectionFingerprint: `sha256:${digest}` } },
+      state: {
+        currentData: {
+          recorded: { projectionFingerprint: `sha256:${digest}` },
+        },
+      },
     }),
     digest,
   );
+  const basis = {
+    projectId: "project-1",
+    projectRevision: 1,
+    subjectId: "subject-1",
+    thread: { id: "thread-1", revision: 1 },
+    artifact: { id: "artifact-1", fingerprint: `sha256:${digest}` },
+  };
+  assertEquals(
+    recordedBasis({ state: { currentData: { recorded: { basis } } } }),
+    basis,
+  );
+  assertEquals(recordedBasis({}), undefined);
   assertEquals(shortSysmlKind("sysml::PartUsage"), "PartUsage");
   assertEquals(
     shortSysmlKind("http://example.test?entity=RequirementUsage"),
@@ -234,7 +251,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(requirements.includes("BadgeGroup"), true);
   assertEquals(requirements.includes("SemanticElement"), true);
   assertEquals(requirements.includes("SemanticList"), true);
-  assertEquals(requirements.includes("KeyValueList"), true);
+  assertEquals(requirements.includes("KeyValueList"), false);
   assertEquals(requirements.includes("InlineCode"), true);
   assertEquals(requirements.includes("linkCoverageGauge"), true);
   assertEquals(requirements.includes('title="error"'), true);
@@ -258,17 +275,14 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(value.includes("engineering verification"), true);
 
   assertEquals(adapter.includes("ArtifactRow"), false);
-  assertEquals(adapter.includes("StateMessage"), true);
+  assertEquals(adapter.includes("startPreactSurfaceApp("), true);
   assertEquals(adapter.includes("Card"), false);
   assertEquals(adapter.includes("KeyValueList"), false);
   assertEquals(adapter.includes("Recorded projection"), false);
   assertEquals(adapter.includes("PathBar"), false);
   assertEquals(adapter.includes("syson-message-marker"), false);
   assertEquals(adapter.includes("syson-recorded-stack"), false);
-  assertEquals(
-    adapter.includes("Host-selected component surface rejected"),
-    true,
-  );
+  assertEquals(adapter.includes('code: "session-rejected"'), true);
 
   for (const source of [diagram, explorer, query, requirements, validation]) {
     assertEquals(source.includes("syson-element-stack"), false);

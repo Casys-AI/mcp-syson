@@ -30,8 +30,9 @@ import {
 import {
   definePreactComponent,
   publishSelection,
-  startPreactSurfaceApp,
+  startSysonViewerApp,
   type SurfaceAppContext,
+  type SysonViewData,
 } from "../../shared/preact-surface";
 import { isValidationReport } from "../../shared/recorded-content";
 import "../../global.css";
@@ -77,8 +78,32 @@ function statusTone(
     : "warning";
 }
 
-function Status({ data }: { data: ValidationReport }) {
+function Status(
+  { data, context }: {
+    data: ValidationReport;
+    context: SurfaceAppContext<ValidationReport>;
+  },
+) {
   const status = validationOverallStatus(data.summary);
+  const locale = context.hostContext.locale;
+  const validatedAtFormatted = new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(data.validatedAt)) + " UTC";
+  const headlineReading = data.summary.unresolved > 0
+    ? (
+      <ElementReading
+        label="Unresolved"
+        value={data.summary.unresolved}
+      />
+    )
+    : (
+      <ElementReading
+        label="Constraints"
+        value={data.summary.total}
+      />
+    );
   return (
     <SemanticElement
       reference={sysmlRef("validation", data.elementId)}
@@ -90,6 +115,7 @@ function Status({ data }: { data: ValidationReport }) {
           detail={data.elementId}
         />
       }
+      reading={headlineReading}
       body={data.summary.total === 0
         ? (
           <ElementBody>
@@ -103,7 +129,7 @@ function Status({ data }: { data: ValidationReport }) {
       provenance={
         <ElementProvenance
           label="Validated"
-          value={new Date(data.validatedAt).toLocaleString()}
+          value={validatedAtFormatted}
         />
       }
     />
@@ -129,7 +155,7 @@ function Summary({ data }: { data: ValidationReport }) {
         },
         {
           id: "unresolved",
-          label: "unresolved",
+          label: "Unresolved",
           value: data.summary.unresolved,
           tone: data.summary.unresolved ? "warning" : "neutral",
         },
@@ -140,23 +166,30 @@ function Summary({ data }: { data: ValidationReport }) {
 
 function formatResolved(
   value: number | { value: number; unit?: string },
+  locale: string | undefined,
 ): string {
   const quantity = typeof value === "number" ? { value } : value;
-  const number = quantity.value.toLocaleString(undefined, {
+  const number = new Intl.NumberFormat(locale, {
     maximumFractionDigits: 4,
-  });
+  }).format(quantity.value);
   return quantity.unit ? `${number} ${quantity.unit}` : number;
 }
 
-function ResolvedValues({ data }: { data: ValidationReport }) {
+function ResolvedValues(
+  { data, context }: {
+    data: ValidationReport;
+    context: SurfaceAppContext<ValidationReport>;
+  },
+) {
   const values = Object.entries(data.resolvedValues ?? {});
+  const locale = context.hostContext.locale;
   return (
     <Card title="Resolved model values">
       <KeyValueList
         items={values.map(([name, value]) => ({
           id: name,
           label: name,
-          value: <InlineCode>{formatResolved(value)}</InlineCode>,
+          value: <InlineCode>{formatResolved(value, locale)}</InlineCode>,
         }))}
       />
       {!values.length && <EmptyState>No resolved model values</EmptyState>}
@@ -164,8 +197,14 @@ function ResolvedValues({ data }: { data: ValidationReport }) {
   );
 }
 
-function formatValue(value: number | undefined, digits = 2): string {
-  return value === undefined ? "−" : value.toFixed(digits);
+function formatValue(
+  value: number | undefined,
+  locale: string | undefined,
+  digits = 2,
+): string {
+  if (value === undefined) return "−";
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: digits })
+    .format(value);
 }
 
 function Constraints(
@@ -176,6 +215,7 @@ function Constraints(
 ) {
   const [selected, setSelected] = useState<string>();
   const digest = recordedProjectionDigest(context);
+  const locale = context.hostContext.locale;
   return (
     <Card
       title="Constraints"
@@ -188,11 +228,11 @@ function Constraints(
               const margin = constraint.margin === undefined
                 ? undefined
                 : `${constraint.margin >= 0 ? "+" : ""}${
-                  formatValue(constraint.margin, 1)
+                  formatValue(constraint.margin, locale, 1)
                 }${
                   constraint.marginPercent === undefined
                     ? ""
-                    : ` (${constraint.marginPercent.toFixed(0)}%)`
+                    : ` (${formatValue(constraint.marginPercent, locale, 0)}%)`
                 }`;
               return (
                 <SemanticElement
@@ -220,12 +260,12 @@ function Constraints(
                   reading={
                     <ElementReading
                       label="Value"
-                      value={formatValue(constraint.computedValue)}
+                      value={formatValue(constraint.computedValue, locale)}
                       detail={constraint.threshold === undefined
                         ? margin
-                        : `threshold ${formatValue(constraint.threshold)}${
-                          margin ? ` · ${margin}` : ""
-                        }`}
+                        : `threshold ${
+                          formatValue(constraint.threshold, locale)
+                        }${margin ? ` · ${margin}` : ""}`}
                     />
                   }
                   verdict={
@@ -259,14 +299,14 @@ function Constraints(
 
 const keys = VIEWER_COMPONENT_KEYS.validation;
 const registry = defineComponentRegistry<
-  ValidationReport,
+  SysonViewData<ValidationReport>,
   SurfaceAppContext<ValidationReport>
 >({
   components: {
     [keys[0]]: definePreactComponent({
       title: "Validation status",
       description: "Element and global result",
-    }, ({ data }) => <Status data={data} />),
+    }, ({ data, context }) => <Status data={data} context={context} />),
     [keys[1]]: definePreactComponent({
       title: "Validation summary",
       description: "Pass, fail, error and unresolved counts",
@@ -274,7 +314,7 @@ const registry = defineComponentRegistry<
     [keys[2]]: definePreactComponent({
       title: "Resolved values",
       description: "Model parameters used by validation",
-    }, ({ data }) => <ResolvedValues data={data} />),
+    }, ({ data, context }) => <ResolvedValues data={data} context={context} />),
     [keys[3]]: definePreactComponent({
       title: "Constraints",
       description: "Detailed selectable constraint results",
@@ -285,7 +325,7 @@ const registry = defineComponentRegistry<
   ),
 });
 
-void startPreactSurfaceApp({
+void startSysonViewerApp({
   root: document.getElementById("app")!,
   registry,
   recordedSession: { view: "validation", validateContent: isValidationReport },

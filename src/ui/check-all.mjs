@@ -46,6 +46,7 @@ try {
             "@casys/mcp-view-components/preact": split.componentsPreact.href,
             "@casys/mcp-view-components/preact/components":
               split.presentation.href,
+            "@casys/mcp-view-components/fonts": split.fonts.href,
             "@modelcontextprotocol/ext-apps":
               "npm:@modelcontextprotocol/ext-apps@^1.7.4",
             "@modelcontextprotocol/sdk":

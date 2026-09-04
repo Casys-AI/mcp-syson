@@ -33,15 +33,6 @@ input {
   padding: clamp(0.45rem, 1.4cqi, 0.75rem);
 }
 
-.syson-component-surface[data-display-mode="fullscreen"] {
-  min-height: 100vh;
-  padding: 0.75rem;
-}
-
-.syson-recorded-basis {
-  margin-bottom: 0.45rem;
-}
-
 .syson-kind-mark {
   display: inline-grid;
   width: 1.15rem;

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SysON requirements-trace viewer documentation preview</title>
+    <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f4f5f3;
+      color: #171917;
+    }
+    main {
+      width: min(760px, calc(100vw - 48px));
+    }
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 12px;
+      color: #5d655e;
+      font-size: 13px;
+      letter-spacing: .01em;
+    }
+    .legend strong {
+      color: #47614d;
+      background: #e5efe7;
+      border: 1px solid #c8dacb;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    /* The viewer frames itself and reports its height; the page only lends it the ground. */
+    iframe {
+      display: block;
+      width: 100%;
+      height: 120px;
+      border: 0;
+    }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="legend"><strong>Fixture</strong> Contract preview — not execution evidence</p>
+      <iframe
+        id="viewer"
+        title="SysON requirements-trace viewer"
+        src="../../src/ui/dist/requirements-trace-viewer/index.html"
+      ></iframe>
+    </main>
+    <script type="module">
+    const viewer = document.querySelector("#viewer");
+    // Listen before the fixture arrives: the bundle may initialize first.
+    const session = fetch("./requirements-trace-session.json").then((response) => {
+      if (!response.ok) throw new Error(`Fixture HTTP ${response.status}`);
+      return response.json();
+    });
+    const MAX_HEIGHT = 640;
+    let initialized = false;
+    window.addEventListener("message", async (event) => {
+      if (event.source !== viewer.contentWindow) return;
+      const message = event.data;
+      if (message?.jsonrpc !== "2.0") return;
+      if (message.method === "ui/initialize" && message.id !== undefined) {
+        viewer.contentWindow.postMessage({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            protocolVersion: message.params.protocolVersion,
+            hostInfo: { name: "SysON documentation harness", version: "1.0.0" },
+            hostCapabilities: {},
+            hostContext: {
+              theme: "light",
+              displayMode: "inline",
+              containerDimensions: { width: 760, maxHeight: MAX_HEIGHT },
+              locale: "en-US",
+              platform: "web",
+            },
+          },
+        }, "*");
+        return;
+      }
+      if (message.method === "ui/notifications/size-changed") {
+        // Follow the App's reported height up to the container limit, like a host does.
+        const height = message.params?.height;
+        if (typeof height === "number") {
+          viewer.style.height = `${Math.min(Math.ceil(height), MAX_HEIGHT)}px`;
+        }
+        return;
+      }
+      if (message.method === "ui/notifications/initialized" && !initialized) {
+        initialized = true;
+        viewer.contentWindow.postMessage({
+          jsonrpc: "2.0",
+          method: "ui/compose/event",
+          params: { action: "viewer.session.apply", data: await session },
+        }, "*");
+        document.documentElement.dataset.viewerReady = "true";
+      }
+    });
+    </script>
+  </body>
+</html>

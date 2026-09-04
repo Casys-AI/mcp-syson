@@ -13,7 +13,6 @@ import {
   ElementVerdict,
   EmptyState,
   InlineCode,
-  KeyValueList,
   LimitGauge,
   SemanticElement,
   SemanticList,
@@ -24,6 +23,7 @@ import { useState } from "preact/hooks";
 import {
   defaultComponentSurface,
   linkCoverageGauge,
+  recordedBasis,
   recordedProjectionDigest,
   shortSysmlKind,
   sysmlRef,
@@ -34,8 +34,9 @@ import {
 import {
   definePreactComponent,
   publishSelection,
-  startPreactSurfaceApp,
+  startSysonViewerApp,
   type SurfaceAppContext,
+  type SysonViewData,
 } from "../../shared/preact-surface";
 import {
   adaptRequirementsRecordedContent,
@@ -79,7 +80,46 @@ function TraceResultError({ error }: { error: string | undefined }) {
   );
 }
 
-function RequirementSet({ data }: { data: RequirementsCaptureReadModel }) {
+function operatorGlyph(operator: string): string {
+  switch (operator) {
+    case "<=":
+      return "≤";
+    case ">=":
+      return "≥";
+    case "==":
+      return "=";
+    case "!=":
+      return "≠";
+    default:
+      return operator;
+  }
+}
+
+function formatLimitValue(
+  value: number,
+  locale: string | undefined,
+): string {
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }).format(
+    value,
+  );
+}
+
+function RequirementSet(
+  { data, context }: {
+    data: RequirementsCaptureReadModel;
+    context: SurfaceAppContext<RequirementsData>;
+  },
+) {
+  const locale = context.hostContext.locale;
+  const basis = recordedBasis(context);
+  const provenance = basis !== undefined
+    ? (
+      <ElementProvenance
+        label="Recorded from"
+        value={`${basis.thread.id} r${basis.thread.revision}`}
+      />
+    )
+    : undefined;
   return (
     <SemanticElement
       reference={sysmlRef("RequirementUsage", data.rootId)}
@@ -113,7 +153,9 @@ function RequirementSet({ data }: { data: RequirementsCaptureReadModel }) {
                 reading={
                   <ElementReading
                     label="Limit"
-                    value={`${requirement.operator} ${requirement.limit.value}`}
+                    value={`${operatorGlyph(requirement.operator)} ${
+                      formatLimitValue(requirement.limit.value, locale)
+                    }`}
                     unit={requirement.limit.unit}
                   />
                 }
@@ -122,19 +164,19 @@ function RequirementSet({ data }: { data: RequirementsCaptureReadModel }) {
           </SemanticList>
         </ElementBody>
       }
-      provenance={
-        <ElementProvenance
-          label="Target"
-          value={data.target.label || data.target.id}
-        />
-      }
+      provenance={provenance}
     />
   );
 }
 
-function Coverage({ data }: { data: RequirementsData }) {
+function Coverage(
+  { data, context }: {
+    data: RequirementsData;
+    context: SurfaceAppContext<RequirementsData>;
+  },
+) {
   if (isRecordedRequirementsCapture(data)) {
-    return <RequirementSet data={data} />;
+    return <RequirementSet data={data} context={context} />;
   }
   if (data.error !== undefined) return <TraceResultError error={data.error} />;
   const unresolvedCount =
@@ -316,7 +358,11 @@ function SatisfactionLinks({ data }: { data: RequirementsData }) {
     );
   }
   return (
-    <Card title="Satisfaction links" actions={<Badge>{linked.length}</Badge>}>
+    <Card
+      title="Satisfaction links"
+      eyebrow={<InlineCode>{data.rootId}</InlineCode>}
+      actions={<Badge>{linked.length}</Badge>}
+    >
       <SemanticList label="Satisfaction links" scrollable>
         {linked.map((trace) => (
           <SemanticElement
@@ -344,20 +390,13 @@ function SatisfactionLinks({ data }: { data: RequirementsData }) {
           />
         ))}
       </SemanticList>
-      <KeyValueList
-        items={[{
-          id: "root",
-          label: "Root",
-          value: <InlineCode>{data.rootId}</InlineCode>,
-        }]}
-      />
     </Card>
   );
 }
 
 const keys = VIEWER_COMPONENT_KEYS.requirementsTrace;
 const registry = defineComponentRegistry<
-  RequirementsData,
+  SysonViewData<RequirementsData>,
   SurfaceAppContext<RequirementsData>
 >({
   components: {
@@ -366,7 +405,7 @@ const registry = defineComponentRegistry<
         title: "Requirements coverage",
         description: "Coverage percentage and counters",
       },
-      ({ data }) => <Coverage data={data} />,
+      ({ data, context }) => <Coverage data={data} context={context} />,
     ),
     [keys[1]]: definePreactComponent(
       {
@@ -388,7 +427,7 @@ const registry = defineComponentRegistry<
   ),
 });
 
-void startPreactSurfaceApp({
+void startSysonViewerApp({
   root: document.getElementById("app")!,
   registry,
   recordedSession: {

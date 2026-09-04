@@ -1,5 +1,9 @@
 /** Canonical SysON component keys shared by registries, docs and tests. */
 
+import type { SysonRecordedViewSession } from "./recorded-session.ts";
+
+type RecordedBasis = SysonRecordedViewSession<Record<string, unknown>>["basis"];
+
 export const VIEWER_COMPONENT_KEYS = {
   diagram: [
     "syson.diagram.summary",
@@ -91,13 +95,28 @@ export function digestFromSha256Prefix(
 export function recordedProjectionDigest(
   context: {
     readonly state?: {
-      readonly recordedSession?: { readonly projectionFingerprint?: string };
+      readonly currentData?: {
+        readonly recorded?: { readonly projectionFingerprint?: string };
+      };
     };
   },
 ): string | undefined {
   return digestFromSha256Prefix(
-    context.state?.recordedSession?.projectionFingerprint,
+    context.state?.currentData?.recorded?.projectionFingerprint,
   );
+}
+
+/** Digital Thread basis of the recorded session behind the current data, if any. */
+export function recordedBasis(
+  context: {
+    readonly state?: {
+      readonly currentData?: {
+        readonly recorded?: { readonly basis?: RecordedBasis };
+      };
+    };
+  },
+): RecordedBasis | undefined {
+  return context.state?.currentData?.recorded?.basis;
 }
 
 export function shortSysmlKind(kind: string): string {

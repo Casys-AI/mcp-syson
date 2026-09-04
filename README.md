@@ -9,11 +9,14 @@ A focused [Model Context Protocol](https://modelcontextprotocol.io) provider for
 real SysON model through explicit modelling, navigation, diagram, requirement,
 constraint and value operations.
 
-![A recorded SysON requirements viewer opened on the Casys Digital Thread whiteboard](docs/images/mcp-syson-requirements-viewer.png)
+![A recorded SysON requirements viewer showing the TPS03 StandBackrest authored limits](docs/images/mcp-syson-requirements-viewer.png)
 
-_A real recorded TPS03 requirements capture rendered by the provider-owned MCP
-App. The viewer remains read-only and preserves authored limits without
-inventing a satisfaction verdict._
+_The TPS03 StandBackrest requirements capture fixture rendered by the
+provider-owned MCP App — a contract preview, not execution evidence. The image
+is rendered from the committed fixture
+(`docs/fixtures/requirements-trace-session.json`) through the documentation
+harness (`deno task docs:viewer-screenshot`). The viewer remains read-only and
+preserves authored limits without inventing a satisfaction verdict._
 
 ## Built for small, useful views
 

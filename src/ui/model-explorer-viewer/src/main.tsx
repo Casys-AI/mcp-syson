@@ -9,7 +9,6 @@ import {
   ElementReading,
   EmptyState,
   InlineCode,
-  KeyValueList,
   SemanticElement,
   SemanticList,
   TextInput,
@@ -26,8 +25,9 @@ import {
 import {
   definePreactComponent,
   publishSelection,
-  startPreactSurfaceApp,
+  startSysonViewerApp,
   type SurfaceAppContext,
+  type SysonViewData,
 } from "../../shared/preact-surface";
 import {
   adaptModelExplorerRecordedContent,
@@ -186,21 +186,30 @@ function KindBreakdown({ data }: { data: ChildrenData }) {
 
 function ParentContext({ data }: { data: ChildrenData }) {
   return (
-    <Card title="Parent context">
-      <KeyValueList
-        items={[{
-          id: "parent-id",
-          label: "Parent",
-          value: <InlineCode>{data.parentId || "root"}</InlineCode>,
-        }]}
-      />
-    </Card>
+    <SemanticElement
+      reference={sysmlRef("element", data.parentId || "root")}
+      density="card"
+      ident={
+        <ElementIdent
+          label="Parent"
+          detail={data.parentId
+            ? <InlineCode>{data.parentId}</InlineCode>
+            : undefined}
+        />
+      }
+      reading={
+        <ElementReading
+          label="Children"
+          value={String(data.count)}
+        />
+      }
+    />
   );
 }
 
 const keys = VIEWER_COMPONENT_KEYS.modelExplorer;
 const registry = defineComponentRegistry<
-  ChildrenData,
+  SysonViewData<ChildrenData>,
   SurfaceAppContext<ChildrenData>
 >({
   components: {
@@ -226,7 +235,7 @@ const registry = defineComponentRegistry<
   ),
 });
 
-void startPreactSurfaceApp({
+void startSysonViewerApp({
   root: document.getElementById("app")!,
   registry,
   recordedSession: {

@@ -2,6 +2,41 @@
 
 All notable changes to `@casys/mcp-syson` will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Reproducible README capture: `docs/fixtures/requirements-trace-session.json`
+  is a fully fingerprinted TPS03 StandBackrest recorded session built by
+  `deno task docs:viewer-fixtures`; `docs/fixtures/viewer-preview.html` is the
+  documentation harness that drives the viewer through the standard MCP UI
+  handshake; `deno task docs:viewer-screenshot` produces
+  `docs/images/mcp-syson-requirements-viewer.png` from headless Chrome at 2×
+  scale without manual intervention.
+
+### Changed
+
+- Requirements-trace, validation, query-results and model-explorer viewers read
+  as datasheets: ident + one reading + provenance once, host-locale `Intl`
+  number and date formatting (UTC), the recorded basis as the requirement set's
+  provenance ("Recorded from tps03 r15"), operator glyphs (≤ ≥ = ≠) and grouped
+  limit values, and no single-row `KeyValueList` field dumps.
+- Viewers now boot through `@casys/mcp-view-components` 0.6.0
+  `startPreactSurfaceApp` (kit-owned statuses, host-context remount and surface
+  selection; the recorded-mode standalone lock,
+  `data-mode`/`data-display-mode`/`data-platform` stamps and the `aria-label`
+  are gone).
+- Kit status wording replaces the facade's: a missing host surface reads "This
+  App exposes components and requires a host-selected surface." and a rejected
+  one renders the "Surface invalid" title, a recorded session whose fingerprint
+  fails renders "Session rejected" (`code: "session-rejected"`); the kit stamps
+  `data-casys-surface-*` on the document element on every host-context change.
+  The `data-display-mode="fullscreen"` layout rule (`min-height: 100vh`) is gone
+  with the stamp it keyed on.
+- Viewer builds require the audited `@casys/mcp-view@0.9.2` +
+  `@casys/mcp-view-contracts@0.1.0` + `@casys/mcp-view-components@0.6.0` split
+  (kit commit 676a2c7); the kit fonts are installed at boot.
+
 ## [0.8.6] - 2026-08-31
 
 ### Fixed
@@ -15,13 +50,13 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 - A provider-owned serialized View App manifest, published through the
   `./view-app-manifest` package export, declares all six viewer bundles and
-  their exact recorded-session compatibility without embedding a session,
-  anchor or provider authority.
+  their exact recorded-session compatibility without embedding a session, anchor
+  or provider authority.
 - Provider-owned read-only projections for exact Digital Thread architecture,
   part-definition and requirements captures, verified against their original
   recorded-session fingerprint before adaptation.
-- Focused MCP App, safety, configuration and provider-development guides, plus
-  a real recorded requirements-viewer capture in the public README.
+- Focused MCP App, safety, configuration and provider-development guides, plus a
+  real recorded requirements-viewer capture in the public README.
 
 ### Changed
 
@@ -46,8 +81,8 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 ### Changed
 
 - The qualification workflow discovers its Compose service IDs, gives SysON a
-  240-second healthcheck start period and up to 600 seconds to become ready,
-  and fails the release if cleanup cannot complete.
+  240-second healthcheck start period and up to 600 seconds to become ready, and
+  fails the release if cleanup cannot complete.
 - Local SysON and PostgreSQL Compose defaults now use immutable OCI digests.
 
 ## [0.8.3] - 2026-08-28
@@ -55,11 +90,11 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 ### Fixed
 
 - The release runtime-contract is now written to the GitHub runner temporary
-  directory. JSR therefore verifies and publishes the exact clean tagged
-  source, while the identical generated evidence is uploaded and attached to
-  the GitHub Release. This reissues the complete package release after the
-  `v0.8.2` workflow published its OCI image but stopped before JSR and GitHub
-  Release creation.
+  directory. JSR therefore verifies and publishes the exact clean tagged source,
+  while the identical generated evidence is uploaded and attached to the GitHub
+  Release. This reissues the complete package release after the `v0.8.2`
+  workflow published its OCI image but stopped before JSR and GitHub Release
+  creation.
 
 ## [0.8.2] - 2026-08-28
 
@@ -77,17 +112,18 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 ### Changed
 
 - The provider release now pins supported Deno 2.9.6 in CI and to its verified
-  multi-architecture OCI index (`sha256:2014dc167ece617ef7e7ba40631ac2234c59e75ce693e7cc2dc2602b3c87859d`),
+  multi-architecture OCI index
+  (`sha256:2014dc167ece617ef7e7ba40631ac2234c59e75ce693e7cc2dc2602b3c87859d`),
   with Node.js 24.20.0 LTS for the viewer build. The `v0.8.1` tag was cancelled
   before image, JSR, or GitHub Release publication because its Deno 2.5.4 pin
   was past LTS support.
 - External Kroki rendering is opt-in through operator-only `SYSON_KROKI_URL`.
   Local SVG rendering is the default and external failures fall back locally
   without exposing raw DOT.
-- The stdio integration test now makes a real `tools/call` through the same
-  mock provider fixture used to prove HTTP handler behavior.
-- `main` verifies source only; a matching `v<semver>` tag is required to
-  publish the linked JSR package and OCI image.
+- The stdio integration test now makes a real `tools/call` through the same mock
+  provider fixture used to prove HTTP handler behavior.
+- `main` verifies source only; a matching `v<semver>` tag is required to publish
+  the linked JSR package and OCI image.
 
 ## [0.8.0] - 2026-08-28
 
