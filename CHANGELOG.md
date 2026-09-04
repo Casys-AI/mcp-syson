@@ -21,7 +21,7 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
   number and date formatting (UTC), the recorded basis as the requirement set's
   provenance ("Recorded from tps03 r15"), operator glyphs (≤ ≥ = ≠) and grouped
   limit values, and no single-row `KeyValueList` field dumps.
-- Viewers now boot through `@casys/mcp-view-components` 0.6.0
+- Viewers now boot through `@casys/mcp-view-components` 0.7.0
   `startPreactSurfaceApp` (kit-owned statuses, host-context remount and surface
   selection; the recorded-mode standalone lock,
   `data-mode`/`data-display-mode`/`data-platform` stamps and the `aria-label`
@@ -33,9 +33,10 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
   `data-casys-surface-*` on the document element on every host-context change.
   The `data-display-mode="fullscreen"` layout rule (`min-height: 100vh`) is gone
   with the stamp it keyed on.
-- Viewer builds require the audited `@casys/mcp-view@0.9.2` +
-  `@casys/mcp-view-contracts@0.1.0` + `@casys/mcp-view-components@0.6.0` split
-  (kit commit 676a2c7); the kit fonts are installed at boot.
+- Viewer builds require the audited `@casys/mcp-view@0.9.3` +
+  `@casys/mcp-view-contracts@0.1.0` + `@casys/mcp-view-components@0.7.0` split
+  (kit commit 59eeb37); the kit fonts are installed at boot. With 0.7.0 a
+  complete `tool-input`, not only a partial one, returns the App to `loading`.
 
 ## [0.8.6] - 2026-08-31
 

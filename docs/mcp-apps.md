@@ -154,9 +154,9 @@ rebuilding leaves the served bundle stale.
 The viewer build intentionally has no fallback to the retired monolithic viewer
 package. It requires local file URLs for the audited split:
 
-- `@casys/mcp-view@0.9.2` for the renderer-neutral lifecycle and router;
+- `@casys/mcp-view@0.9.3` for the renderer-neutral lifecycle and router;
 - `@casys/mcp-view-contracts@0.1.0` for wire contracts;
-- `@casys/mcp-view-components@0.6.0` for catalogs, surfaces, theme and Preact
+- `@casys/mcp-view-components@0.7.0` for catalogs, surfaces, theme and Preact
   presentation.
 
 For a standard sibling `mcp-server` checkout:
