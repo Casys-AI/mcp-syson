@@ -23,7 +23,6 @@ import { useState } from "preact/hooks";
 import {
   defaultComponentSurface,
   linkCoverageGauge,
-  recordedBasis,
   recordedProjectionDigest,
   shortSysmlKind,
   sysmlRef,
@@ -38,11 +37,7 @@ import {
   type SurfaceAppContext,
   type SysonViewData,
 } from "../../shared/preact-surface";
-import {
-  adaptRequirementsRecordedContent,
-  isRequirementsTrace,
-  type RequirementsCaptureReadModel,
-} from "../../shared/recorded-content";
+import { isRequirementsTrace } from "../../shared/recorded-content";
 import "../../global.css";
 
 interface TraceEntry {
@@ -64,14 +59,6 @@ interface TraceData extends Record<string, unknown> {
   };
 }
 
-type RequirementsData = TraceData | RequirementsCaptureReadModel;
-
-function isRecordedRequirementsCapture(
-  data: RequirementsData,
-): data is RequirementsCaptureReadModel {
-  return data.kind === "recorded-requirements-capture";
-}
-
 function TraceResultError({ error }: { error: string | undefined }) {
   return (
     <StateMessage tone="danger" title="error">
@@ -80,104 +67,9 @@ function TraceResultError({ error }: { error: string | undefined }) {
   );
 }
 
-function operatorGlyph(operator: string): string {
-  switch (operator) {
-    case "<=":
-      return "≤";
-    case ">=":
-      return "≥";
-    case "==":
-      return "=";
-    case "!=":
-      return "≠";
-    default:
-      return operator;
-  }
-}
-
-function formatLimitValue(
-  value: number,
-  locale: string | undefined,
-): string {
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }).format(
-    value,
-  );
-}
-
-function RequirementSet(
-  { data, context }: {
-    data: RequirementsCaptureReadModel;
-    context: SurfaceAppContext<RequirementsData>;
-  },
-) {
-  const locale = context.hostContext.locale;
-  const basis = recordedBasis(context);
-  const provenance = basis !== undefined
-    ? (
-      <ElementProvenance
-        label="Recorded from"
-        value={`${basis.thread.id} r${basis.thread.revision}`}
-      />
-    )
-    : undefined;
-  return (
-    <SemanticElement
-      reference={sysmlRef("RequirementUsage", data.rootId)}
-      density="card"
-      ident={
-        <ElementIdent
-          label="Requirements"
-          detail={data.target.label || data.target.id}
-        />
-      }
-      reading={
-        <ElementReading
-          label="Authored limits"
-          value={String(data.count)}
-        />
-      }
-      body={
-        <ElementBody>
-          <SemanticList label="Authored requirements">
-            {data.requirements.map((requirement) => (
-              <SemanticElement
-                key={requirement.id}
-                reference={sysmlRef("Requirement", requirement.id)}
-                density="row"
-                ident={
-                  <ElementIdent
-                    label={requirement.name}
-                    detail={requirement.metric}
-                  />
-                }
-                reading={
-                  <ElementReading
-                    label="Limit"
-                    value={`${operatorGlyph(requirement.operator)} ${
-                      formatLimitValue(requirement.limit.value, locale)
-                    }`}
-                    unit={requirement.limit.unit}
-                  />
-                }
-              />
-            ))}
-          </SemanticList>
-        </ElementBody>
-      }
-      provenance={provenance}
-    />
-  );
-}
-
 function Coverage(
-  { data, context }: {
-    data: RequirementsData;
-    context: SurfaceAppContext<RequirementsData>;
-  },
+  { data }: { data: TraceData },
 ) {
-  if (isRecordedRequirementsCapture(data)) {
-    return <RequirementSet data={data} context={context} />;
-  }
   if (data.error !== undefined) return <TraceResultError error={data.error} />;
   const unresolvedCount =
     data.traces.filter((trace) => traceLinkStatus(trace) === "unresolved")
@@ -245,17 +137,10 @@ function Coverage(
 
 function TraceList(
   { data, context }: {
-    data: RequirementsData;
-    context: SurfaceAppContext<RequirementsData>;
+    data: TraceData;
+    context: SurfaceAppContext<TraceData>;
   },
 ) {
-  if (isRecordedRequirementsCapture(data)) {
-    return (
-      <StateMessage title="unavailable">
-        Satisfaction links were not part of this requirements capture.
-      </StateMessage>
-    );
-  }
   if (data.error !== undefined) return <TraceResultError error={data.error} />;
   const [selected, setSelected] = useState<string>();
   const [mode, setMode] = useState<
@@ -338,14 +223,7 @@ function TraceList(
   );
 }
 
-function SatisfactionLinks({ data }: { data: RequirementsData }) {
-  if (isRecordedRequirementsCapture(data)) {
-    return (
-      <StateMessage title="unavailable">
-        Satisfaction links were not part of this requirements capture.
-      </StateMessage>
-    );
-  }
+function SatisfactionLinks({ data }: { data: TraceData }) {
   if (data.error !== undefined) return <TraceResultError error={data.error} />;
   const linked = data.traces.filter((trace) =>
     trace.satisfiedBy.length || trace.error
@@ -396,8 +274,8 @@ function SatisfactionLinks({ data }: { data: RequirementsData }) {
 
 const keys = VIEWER_COMPONENT_KEYS.requirementsTrace;
 const registry = defineComponentRegistry<
-  SysonViewData<RequirementsData>,
-  SurfaceAppContext<RequirementsData>
+  SysonViewData<TraceData>,
+  SurfaceAppContext<TraceData>
 >({
   components: {
     [keys[0]]: definePreactComponent(
@@ -405,7 +283,7 @@ const registry = defineComponentRegistry<
         title: "Requirements coverage",
         description: "Coverage percentage and counters",
       },
-      ({ data, context }) => <Coverage data={data} context={context} />,
+      ({ data }) => <Coverage data={data} />,
     ),
     [keys[1]]: definePreactComponent(
       {
@@ -433,7 +311,6 @@ void startSysonViewerApp({
   recordedSession: {
     view: "requirementsTrace",
     validateContent: isRequirementsTrace,
-    adaptContent: adaptRequirementsRecordedContent,
   },
   loadingLabel: "Waiting for requirements trace data…",
 }).catch((error) =>

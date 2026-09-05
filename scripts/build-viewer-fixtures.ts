@@ -38,11 +38,11 @@ async function fixtureDigest(label: string): Promise<string> {
 }
 
 /**
- * Build the complete recorded session envelope for the requirements-trace
+ * Build the complete recorded session envelope for the requirements
  * viewer with TPS03 stand backrest content. Exported so the fixture test can
  * verify idempotency without re-running the script on disk.
  */
-export async function buildRequirementsTraceSession(): Promise<
+export async function buildRequirementsSession(): Promise<
   Record<string, unknown>
 > {
   const archDigest = await fixtureDigest("architecture:r15");
@@ -110,8 +110,8 @@ export async function buildRequirementsTraceSession(): Promise<
   };
 
   const sessionBase = {
-    schemaVersion: SYSON_RECORDED_SESSION_SCHEMAS.requirementsTrace,
-    resourceUri: SYSON_UI_RESOURCE_URIS.requirementsTrace,
+    schemaVersion: SYSON_RECORDED_SESSION_SCHEMAS.requirements,
+    resourceUri: SYSON_UI_RESOURCE_URIS.requirements,
     resultSchema: SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.requirements,
     readOnly: true as const,
     basis: {
@@ -136,9 +136,9 @@ export async function buildRequirementsTraceSession(): Promise<
 
 if (import.meta.main) {
   const root = new URL("..", import.meta.url).pathname;
-  const outPath = `${root}docs/fixtures/requirements-trace-session.json`;
+  const outPath = `${root}docs/fixtures/requirements-session.json`;
   await Deno.mkdir(`${root}docs/fixtures`, { recursive: true });
-  const session = await buildRequirementsTraceSession();
+  const session = await buildRequirementsSession();
   await Deno.writeTextFile(outPath, JSON.stringify(session, null, 2) + "\n");
   console.log(`[docs:viewer-fixtures] wrote ${outPath}`);
 }

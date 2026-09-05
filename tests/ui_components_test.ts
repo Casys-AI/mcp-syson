@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { VIEWER_COMPONENT_KEYS } from "../src/ui/shared/component-catalog.ts";
 
-Deno.test("six SysON Apps expose stable fine-grained component keys", () => {
+Deno.test("SysON Apps expose stable fine-grained component keys", () => {
   assertEquals(VIEWER_COMPONENT_KEYS, {
     diagram: [
       "syson.diagram.summary",
@@ -20,6 +20,7 @@ Deno.test("six SysON Apps expose stable fine-grained component keys", () => {
       "syson.query.expression",
       "syson.query.values",
     ],
+    requirements: ["syson.requirements.authored-list"],
     requirementsTrace: [
       "syson.requirements.coverage",
       "syson.requirements.trace-list",
@@ -39,6 +40,6 @@ Deno.test("six SysON Apps expose stable fine-grained component keys", () => {
   });
 
   const all = Object.values(VIEWER_COMPONENT_KEYS).flat();
-  assertEquals(new Set(all).size, 21);
+  assertEquals(new Set(all).size, 22);
   assertEquals(all.every((key) => key.startsWith("syson.")), true);
 });

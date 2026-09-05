@@ -8,11 +8,12 @@ const EXPECTED_RESOURCE_URIS = [
   "ui://mcp-syson/model-explorer-viewer",
   "ui://mcp-syson/query-results-viewer",
   "ui://mcp-syson/requirements-trace-viewer",
+  "ui://mcp-syson/requirements-viewer",
   "ui://mcp-syson/validation-viewer",
   "ui://mcp-syson/value-change-viewer",
 ];
 
-Deno.test("ships all six SysON viewer bundles as readable UI resources", async () => {
+Deno.test("ships all SysON viewer bundles as readable UI resources", async () => {
   assertEquals([...UI_RESOURCE_URIS].sort(), EXPECTED_RESOURCE_URIS);
   assertEquals(Object.keys(UI_RESOURCES).sort(), EXPECTED_RESOURCE_URIS);
 

@@ -4,6 +4,7 @@ const UI_HTML_LOADERS = {
   "model-explorer-viewer": () => import("./bundles/model-explorer-viewer.ts").then((module) => module.UI_HTML),
   "query-results-viewer": () => import("./bundles/query-results-viewer.ts").then((module) => module.UI_HTML),
   "requirements-trace-viewer": () => import("./bundles/requirements-trace-viewer.ts").then((module) => module.UI_HTML),
+  "requirements-viewer": () => import("./bundles/requirements-viewer.ts").then((module) => module.UI_HTML),
   "validation-viewer": () => import("./bundles/validation-viewer.ts").then((module) => module.UI_HTML),
   "value-change-viewer": () => import("./bundles/value-change-viewer.ts").then((module) => module.UI_HTML),
 } as const;

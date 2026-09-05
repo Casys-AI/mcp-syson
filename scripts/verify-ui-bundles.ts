@@ -13,12 +13,13 @@ const EXPECTED_VIEWERS = [
   "model-explorer-viewer",
   "query-results-viewer",
   "requirements-trace-viewer",
+  "requirements-viewer",
   "validation-viewer",
   "value-change-viewer",
 ];
 
 const EXPECTED_SPLIT_PROVENANCE =
-  "@casys/mcp-view@0.9.3 + @casys/mcp-view-contracts@0.1.0 + @casys/mcp-view-components@0.7.0";
+  "@casys/mcp-view@0.9.3 + @casys/mcp-view-contracts@0.1.0 + @casys/mcp-view-components@0.7.1";
 
 const VIEWER_SOURCE_PATHS = EXPECTED_VIEWERS.map((viewer) =>
   new URL(`../src/ui/${viewer}/src/main.tsx`, import.meta.url)
@@ -29,6 +30,7 @@ const COMPONENTS_BY_VIEWER = {
   "model-explorer-viewer": VIEWER_COMPONENT_KEYS.modelExplorer,
   "query-results-viewer": VIEWER_COMPONENT_KEYS.queryResults,
   "requirements-trace-viewer": VIEWER_COMPONENT_KEYS.requirementsTrace,
+  "requirements-viewer": VIEWER_COMPONENT_KEYS.requirements,
   "validation-viewer": VIEWER_COMPONENT_KEYS.validation,
   "value-change-viewer": VIEWER_COMPONENT_KEYS.value,
 } as const;

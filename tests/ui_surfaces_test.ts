@@ -25,6 +25,10 @@ const VIEWER_SOURCES = {
     "../src/ui/query-results-viewer/src/main.tsx",
     import.meta.url,
   ),
+  requirements: new URL(
+    "../src/ui/requirements-viewer/src/main.tsx",
+    import.meta.url,
+  ),
   requirementsTrace: new URL(
     "../src/ui/requirements-trace-viewer/src/main.tsx",
     import.meta.url,
@@ -41,6 +45,7 @@ Deno.test("default surfaces foreground one bounded catalog key per resource", ()
     diagram: ["syson.diagram.visual"],
     modelExplorer: ["syson.model.elements"],
     queryResults: ["syson.query.values"],
+    requirements: ["syson.requirements.authored-list"],
     requirementsTrace: ["syson.requirements.coverage"],
     validation: ["syson.validation.status"],
     value: ["syson.value.readout"],
@@ -61,7 +66,7 @@ Deno.test("default surfaces foreground one bounded catalog key per resource", ()
       ),
       [...defaults],
     );
-    assertEquals(catalog.length > defaults.length, true);
+    assertEquals(catalog.length >= defaults.length, true);
   }
 });
 

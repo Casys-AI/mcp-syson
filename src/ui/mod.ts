@@ -35,6 +35,12 @@ const UI_BUNDLES = {
     description: "SysON UI: query-results-viewer",
     tools: ["syson_search", "syson_query_eval"],
   },
+  "ui://mcp-syson/requirements-viewer": {
+    bundle: "requirements-viewer",
+    name: "Authored Requirements Viewer",
+    description: "SysON UI: authored requirement limits",
+    tools: [],
+  },
   "ui://mcp-syson/requirements-trace-viewer": {
     bundle: "requirements-trace-viewer",
     name: "Requirements Trace Viewer",

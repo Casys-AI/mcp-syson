@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SysON requirements-trace viewer documentation preview</title>
+    <title>SysON requirements viewer documentation preview</title>
     <style>
     :root {
       color-scheme: light;
@@ -56,14 +56,14 @@
       <p class="legend"><strong>Fixture</strong> Contract preview — not execution evidence</p>
       <iframe
         id="viewer"
-        title="SysON requirements-trace viewer"
-        src="../../src/ui/dist/requirements-trace-viewer/index.html"
+        title="SysON requirements viewer"
+        src="../../src/ui/dist/requirements-viewer/index.html"
       ></iframe>
     </main>
     <script type="module">
     const viewer = document.querySelector("#viewer");
     // Listen before the fixture arrives: the bundle may initialize first.
-    const session = fetch("./requirements-trace-session.json").then((response) => {
+    const session = fetch("./requirements-session.json").then((response) => {
       if (!response.ok) throw new Error(`Fixture HTTP ${response.status}`);
       return response.json();
     });

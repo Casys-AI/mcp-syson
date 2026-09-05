@@ -11,6 +11,7 @@ export const SYSON_UI_RESOURCE_URIS = {
   diagram: "ui://mcp-syson/diagram-viewer",
   modelExplorer: "ui://mcp-syson/model-explorer-viewer",
   queryResults: "ui://mcp-syson/query-results-viewer",
+  requirements: "ui://mcp-syson/requirements-viewer",
   requirementsTrace: "ui://mcp-syson/requirements-trace-viewer",
   validation: "ui://mcp-syson/validation-viewer",
   value: "ui://mcp-syson/value-change-viewer",
@@ -20,6 +21,7 @@ export const SYSON_RESULT_SCHEMAS = {
   diagram: "io.casys.mcp-syson.diagram-snapshot-result/1.0",
   modelExplorer: "io.casys.mcp-syson.model-children-result/1.0",
   queryResults: "io.casys.mcp-syson.query-result/1.0",
+  requirements: "io.casys.mcp-syson.authored-requirements-result/1.0",
   requirementsTrace: "io.casys.mcp-syson.requirements-trace-result/1.0",
   validation: "io.casys.mcp-syson.validation-result/1.0",
   value: "io.casys.mcp-syson.value-result/1.0",
@@ -36,6 +38,7 @@ export const SYSON_RECORDED_SESSION_SCHEMAS = {
   diagram: "io.casys.mcp-syson.recorded-diagram-session/1.0",
   modelExplorer: "io.casys.mcp-syson.recorded-model-children-session/1.0",
   queryResults: "io.casys.mcp-syson.recorded-query-session/1.0",
+  requirements: "io.casys.mcp-syson.recorded-authored-requirements-session/1.0",
   requirementsTrace:
     "io.casys.mcp-syson.recorded-requirements-trace-session/1.0",
   validation: "io.casys.mcp-syson.recorded-validation-session/1.0",
@@ -75,7 +78,7 @@ const resources: SysonViewAppResource[] = (
           SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.architecture,
           SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.partDefinitions,
         ]
-        : key === "requirementsTrace"
+        : key === "requirements"
         ? [SYSON_DIGITAL_THREAD_RESULT_SCHEMAS.requirements]
         : []),
     ],

@@ -30,7 +30,7 @@ Deno.test("serialized SysON View App manifest is the exact exported package cont
 });
 
 Deno.test("every serialized resource maps to a bundled App session receiver", async () => {
-  assertEquals(SYSON_VIEW_APP_MANIFEST.resources.length, 6);
+  assertEquals(SYSON_VIEW_APP_MANIFEST.resources.length, 7);
 
   for (const resource of SYSON_VIEW_APP_MANIFEST.resources) {
     assertEquals(resource.acceptedActions, [SYSON_VIEWER_SESSION_ACTION]);

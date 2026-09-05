@@ -1,6 +1,6 @@
 {
-  "schemaVersion": "io.casys.mcp-syson.recorded-requirements-trace-session/1.0",
-  "resourceUri": "ui://mcp-syson/requirements-trace-viewer",
+  "schemaVersion": "io.casys.mcp-syson.recorded-authored-requirements-session/1.0",
+  "resourceUri": "ui://mcp-syson/requirements-viewer",
   "resultSchema": "requirements-capture/3.0",
   "readOnly": true,
   "basis": {
@@ -94,5 +94,5 @@
     ],
     "insertedAt": "2026-08-26T00:00:00.000Z"
   },
-  "projectionFingerprint": "sha256:5093f51aab2980bbc9efb2b68fedb43bbbf2deb3d782fef10bd771074b6d0f92"
+  "projectionFingerprint": "sha256:0e65be4a5b896681f75108b99735793f231a66980a4c14a2f515d78e120bfecf"
 }

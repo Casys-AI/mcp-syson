@@ -22,6 +22,7 @@ export const VIEWER_COMPONENT_KEYS = {
     "syson.query.expression",
     "syson.query.values",
   ],
+  requirements: ["syson.requirements.authored-list"],
   requirementsTrace: [
     "syson.requirements.coverage",
     "syson.requirements.trace-list",
@@ -48,6 +49,7 @@ export const VIEWER_DEFAULT_SURFACE_KEYS = {
   diagram: ["syson.diagram.visual"],
   modelExplorer: ["syson.model.elements"],
   queryResults: ["syson.query.values"],
+  requirements: ["syson.requirements.authored-list"],
   requirementsTrace: ["syson.requirements.coverage"],
   validation: ["syson.validation.status"],
   value: ["syson.value.readout"],

@@ -14,9 +14,9 @@ constraint and value operations.
 _The TPS03 StandBackrest requirements capture fixture rendered by the
 provider-owned MCP App — a contract preview, not execution evidence. The image
 is rendered from the committed fixture
-(`docs/fixtures/requirements-trace-session.json`) through the documentation
-harness (`deno task docs:viewer-screenshot`). The viewer remains read-only and
-preserves authored limits without inventing a satisfaction verdict._
+(`docs/fixtures/requirements-session.json`) through the documentation harness
+(`deno task docs:viewer-screenshot`). The viewer remains read-only and preserves
+authored limits without inventing a satisfaction verdict._
 
 ## Built for small, useful views
 

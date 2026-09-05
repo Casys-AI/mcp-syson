@@ -29,7 +29,7 @@ const CONTENT_TYPES: Record<string, string> = {
 
 for (
   const required of [
-    "src/ui/dist/requirements-trace-viewer/index.html",
+    "src/ui/dist/requirements-viewer/index.html",
     harnessPath.slice(1),
   ]
 ) {

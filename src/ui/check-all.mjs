@@ -1,4 +1,4 @@
-/** Type-check all six Apps against the same explicit local split as the build. */
+/** Type-check all Apps against the same explicit local split as the build. */
 
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -16,6 +16,7 @@ const entries = [
   "model-explorer-viewer",
   "query-results-viewer",
   "requirements-trace-viewer",
+  "requirements-viewer",
   "validation-viewer",
   "value-change-viewer",
 ].map((name) => resolve(here, name, "src", "main.tsx"));

@@ -99,6 +99,25 @@ export function adaptRequirementsRecordedContent(
   };
 }
 
+export function isRequirementsCaptureReadModel(
+  value: unknown,
+): value is RequirementsCaptureReadModel {
+  return isExactRecord(value, [
+    "count",
+    "kind",
+    "requirements",
+    "rootId",
+    "target",
+  ]) &&
+    value.kind === "recorded-requirements-capture" &&
+    isNonEmptyString(value.rootId) &&
+    isIdentity(value.target) &&
+    isDenseJsonArray(value.requirements) &&
+    value.requirements.every(isCapturedRequirement) &&
+    isNonNegativeInteger(value.count) &&
+    value.count === value.requirements.length;
+}
+
 export function isDiagramSnapshot(
   value: unknown,
 ): value is Record<string, unknown> {

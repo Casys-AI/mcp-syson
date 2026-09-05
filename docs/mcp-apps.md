@@ -7,14 +7,15 @@ result data.
 
 ## App resources
 
-| Resource                                   | Primary standalone view                 | Direct result schema                               |
-| ------------------------------------------ | --------------------------------------- | -------------------------------------------------- |
-| `ui://mcp-syson/diagram-viewer`            | Diagram visual                          | `io.casys.mcp-syson.diagram-snapshot-result/1.0`   |
-| `ui://mcp-syson/model-explorer-viewer`     | Model elements                          | `io.casys.mcp-syson.model-children-result/1.0`     |
-| `ui://mcp-syson/query-results-viewer`      | Query values                            | `io.casys.mcp-syson.query-result/1.0`              |
-| `ui://mcp-syson/requirements-trace-viewer` | Requirement coverage or authored limits | `io.casys.mcp-syson.requirements-trace-result/1.0` |
-| `ui://mcp-syson/validation-viewer`         | Validation state                        | `io.casys.mcp-syson.validation-result/1.0`         |
-| `ui://mcp-syson/value-change-viewer`       | Value readout                           | `io.casys.mcp-syson.value-result/1.0`              |
+| Resource                                   | Primary standalone view     | Direct result schema                                  |
+| ------------------------------------------ | --------------------------- | ----------------------------------------------------- |
+| `ui://mcp-syson/diagram-viewer`            | Diagram visual              | `io.casys.mcp-syson.diagram-snapshot-result/1.0`      |
+| `ui://mcp-syson/model-explorer-viewer`     | Model elements              | `io.casys.mcp-syson.model-children-result/1.0`        |
+| `ui://mcp-syson/query-results-viewer`      | Query values                | `io.casys.mcp-syson.query-result/1.0`                 |
+| `ui://mcp-syson/requirements-viewer`       | Authored requirement limits | `io.casys.mcp-syson.authored-requirements-result/1.0` |
+| `ui://mcp-syson/requirements-trace-viewer` | Satisfaction-link coverage  | `io.casys.mcp-syson.requirements-trace-result/1.0`    |
+| `ui://mcp-syson/validation-viewer`         | Validation state            | `io.casys.mcp-syson.validation-result/1.0`            |
+| `ui://mcp-syson/value-change-viewer`       | Value readout               | `io.casys.mcp-syson.value-result/1.0`                 |
 
 The serialized compatibility declaration is
 [`src/ui/view-app-manifest.json`](../src/ui/view-app-manifest.json), exported as
@@ -77,12 +78,16 @@ Thread capture into its bounded read model. Current adapters accept:
 Architecture and part-definition captures become a small list of provider
 identities. Requirements become authored limits. The adapter deliberately does
 not infer requirement satisfaction from a limit, and recorded mode does not gain
-live mutation or provider credentials.
+live mutation or provider credentials. Authored limits use the shared kit's
+`ElementLimit` in a compact `CollectionCard`; the operator, value and unit are
+rendered from the capture. The viewer neither derives a measurement nor assigns
+a satisfaction verdict. Satisfaction-link coverage remains in the separate
+requirements-trace resource, which does not accept authored-limit captures.
 
-The requirements-trace viewer ships a committed fixture and a documentation
+The authored-requirements viewer ships a committed fixture and a documentation
 harness for reproducible README captures.
-`docs/fixtures/requirements-trace-session.json` is a fully fingerprinted
-recorded session for the TPS03 StandBackrest capture, built deterministically by
+`docs/fixtures/requirements-session.json` is a fully fingerprinted recorded
+session for the TPS03 StandBackrest capture, built deterministically by
 `deno task docs:viewer-fixtures` (`scripts/build-viewer-fixtures.ts`).
 `docs/fixtures/viewer-preview.html` is a minimal host harness that loads the
 fixture and drives the App through the standard MCP UI handshake.
@@ -98,14 +103,15 @@ level on a few anti-aliased pixels, so the bytes are not bit-identical).
 Components are advertised under `io.casys.mcp.view-components/v1` and selected
 through the host context `io.casys.mcp.surface/v1`.
 
-| Resource       | Component keys                                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Diagram        | `syson.diagram.summary`, `syson.diagram.visual`, `syson.diagram.elements`, `syson.diagram.identity`                       |
-| Model explorer | `syson.model.summary`, `syson.model.elements`, `syson.model.kind-breakdown`, `syson.model.parent-context`                 |
-| Query results  | `syson.query.summary`, `syson.query.expression`, `syson.query.values`                                                     |
-| Requirements   | `syson.requirements.coverage`, `syson.requirements.trace-list`, `syson.requirements.satisfaction-links`                   |
-| Validation     | `syson.validation.status`, `syson.validation.summary`, `syson.validation.resolved-values`, `syson.validation.constraints` |
-| Value          | `syson.value.readout`, `syson.value.identity`, `syson.value.verification`                                                 |
+| Resource              | Component keys                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Diagram               | `syson.diagram.summary`, `syson.diagram.visual`, `syson.diagram.elements`, `syson.diagram.identity`                       |
+| Model explorer        | `syson.model.summary`, `syson.model.elements`, `syson.model.kind-breakdown`, `syson.model.parent-context`                 |
+| Query results         | `syson.query.summary`, `syson.query.expression`, `syson.query.values`                                                     |
+| Authored requirements | `syson.requirements.authored-list`                                                                                        |
+| Requirements trace    | `syson.requirements.coverage`, `syson.requirements.trace-list`, `syson.requirements.satisfaction-links`                   |
+| Validation            | `syson.validation.status`, `syson.validation.summary`, `syson.validation.resolved-values`, `syson.validation.constraints` |
+| Value                 | `syson.value.readout`, `syson.value.identity`, `syson.value.verification`                                                 |
 
 Every key has one local mount implementation and a stable component instance ID.
 A host may arrange known keys in a stack, row or grid. Unknown keys, malformed
@@ -156,7 +162,7 @@ package. It requires local file URLs for the audited split:
 
 - `@casys/mcp-view@0.9.3` for the renderer-neutral lifecycle and router;
 - `@casys/mcp-view-contracts@0.1.0` for wire contracts;
-- `@casys/mcp-view-components@0.7.0` for catalogs, surfaces, theme and Preact
+- `@casys/mcp-view-components@0.7.1` for catalogs, surfaces, theme and Preact
   presentation.
 
 For a standard sibling `mcp-server` checkout:

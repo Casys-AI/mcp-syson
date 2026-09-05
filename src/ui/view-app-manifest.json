@@ -48,11 +48,24 @@
       ]
     },
     {
+      "uri": "ui://mcp-syson/requirements-viewer",
+      "ownership": "whole-view",
+      "resultSchemas": [
+        "io.casys.mcp-syson.authored-requirements-result/1.0",
+        "requirements-capture/3.0"
+      ],
+      "acceptedActions": [
+        "viewer.session.apply"
+      ],
+      "sessionSchemas": [
+        "io.casys.mcp-syson.recorded-authored-requirements-session/1.0"
+      ]
+    },
+    {
       "uri": "ui://mcp-syson/requirements-trace-viewer",
       "ownership": "whole-view",
       "resultSchemas": [
-        "io.casys.mcp-syson.requirements-trace-result/1.0",
-        "requirements-capture/3.0"
+        "io.casys.mcp-syson.requirements-trace-result/1.0"
       ],
       "acceptedActions": [
         "viewer.session.apply"
