@@ -8,6 +8,8 @@
 
 import { readResultData, type ResultData } from "@casys/mcp-view";
 import {
+  createTranslator,
+  mcpViewMessages,
   readSurfaceContext,
   type ViewComponentDefinition,
   type ViewComponentDescriptor,
@@ -18,16 +20,34 @@ import {
   type PreactSurfaceComponentProps,
   type PreactSurfaceContext,
   startPreactSurfaceApp,
+  type SurfaceLabel,
 } from "@casys/mcp-view-components/preact";
 import { installMcpViewFonts } from "@casys/mcp-view-components/fonts";
 import { createElement, type FunctionComponent } from "preact";
 import { SYSON_VIEW_APP_MANIFEST, type SysonViewKey } from "../app-manifest.ts";
+import {
+  SYSON_MESSAGES_EN,
+  SYSON_MESSAGES_FR,
+  type SysonMessageKey,
+} from "./messages.ts";
 import {
   isSysonRecordedViewSessionEnvelope,
   parseSysonRecordedViewSession,
   type SysonRecordedContentAdapter,
   type SysonRecordedViewSession,
 } from "./recorded-session.ts";
+
+export type { SurfaceLabel };
+
+export const sysonMessages = createTranslator({
+  defaultLocale: "en",
+  messages: SYSON_MESSAGES_EN,
+  translations: { fr: SYSON_MESSAGES_FR },
+});
+
+export function surfaceLabel(key: SysonMessageKey): SurfaceLabel {
+  return (locale) => sysonMessages(locale)(key);
+}
 
 /** App-level data carrying the projected content and optional recorded-session origin. */
 export interface SysonViewData<TContent extends ResultData> {
@@ -77,8 +97,8 @@ interface SysonViewerAppOptions<TContent extends ResultData> {
     readonly validateContent: (value: unknown) => boolean;
     readonly adaptContent?: SysonRecordedContentAdapter<TContent>;
   };
-  readonly loadingLabel?: string;
-  readonly emptyLabel?: string;
+  readonly loadingLabel?: SurfaceLabel;
+  readonly emptyLabel?: SurfaceLabel;
 }
 
 /**
@@ -86,8 +106,8 @@ interface SysonViewerAppOptions<TContent extends ResultData> {
  *
  * The kit's startPreactSurfaceApp owns statuses, host-context remount and
  * surface selection, and stamps `data-casys-surface-*` on the document element.
- * The recorded-mode standalone lock, data-mode/data-display-mode/data-platform
- * stamps and the aria-label are dropped — the kit manages the shell.
+ * Theme tokens already drive the CSS/DOM, so a theme-only host change stays
+ * in place; locale and surface selection still remount.
  */
 export async function startSysonViewerApp<TContent extends ResultData>(
   options: SysonViewerAppOptions<TContent>,
@@ -108,6 +128,8 @@ export async function startSysonViewerApp<TContent extends ResultData>(
     surfaceClassName: "mcp-view-preact-surface syson-component-surface",
     loadingLabel,
     emptyLabel,
+    documentLanguage: sysonMessages.locale,
+    themeUpdates: "in-place",
     fromToolResult: (result) => {
       const validate = (value: unknown): value is TContent =>
         validateContent(value);
@@ -137,9 +159,10 @@ export async function startSysonViewerApp<TContent extends ResultData>(
         if (!session) {
           return {
             kind: "error",
-            title: "Session rejected",
+            title: (locale) => mcpViewMessages(locale)("sessionRejectedTitle"),
             code: "session-rejected",
-            message: `Recorded ${view} session rejected.`,
+            message: (locale) =>
+              sysonMessages(locale)("sessionRejected", { view }),
           };
         }
         return {

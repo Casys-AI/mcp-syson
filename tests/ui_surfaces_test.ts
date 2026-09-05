@@ -215,6 +215,7 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   const diagram = await Deno.readTextFile(VIEWER_SOURCES.diagram);
   const explorer = await Deno.readTextFile(VIEWER_SOURCES.modelExplorer);
   const query = await Deno.readTextFile(VIEWER_SOURCES.queryResults);
+  const authored = await Deno.readTextFile(VIEWER_SOURCES.requirements);
   const requirements = await Deno.readTextFile(
     VIEWER_SOURCES.requirementsTrace,
   );
@@ -253,6 +254,8 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(query.includes("ElementVerdict"), false);
 
   assertEquals(requirements.includes("LimitGauge"), true);
+  assertEquals(requirements.includes("FocusedView"), true);
+  assertEquals(requirements.includes("Disclosure"), true);
   assertEquals(requirements.includes("BadgeGroup"), true);
   assertEquals(requirements.includes("SemanticElement"), true);
   assertEquals(requirements.includes("SemanticList"), true);
@@ -262,6 +265,33 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(requirements.includes('title="error"'), true);
   assertEquals(requirements.includes("data.error !== undefined"), true);
   assertEquals(requirements.includes("PathBar"), false);
+  assertEquals([...requirements.matchAll(/<Coverage[\s>]/g)].length, 1);
+  assertEquals([...requirements.matchAll(/<TraceList[\s>]/g)].length, 1);
+  assertEquals(
+    [...requirements.matchAll(/<SatisfactionLinks[\s>]/g)].length,
+    1,
+  );
+  assertEquals(coverageFunction(requirements).includes("<TraceList"), false);
+  assertEquals(
+    coverageFunction(requirements).includes("<SatisfactionLinks"),
+    false,
+  );
+  assertEquals(coverageFunction(requirements).includes("<Coverage"), false);
+  assertEquals(
+    requirements.includes("VIEWER_DEFAULT_SURFACE_KEYS.requirementsTrace"),
+    true,
+  );
+  assertEquals(requirements.includes('t("noRequirements")'), true);
+  assertEquals(
+    requirements.includes('t("noModeRequirements", { mode })'),
+    true,
+  );
+  assertEquals(requirements.includes("Aucune exigence all"), false);
+
+  assertEquals(authored.includes("ElementLimit"), true);
+  assertEquals(authored.includes("Disclosure"), true);
+  assertEquals(authored.includes("FocusedView"), false);
+  assertEquals(authored.includes("sysonMessages("), true);
 
   assertEquals(validation.includes("validationContractLabel"), true);
   assertEquals(validation.includes("SemanticElement"), true);
@@ -277,10 +307,19 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(value.includes("Documentary · unverified"), true);
   assertEquals(value.includes("unavailable"), true);
   assertEquals(value.includes("LimitGauge"), false);
-  assertEquals(value.includes("engineering verification"), true);
+  assertEquals(value.includes("evidenceDisclaimer"), true);
+  assertEquals(value.includes("FocusedView"), false);
 
   assertEquals(adapter.includes("ArtifactRow"), false);
   assertEquals(adapter.includes("startPreactSurfaceApp("), true);
+  assertEquals(adapter.includes("createTranslator("), true);
+  assertEquals(adapter.includes('themeUpdates: "in-place"'), true);
+  assertEquals(adapter.includes("type SurfaceLabel"), true);
+  assertEquals(adapter.includes("export type SurfaceLabel ="), false);
+  assertEquals(
+    adapter.includes("documentLanguage: sysonMessages.locale"),
+    true,
+  );
   assertEquals(adapter.includes("Card"), false);
   assertEquals(adapter.includes("KeyValueList"), false);
   assertEquals(adapter.includes("Recorded projection"), false);
@@ -289,9 +328,24 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
   assertEquals(adapter.includes("syson-recorded-stack"), false);
   assertEquals(adapter.includes('code: "session-rejected"'), true);
 
-  for (const source of [diagram, explorer, query, requirements, validation]) {
+  for (
+    const source of [
+      diagram,
+      explorer,
+      query,
+      authored,
+      requirements,
+      validation,
+    ]
+  ) {
     assertEquals(source.includes("syson-element-stack"), false);
+    assertEquals(source.includes("sysonMessages("), true);
+    assertEquals(source.includes("surfaceLabel("), true);
+    assertEquals(source.includes("context.hostContext.locale"), true);
   }
+  assertEquals(value.includes("sysonMessages("), true);
+  assertEquals(value.includes("surfaceLabel("), true);
+  assertEquals(value.includes("context.hostContext.locale"), true);
   assertEquals(explorer.includes("syson-input"), false);
   assertEquals(query.includes("syson-input"), false);
   assertEquals(query.includes("syson-code-block"), false);
@@ -302,3 +356,9 @@ Deno.test("viewers reuse v2 primitives only where the data is truthful", async (
     assertEquals(source.includes("mcp-view-selected"), false);
   }
 });
+
+function coverageFunction(source: string): string {
+  const start = source.indexOf("function Coverage(");
+  const next = source.indexOf("\nfunction ", start + 1);
+  return start < 0 || next < 0 ? "" : source.slice(start, next);
+}

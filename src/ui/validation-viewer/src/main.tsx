@@ -27,11 +27,14 @@ import {
   VIEWER_COMPONENT_KEYS,
   VIEWER_DEFAULT_SURFACE_KEYS,
 } from "../../shared/component-catalog";
+import { formatHostDateTime, formatHostNumber } from "../../shared/messages";
 import {
   definePreactComponent,
   publishSelection,
   startSysonViewerApp,
   type SurfaceAppContext,
+  surfaceLabel,
+  sysonMessages,
   type SysonViewData,
 } from "../../shared/preact-surface";
 import { isValidationReport } from "../../shared/recorded-content";
@@ -84,23 +87,24 @@ function Status(
     context: SurfaceAppContext<ValidationReport>;
   },
 ) {
+  const t = sysonMessages(context.hostContext.locale);
   const status = validationOverallStatus(data.summary);
   const locale = context.hostContext.locale;
-  const validatedAtFormatted = new Intl.DateTimeFormat(locale, {
+  const validatedAtFormatted = formatHostDateTime(data.validatedAt, locale, {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: "UTC",
-  }).format(new Date(data.validatedAt)) + " UTC";
+  }) + " UTC";
   const headlineReading = data.summary.unresolved > 0
     ? (
       <ElementReading
-        label="Unresolved"
+        label="unresolved"
         value={data.summary.unresolved}
       />
     )
     : (
       <ElementReading
-        label="Constraints"
+        label={t("constraints")}
         value={data.summary.total}
       />
     );
@@ -111,7 +115,7 @@ function Status(
       tone={statusTone(status)}
       ident={
         <ElementIdent
-          label={data.elementName || "Validation"}
+          label={data.elementName || t("validation")}
           detail={data.elementId}
         />
       }
@@ -120,7 +124,7 @@ function Status(
         ? (
           <ElementBody>
             <StateMessage tone="warning" title="unavailable">
-              No constraints were returned, so this surface cannot claim a pass.
+              {t("cannotClaimPass")}
             </StateMessage>
           </ElementBody>
         )
@@ -128,7 +132,7 @@ function Status(
       verdict={<ElementVerdict value={validationContractLabel(status)} />}
       provenance={
         <ElementProvenance
-          label="Validated"
+          label={t("validated")}
           value={validatedAtFormatted}
         />
       }
@@ -142,20 +146,20 @@ function Summary({ data }: { data: ValidationReport }) {
       items={[
         {
           id: "pass",
-          label: "Pass",
+          label: "pass",
           value: data.summary.pass,
           tone: "success",
         },
-        { id: "fail", label: "Fail", value: data.summary.fail, tone: "danger" },
+        { id: "fail", label: "fail", value: data.summary.fail, tone: "danger" },
         {
           id: "error",
-          label: "Error",
+          label: "error",
           value: data.summary.error,
           tone: "danger",
         },
         {
           id: "unresolved",
-          label: "Unresolved",
+          label: "unresolved",
           value: data.summary.unresolved,
           tone: data.summary.unresolved ? "warning" : "neutral",
         },
@@ -169,9 +173,9 @@ function formatResolved(
   locale: string | undefined,
 ): string {
   const quantity = typeof value === "number" ? { value } : value;
-  const number = new Intl.NumberFormat(locale, {
+  const number = formatHostNumber(quantity.value, locale, {
     maximumFractionDigits: 4,
-  }).format(quantity.value);
+  });
   return quantity.unit ? `${number} ${quantity.unit}` : number;
 }
 
@@ -181,10 +185,11 @@ function ResolvedValues(
     context: SurfaceAppContext<ValidationReport>;
   },
 ) {
+  const t = sysonMessages(context.hostContext.locale);
   const values = Object.entries(data.resolvedValues ?? {});
   const locale = context.hostContext.locale;
   return (
-    <Card title="Resolved model values">
+    <Card title={t("resolvedModelValues")}>
       <KeyValueList
         items={values.map(([name, value]) => ({
           id: name,
@@ -192,7 +197,7 @@ function ResolvedValues(
           value: <InlineCode>{formatResolved(value, locale)}</InlineCode>,
         }))}
       />
-      {!values.length && <EmptyState>No resolved model values</EmptyState>}
+      {!values.length && <EmptyState>{t("noResolvedValues")}</EmptyState>}
     </Card>
   );
 }
@@ -203,8 +208,7 @@ function formatValue(
   digits = 2,
 ): string {
   if (value === undefined) return "−";
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: digits })
-    .format(value);
+  return formatHostNumber(value, locale, { maximumFractionDigits: digits });
 }
 
 function Constraints(
@@ -213,17 +217,18 @@ function Constraints(
     context: SurfaceAppContext<ValidationReport>;
   },
 ) {
+  const t = sysonMessages(context.hostContext.locale);
   const [selected, setSelected] = useState<string>();
   const digest = recordedProjectionDigest(context);
   const locale = context.hostContext.locale;
   return (
     <Card
-      title="Constraints"
+      title={t("constraints")}
       actions={<Badge>{data.constraints.length}</Badge>}
     >
       {data.constraints.length
         ? (
-          <SemanticList label="Constraint validation results" scrollable>
+          <SemanticList label={t("constraintResults")} scrollable>
             {data.constraints.map((constraint) => {
               const margin = constraint.margin === undefined
                 ? undefined
@@ -252,19 +257,23 @@ function Constraints(
                         constraint.expression,
                         constraint.error,
                         constraint.unresolvedRefs?.length
-                          ? `Missing: ${constraint.unresolvedRefs.join(", ")}`
+                          ? t("missingRefs", {
+                            refs: constraint.unresolvedRefs.join(", "),
+                          })
                           : undefined,
                       ].filter(Boolean).join(" · ")}
                     />
                   }
                   reading={
                     <ElementReading
-                      label="Value"
+                      label={t("value")}
                       value={formatValue(constraint.computedValue, locale)}
                       detail={constraint.threshold === undefined
                         ? margin
-                        : `threshold ${
-                          formatValue(constraint.threshold, locale)
+                        : `${
+                          t("thresholdDetail", {
+                            value: formatValue(constraint.threshold, locale),
+                          })
                         }${margin ? ` · ${margin}` : ""}`}
                     />
                   }
@@ -273,7 +282,9 @@ function Constraints(
                       value={validationContractLabel(constraint.status)}
                     />
                   }
-                  activationLabel={`Select ${constraint.constraintName}`}
+                  activationLabel={t("selectItem", {
+                    label: constraint.constraintName,
+                  })}
                   onActivate={() => {
                     setSelected(constraint.constraintId);
                     publishSelection(
@@ -292,7 +303,7 @@ function Constraints(
             })}
           </SemanticList>
         )
-        : <EmptyState>No constraints found on this element</EmptyState>}
+        : <EmptyState>{t("noConstraints")}</EmptyState>}
     </Card>
   );
 }
@@ -329,7 +340,7 @@ void startSysonViewerApp({
   root: document.getElementById("app")!,
   registry,
   recordedSession: { view: "validation", validateContent: isValidationReport },
-  loadingLabel: "Validating constraints…",
+  loadingLabel: surfaceLabel("loadingValidation"),
 }).catch((error) =>
   console.error("[validation-viewer] Failed to start", error)
 );

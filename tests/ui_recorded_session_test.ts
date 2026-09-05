@@ -446,6 +446,17 @@ Deno.test("kit startPreactSurfaceApp owns the lifecycle; facade delegates record
   assertEquals(source.includes("recorded: session"), true);
   assertEquals(source.includes('code: "session-rejected"'), true);
   assertEquals(source.includes("installMcpViewFonts("), true);
+  assertEquals(source.includes("createTranslator("), true);
+  assertEquals(source.includes('themeUpdates: "in-place"'), true);
+  assertEquals(source.includes("type SurfaceLabel"), true);
+  assertEquals(source.includes("export type SurfaceLabel ="), false);
+  assertEquals(source.includes("documentLanguage: sysonMessages.locale"), true);
+  assertEquals(source.includes("title: (locale) =>"), true);
+  assertEquals(
+    source.includes('mcpViewMessages(locale)("sessionRejectedTitle")'),
+    true,
+  );
+  assertEquals(source.includes("mcpViewMessages(host.locale)"), false);
   assertEquals(source.includes("createMcpApp"), false);
   assertEquals(source.includes("defineView"), false);
   assertEquals(source.includes("mountComponentSurface"), false);

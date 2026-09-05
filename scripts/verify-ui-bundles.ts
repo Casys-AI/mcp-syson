@@ -19,7 +19,7 @@ const EXPECTED_VIEWERS = [
 ];
 
 const EXPECTED_SPLIT_PROVENANCE =
-  "@casys/mcp-view@0.9.3 + @casys/mcp-view-contracts@0.1.0 + @casys/mcp-view-components@0.7.1";
+  "@casys/mcp-view@0.9.3 + @casys/mcp-view-contracts@0.1.0 + @casys/mcp-view-components@0.9.0";
 
 const VIEWER_SOURCE_PATHS = EXPECTED_VIEWERS.map((viewer) =>
   new URL(`../src/ui/${viewer}/src/main.tsx`, import.meta.url)
@@ -116,6 +116,26 @@ for (const sourceUrl of VIEWER_SOURCE_PATHS) {
       `${sourceUrl.pathname}: viewer must not override the exact manifest appInfo identity.`,
     );
   }
+  if (
+    !source.includes("sysonMessages(") ||
+    !source.includes("surfaceLabel(")
+  ) {
+    throw new Error(
+      `${sourceUrl.pathname}: viewer interface wording must use the shared createTranslator catalog.`,
+    );
+  }
+}
+
+const coverageSource = await Deno.readTextFile(
+  new URL("../src/ui/requirements-trace-viewer/src/main.tsx", import.meta.url),
+);
+if (
+  !coverageSource.includes("FocusedView") ||
+  !coverageSource.includes("Disclosure")
+) {
+  throw new Error(
+    "Requirements-trace coverage must use the kit FocusedView/Disclosure.",
+  );
 }
 
 const adapterSource = await Deno.readTextFile(
@@ -129,6 +149,19 @@ if (
   !adapterSource.includes("startPreactSurfaceApp(") ||
   !adapterSource.includes("viewerSession:") ||
   !adapterSource.includes("toState") ||
+  !adapterSource.includes("createTranslator(") ||
+  !adapterSource.includes('themeUpdates: "in-place"') ||
+  !adapterSource.includes("type SurfaceLabel") ||
+  !adapterSource.includes("documentLanguage: sysonMessages.locale") ||
+  !adapterSource.includes("title: (locale) =>") ||
+  !adapterSource.includes(
+    'mcpViewMessages(locale)("sessionRejectedTitle")',
+  ) ||
+  !adapterSource.includes(
+    'sysonMessages(locale)("sessionRejected", { view })',
+  ) ||
+  adapterSource.includes("export type SurfaceLabel =") ||
+  adapterSource.includes("mcpViewMessages(host.locale)") ||
   !adapterSource.includes("name: SYSON_VIEW_APP_MANIFEST.app.id") ||
   !adapterSource.includes("version: SYSON_VIEW_APP_MANIFEST.app.version") ||
   adapterSource.includes("createMcpApp") ||
@@ -153,6 +186,9 @@ const packageLock = await Deno.readTextFile(
 const splitResolver = await Deno.readTextFile(
   new URL("../src/ui/split-modules.mjs", import.meta.url),
 );
+const workflow = await Deno.readTextFile(
+  new URL("../.github/workflows/publish.yml", import.meta.url),
+);
 if (
   packageJson.dependencies?.["@casys/mcp-view"] !== undefined ||
   packageJson.dependencies?.["@casys/mcp-view-components"] !== undefined ||
@@ -162,10 +198,16 @@ if (
   packageLock.includes('"node_modules/@casys/mcp-view"') ||
   packageLock.includes('"node_modules/@casys/mcp-view-components"') ||
   splitResolver.includes("@casys/mcp-view@0.7") ||
+  !splitResolver.includes('version: "0.9.0"') ||
+  splitResolver.includes('version: "0.8.0"') ||
   !/requiredFileModule\(\s*"MCP_VIEW_MODULE"/.test(splitResolver) ||
   !/requiredFileModule\(\s*"MCP_VIEW_COMPONENTS_MODULE"/.test(
     splitResolver,
-  )
+  ) ||
+  !workflow.includes("ref: b08802df353bb25d25a1c8d64b22ea61b5287ae0") ||
+  workflow.includes("f9cb8493edfd555c58b9fc6f5601fe444fc78046") ||
+  workflow.includes("59eeb37") ||
+  workflow.includes("342c1b7456c011d3f21cad988f9dde23bcbecae0")
 ) {
   throw new Error(
     "SysON UI must require the audited local split without an npm or 0.7 fallback.",

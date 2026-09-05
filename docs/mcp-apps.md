@@ -80,9 +80,15 @@ identities. Requirements become authored limits. The adapter deliberately does
 not infer requirement satisfaction from a limit, and recorded mode does not gain
 live mutation or provider credentials. Authored limits use the shared kit's
 `ElementLimit` in a compact `CollectionCard`; the operator, value and unit are
-rendered from the capture. The viewer neither derives a measurement nor assigns
-a satisfaction verdict. Satisfaction-link coverage remains in the separate
-requirements-trace resource, which does not accept authored-limit captures.
+rendered from the capture. Exact row identifiers stay behind a closed kit
+`Disclosure` so they remain inspectable without flooding the default surface.
+The viewer neither derives a measurement nor assigns a satisfaction verdict.
+Satisfaction-link coverage remains in the separate requirements-trace resource,
+which does not accept authored-limit captures. Its standalone surface is the
+kit `FocusedView`: one coverage visualization, critical status outside the
+collapsed details, and root identity plus optional trace/link inspection in
+that closed disclosure. The trace-list and satisfaction-link keys stay
+independently mountable and are not nested as a dashboard.
 
 The authored-requirements viewer ships a committed fixture and a documentation
 harness for reproducible README captures.
@@ -162,8 +168,8 @@ package. It requires local file URLs for the audited split:
 
 - `@casys/mcp-view@0.9.3` for the renderer-neutral lifecycle and router;
 - `@casys/mcp-view-contracts@0.1.0` for wire contracts;
-- `@casys/mcp-view-components@0.7.1` for catalogs, surfaces, theme and Preact
-  presentation.
+- `@casys/mcp-view-components@0.9.0` for catalogs, surfaces, theme, Preact
+  presentation, `FocusedView`/`Disclosure` and `createTranslator`.
 
 For a standard sibling `mcp-server` checkout:
 
@@ -176,7 +182,21 @@ The resolver derives the contracts, Preact adapter and presentation entry points
 from those package exports. Alternate layouts may set
 `MCP_VIEW_CONTRACTS_MODULE`, `MCP_VIEW_COMPONENTS_PREACT_MODULE` and
 `MCP_VIEW_PRESENTATION_MODULE` explicitly. Every value must be a plain local
-`file:` URL exported by the expected package and version.
+`file:` URL exported by the expected package and version. CI checkouts the
+audited split at `b08802df353bb25d25a1c8d64b22ea61b5287ae0`.
+
+Interface labels, loading and empty copy, buttons, input names and `Intl`
+number/date formatting follow `context.hostContext.locale` through the kit
+`createTranslator` dictionaries (English base, French overrides). Missing or
+invalid host locales fall back to English. Rejected-session title and message
+are kit `SurfaceLabel` callbacks resolved at render; provider text, codes and
+states stay literal strings. `documentLanguage: sysonMessages.locale` sets
+`document.documentElement.lang`. Locale updates do not re-parse a session or
+fetch the provider. Literal domain states (`linked`, `unlinked`, `unresolved`,
+`error`, `unavailable`, `documentary`, `pass`, `fail`, …), source values,
+identifiers, kinds, units and diagnostic messages stay untranslated. Theme-only
+host changes keep the mounted surface (`themeUpdates: "in-place"`) because
+viewers already follow CSS tokens; locale and surface selection still remount.
 
 ## Build and verify
 

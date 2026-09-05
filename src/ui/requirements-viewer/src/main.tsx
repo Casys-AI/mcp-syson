@@ -4,6 +4,7 @@ import { defineComponentRegistry } from "@casys/mcp-view-components";
 import {
   Badge,
   CollectionCard,
+  Disclosure,
   ElementIdent,
   ElementLimit,
   ElementProvenance,
@@ -17,10 +18,13 @@ import {
   VIEWER_COMPONENT_KEYS,
   VIEWER_DEFAULT_SURFACE_KEYS,
 } from "../../shared/component-catalog";
+import { formatHostNumber } from "../../shared/messages";
 import {
   definePreactComponent,
   startSysonViewerApp,
   type SurfaceAppContext,
+  surfaceLabel,
+  sysonMessages,
   type SysonViewData,
 } from "../../shared/preact-surface";
 import {
@@ -46,44 +50,62 @@ function AuthoredList(
     context: SurfaceAppContext<RequirementsCaptureReadModel>;
   },
 ) {
+  const t = sysonMessages(context.hostContext.locale);
   const digest = recordedProjectionDigest(context);
-  const formatter = new Intl.NumberFormat(context.hostContext.locale, {
-    maximumSignificantDigits: 21,
-  });
   return (
     <CollectionCard
-      label="Authored requirements"
-      eyebrow="Authored requirements"
+      label={t("authoredRequirements")}
+      eyebrow={t("authoredRequirements")}
       title={data.target.label || data.target.id}
       actions={
-        <Badge>{data.count} {data.count === 1 ? "limit" : "limits"}</Badge>
+        <Badge>
+          {t(data.count === 1 ? "limitCountOne" : "limitCountMany", {
+            count: data.count,
+          })}
+        </Badge>
       }
       scrollable
     >
       {data.requirements.length
-        ? data.requirements.map((requirement) => (
-          <SemanticElement
-            key={requirement.id}
-            reference={sysmlRef("Requirement", requirement.id, digest)}
-            density="row"
-            ident={
-              <ElementIdent
-                label={requirement.name}
-                detail={requirement.metric}
+        ? (
+          <>
+            {data.requirements.map((requirement) => (
+              <SemanticElement
+                key={requirement.id}
+                reference={sysmlRef("Requirement", requirement.id, digest)}
+                density="row"
+                ident={
+                  <ElementIdent
+                    label={requirement.name}
+                    detail={requirement.metric}
+                  />
+                }
+                reading={
+                  <ElementLimit
+                    label={t("authoredLimit")}
+                    operator={operatorGlyph(requirement.operator)}
+                    value={formatHostNumber(
+                      requirement.limit.value,
+                      context.hostContext.locale,
+                      { maximumSignificantDigits: 21 },
+                    )}
+                    unit={requirement.limit.unit}
+                  />
+                }
               />
-            }
-            reading={
-              <ElementLimit
-                label="Authored limit"
-                operator={operatorGlyph(requirement.operator)}
-                value={formatter.format(requirement.limit.value)}
-                unit={requirement.limit.unit}
-              />
-            }
-            provenance={<ElementProvenance label="ID" value={requirement.id} />}
-          />
-        ))
-        : <EmptyState>No authored requirements</EmptyState>}
+            ))}
+            <Disclosure label={t("rowIdentities")}>
+              {data.requirements.map((requirement) => (
+                <ElementProvenance
+                  key={requirement.id}
+                  label={requirement.name}
+                  value={requirement.id}
+                />
+              ))}
+            </Disclosure>
+          </>
+        )
+        : <EmptyState>{t("noAuthoredRequirements")}</EmptyState>}
     </CollectionCard>
   );
 }
@@ -115,7 +137,7 @@ void startSysonViewerApp({
     validateContent: isRequirementsCaptureReadModel,
     adaptContent: adaptRequirementsRecordedContent,
   },
-  loadingLabel: "Waiting for authored requirements…",
+  loadingLabel: surfaceLabel("loadingRequirements"),
 }).catch((error) =>
   console.error("[requirements-viewer] Failed to start", error)
 );

@@ -22,11 +22,14 @@ import {
   VIEWER_COMPONENT_KEYS,
   VIEWER_DEFAULT_SURFACE_KEYS,
 } from "../../shared/component-catalog";
+import { compareText, formatHostNumber } from "../../shared/messages";
 import {
   definePreactComponent,
   publishSelection,
   startSysonViewerApp,
   type SurfaceAppContext,
+  surfaceLabel,
+  sysonMessages,
   type SysonViewData,
 } from "../../shared/preact-surface";
 import { isQueryResult } from "../../shared/recorded-content";
@@ -79,7 +82,7 @@ function expressionOf(data: QueryData): string | undefined {
 function formatScalar(value: unknown, locale: string | undefined): string {
   if (value === null || value === undefined) return "null";
   if (typeof value === "number") {
-    return new Intl.NumberFormat(locale).format(value);
+    return formatHostNumber(value, locale);
   }
   return String(value);
 }
@@ -90,6 +93,7 @@ function Summary(
     context: SurfaceAppContext<QueryData>;
   },
 ) {
+  const t = sysonMessages(context.hostContext.locale);
   const objects = objectsOf(data);
   const locale = context.hostContext.locale;
   const scalarValue = "result" in data ? data.result : null;
@@ -99,13 +103,13 @@ function Summary(
       density="card"
       ident={
         <ElementIdent
-          label={data.type ?? "Query result"}
+          label={data.type ?? t("queryResult")}
           detail={expressionOf(data)}
         />
       }
       reading={
         <ElementReading
-          label={objects ? "Objects" : "Value"}
+          label={objects ? t("objectCount") : t("value")}
           value={objects
             ? String(objects.length)
             : formatScalar(scalarValue, locale)}
@@ -115,11 +119,17 @@ function Summary(
   );
 }
 
-function Expression({ data }: { data: QueryData }) {
+function Expression(
+  { data, context }: {
+    data: QueryData;
+    context: SurfaceAppContext<QueryData>;
+  },
+) {
+  const t = sysonMessages(context.hostContext.locale);
   return (
-    <Card title="Expression">
-      <CodeBlock label="Query expression">
-        {expressionOf(data) || "No expression supplied"}
+    <Card title={t("expression")}>
+      <CodeBlock label={t("queryExpression")}>
+        {expressionOf(data) || t("noExpression")}
       </CodeBlock>
     </Card>
   );
@@ -128,12 +138,14 @@ function Expression({ data }: { data: QueryData }) {
 function Values(
   { data, context }: { data: QueryData; context: SurfaceAppContext<QueryData> },
 ) {
+  const t = sysonMessages(context.hostContext.locale);
   const objects = objectsOf(data);
   const [filter, setFilter] = useState("");
   const [sortKey, setSortKey] = useState<"label" | "kind">("label");
   const [descending, setDescending] = useState(false);
   const [selected, setSelected] = useState<string>();
   const digest = recordedProjectionDigest(context);
+  const locale = context.hostContext.locale;
   const rows = useMemo(() => {
     if (!objects) return [];
     const needle = filter.toLowerCase();
@@ -142,14 +154,13 @@ function Values(
         !needle || `${item.label} ${item.kind}`.toLowerCase().includes(needle)
       )
       .sort((left, right) => {
-        const compared = left[sortKey].localeCompare(right[sortKey]);
+        const compared = compareText(left[sortKey], right[sortKey], locale);
         return descending ? -compared : compared;
       });
-  }, [objects, filter, sortKey, descending]);
+  }, [objects, filter, sortKey, descending, locale]);
 
   if (!objects) {
     const raw = "result" in data ? data.result : null;
-    const locale = context.hostContext.locale;
     return (
       <SemanticElement
         reference={sysmlRef(
@@ -159,13 +170,13 @@ function Values(
         density="card"
         ident={
           <ElementIdent
-            label={data.type ?? "unknown"}
+            label={data.type ?? t("unknown")}
             detail={expressionOf(data)}
           />
         }
         reading={
           <ElementReading
-            label="Value"
+            label={t("value")}
             value={formatScalar(raw, locale)}
           />
         }
@@ -181,12 +192,12 @@ function Values(
   };
   return (
     <Card
-      title="Object results"
+      title={t("objectResults")}
       actions={
-        <Toolbar label="Query result controls">
+        <Toolbar label={t("queryResultControls")}>
           <TextInput
-            label="Filter query results"
-            placeholder="Filter query results…"
+            label={t("filterQueryResults")}
+            placeholder={t("filterQueryPlaceholder")}
             value={filter}
             onValueInput={setFilter}
           />
@@ -194,20 +205,21 @@ function Values(
             pressed={sortKey === "label"}
             onClick={() => toggleSort("label")}
           >
-            Label {sortKey === "label" ? (descending ? "↓" : "↑") : ""}
+            {t("labelSort")}{" "}
+            {sortKey === "label" ? (descending ? "↓" : "↑") : ""}
           </Button>
           <Button
             pressed={sortKey === "kind"}
             onClick={() => toggleSort("kind")}
           >
-            Kind {sortKey === "kind" ? (descending ? "↓" : "↑") : ""}
+            {t("kindSort")} {sortKey === "kind" ? (descending ? "↓" : "↑") : ""}
           </Button>
         </Toolbar>
       }
     >
       {rows.length
         ? (
-          <SemanticList label="Query results" scrollable>
+          <SemanticList label={t("queryResults")} scrollable>
             {rows.map((item) => {
               const kind = shortSysmlKind(item.kind);
               return (
@@ -218,11 +230,13 @@ function Values(
                   selected={selected === item.id}
                   ident={
                     <ElementIdent
-                      label={item.label || "(unnamed)"}
+                      label={item.label || t("unnamed")}
                       detail={`${kind} · ${item.id}`}
                     />
                   }
-                  activationLabel={`Select ${item.label || item.id}`}
+                  activationLabel={t("selectItem", {
+                    label: item.label || item.id,
+                  })}
                   onActivate={() => {
                     setSelected(item.id);
                     publishSelection(
@@ -237,7 +251,7 @@ function Values(
             })}
           </SemanticList>
         )
-        : <EmptyState>No results</EmptyState>}
+        : <EmptyState>{t("noResults")}</EmptyState>}
     </Card>
   );
 }
@@ -255,7 +269,7 @@ const registry = defineComponentRegistry<
     [keys[1]]: definePreactComponent({
       title: "Query expression",
       description: "AQL expression or search text",
-    }, ({ data }) => <Expression data={data} />),
+    }, ({ data, context }) => <Expression data={data} context={context} />),
     [keys[2]]: definePreactComponent({
       title: "Query values",
       description: "Scalar value or selectable object results",
@@ -270,5 +284,5 @@ void startSysonViewerApp({
   root: document.getElementById("app")!,
   registry,
   recordedSession: { view: "queryResults", validateContent: isQueryResult },
-  loadingLabel: "Waiting for query results…",
+  loadingLabel: surfaceLabel("loadingQuery"),
 }).catch((error) => console.error("[query-results] Failed to start", error));

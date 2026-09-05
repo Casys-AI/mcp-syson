@@ -6,12 +6,13 @@ import {
   BadgeGroup,
   Button,
   Card,
+  Disclosure,
   ElementBody,
   ElementIdent,
   ElementProvenance,
-  ElementReading,
   ElementVerdict,
   EmptyState,
+  FocusedView,
   InlineCode,
   LimitGauge,
   SemanticElement,
@@ -35,6 +36,8 @@ import {
   publishSelection,
   startSysonViewerApp,
   type SurfaceAppContext,
+  surfaceLabel,
+  sysonMessages,
   type SysonViewData,
 } from "../../shared/preact-surface";
 import { isRequirementsTrace } from "../../shared/recorded-content";
@@ -59,78 +62,110 @@ interface TraceData extends Record<string, unknown> {
   };
 }
 
-function TraceResultError({ error }: { error: string | undefined }) {
+function TraceResultError(
+  { error, locale }: { error: string | undefined; locale?: string },
+) {
   return (
     <StateMessage tone="danger" title="error">
-      {error || "The requirements trace failed without an error detail."}
+      {error || sysonMessages(locale)("traceFailedWithoutDetail")}
     </StateMessage>
   );
 }
 
 function Coverage(
-  { data }: { data: TraceData },
+  { data, context }: {
+    data: TraceData;
+    context: SurfaceAppContext<TraceData>;
+  },
 ) {
-  if (data.error !== undefined) return <TraceResultError error={data.error} />;
+  const t = sysonMessages(context.hostContext.locale);
   const unresolvedCount =
     data.traces.filter((trace) => traceLinkStatus(trace) === "unresolved")
       .length;
-  const gauge = linkCoverageGauge(data.coverage, unresolvedCount);
+  const gauge = data.error !== undefined
+    ? { available: false as const, statusLabel: "unavailable" as const }
+    : linkCoverageGauge(data.coverage, unresolvedCount);
   const knownUnlinked = data.coverage.unsatisfied - unresolvedCount;
   const coverageDetail = [
     `${data.coverage.satisfied} linked`,
     knownUnlinked > 0 ? `${knownUnlinked} unlinked` : undefined,
     unresolvedCount > 0 ? `${unresolvedCount} unresolved` : undefined,
   ].filter(Boolean).join(" · ");
-  return (
-    <SemanticElement
-      reference={sysmlRef("requirements-trace", data.rootId)}
-      density="card"
-      tone={gauge.available ? gauge.tone : "warning"}
-      ident={
-        <ElementIdent
-          label="Satisfaction-link coverage"
-          detail={data.rootId}
-        />
-      }
-      reading={gauge.available
+  const details = (
+    <>
+      <ElementProvenance
+        label={t("rootIdentity")}
+        value={<InlineCode>{data.rootId}</InlineCode>}
+      />
+      {coverageDetail
         ? (
-          <ElementReading
-            label="Link coverage"
-            value={String(Math.round(data.coverage.percentage))}
-            unit="%"
-            detail={coverageDetail}
+          <ElementProvenance
+            label={t("linkCoverage")}
+            value={coverageDetail}
           />
         )
         : undefined}
-      body={
-        <ElementBody>
-          {gauge.available
-            ? (
-              <LimitGauge
-                label={gauge.label}
-                min={gauge.min}
-                max={gauge.max}
-                value={gauge.value}
-                valueLabel={gauge.valueLabel}
-                statusLabel={gauge.statusLabel}
-                tone={gauge.tone}
+      {data.traces.length > 0 && (
+        <Disclosure label={t("traceInspection")}>
+          <SemanticList label={t("traceInspection")}>
+            {data.traces.map((trace) => (
+              <SemanticElement
+                key={trace.requirement.id}
+                reference={sysmlRef("RequirementUsage", trace.requirement.id)}
+                density="row"
+                ident={
+                  <ElementIdent
+                    label={trace.requirement.id}
+                    detail={trace.satisfiedBy.map((target) => target.id).join(
+                      " · ",
+                    ) || undefined}
+                  />
+                }
+                verdict={<ElementVerdict value={traceLinkStatus(trace)} />}
               />
-            )
-            : (
-              <StateMessage tone="warning" title="unavailable">
-                No requirements were returned, so link coverage cannot be
-                assessed.
-              </StateMessage>
-            )}
-        </ElementBody>
-      }
-      verdict={<ElementVerdict value={gauge.statusLabel} />}
-      provenance={
-        <ElementProvenance
-          label="Requirements"
-          value={String(data.coverage.total)}
-        />
-      }
+            ))}
+          </SemanticList>
+        </Disclosure>
+      )}
+    </>
+  );
+  return (
+    <FocusedView
+      label={t("coverageLabel")}
+      hostContext={context.hostContext}
+      status={data.error !== undefined
+        ? (
+          <StateMessage tone="danger" title="error">
+            {data.error || t("traceFailedWithoutDetail")}
+          </StateMessage>
+        )
+        : gauge.available
+        ? <ElementVerdict value={gauge.statusLabel} />
+        : (
+          <StateMessage tone="warning" title="unavailable">
+            {t("coverageUnavailable")}
+          </StateMessage>
+        )}
+      primary={gauge.available
+        ? (
+          <LimitGauge
+            label={t("linkCoverage")}
+            min={gauge.min}
+            max={gauge.max}
+            value={gauge.value}
+            valueLabel={gauge.valueLabel}
+            statusLabel={gauge.statusLabel}
+            tone={gauge.tone}
+          />
+        )
+        : (
+          <ElementProvenance
+            label={t("requirements")}
+            value={String(data.coverage.total)}
+          />
+        )}
+      detailsLabel={t("technicalDetails")}
+      details={details}
     />
   );
 }
@@ -141,7 +176,15 @@ function TraceList(
     context: SurfaceAppContext<TraceData>;
   },
 ) {
-  if (data.error !== undefined) return <TraceResultError error={data.error} />;
+  if (data.error !== undefined) {
+    return (
+      <TraceResultError
+        error={data.error}
+        locale={context.hostContext.locale}
+      />
+    );
+  }
+  const t = sysonMessages(context.hostContext.locale);
   const [selected, setSelected] = useState<string>();
   const [mode, setMode] = useState<
     "all" | "linked" | "unlinked" | "unresolved"
@@ -152,9 +195,9 @@ function TraceList(
   );
   return (
     <Card
-      title="Requirements"
+      title={t("requirements")}
       actions={
-        <Toolbar label="Requirement coverage filter">
+        <Toolbar label={t("coverageFilter")}>
           {(["all", "linked", "unlinked", "unresolved"] as const).map(
             (value) => (
               <Button
@@ -162,7 +205,7 @@ function TraceList(
                 pressed={mode === value}
                 onClick={() => setMode(value)}
               >
-                {value}
+                {value === "all" ? t("filterAll") : value}
               </Button>
             ),
           )}
@@ -171,7 +214,7 @@ function TraceList(
     >
       {rows.length
         ? (
-          <SemanticList label="Requirement traces" scrollable>
+          <SemanticList label={t("requirementTraces")} scrollable>
             {rows.map((trace) => {
               const relationStatus = traceLinkStatus(trace);
               const linked = relationStatus === "linked";
@@ -189,14 +232,14 @@ function TraceList(
                   ident={
                     <ElementIdent
                       label={trace.requirement.label ||
-                        "(unnamed requirement)"}
+                        t("unnamedRequirement")}
                       detail={trace.error ?? trace.requirement.id}
                     />
                   }
                   verdict={<ElementVerdict value={relationStatus} />}
-                  activationLabel={`Select ${
-                    trace.requirement.label || trace.requirement.id
-                  }`}
+                  activationLabel={t("selectItem", {
+                    label: trace.requirement.label || trace.requirement.id,
+                  })}
                   onActivate={() => {
                     setSelected(trace.requirement.id);
                     publishSelection(
@@ -218,30 +261,49 @@ function TraceList(
             })}
           </SemanticList>
         )
-        : <EmptyState>{`No ${mode} requirements`}</EmptyState>}
+        : (
+          <EmptyState>
+            {mode === "all"
+              ? t("noRequirements")
+              : t("noModeRequirements", { mode })}
+          </EmptyState>
+        )}
     </Card>
   );
 }
 
-function SatisfactionLinks({ data }: { data: TraceData }) {
-  if (data.error !== undefined) return <TraceResultError error={data.error} />;
+function SatisfactionLinks(
+  { data, context }: {
+    data: TraceData;
+    context: SurfaceAppContext<TraceData>;
+  },
+) {
+  const t = sysonMessages(context.hostContext.locale);
+  if (data.error !== undefined) {
+    return (
+      <TraceResultError
+        error={data.error}
+        locale={context.hostContext.locale}
+      />
+    );
+  }
   const linked = data.traces.filter((trace) =>
     trace.satisfiedBy.length || trace.error
   );
   if (!linked.length) {
     return (
-      <StateMessage title="No satisfaction links">
-        No trace evidence was returned.
+      <StateMessage title={t("noSatisfactionLinks")}>
+        {t("noTraceEvidence")}
       </StateMessage>
     );
   }
   return (
     <Card
-      title="Satisfaction links"
+      title={t("satisfactionLinks")}
       eyebrow={<InlineCode>{data.rootId}</InlineCode>}
       actions={<Badge>{linked.length}</Badge>}
     >
-      <SemanticList label="Satisfaction links" scrollable>
+      <SemanticList label={t("satisfactionLinks")} scrollable>
         {linked.map((trace) => (
           <SemanticElement
             key={trace.requirement.id}
@@ -255,7 +317,7 @@ function SatisfactionLinks({ data }: { data: TraceData }) {
             }
             body={
               <ElementBody>
-                <BadgeGroup label="Satisfied-by elements">
+                <BadgeGroup label={t("satisfiedByElements")}>
                   {trace.satisfiedBy.map((target) => (
                     <Badge key={target.id} tone="info">
                       {target.label || shortSysmlKind(target.kind)}
@@ -283,7 +345,7 @@ const registry = defineComponentRegistry<
         title: "Requirements coverage",
         description: "Coverage percentage and counters",
       },
-      ({ data }) => <Coverage data={data} />,
+      ({ data, context }) => <Coverage data={data} context={context} />,
     ),
     [keys[1]]: definePreactComponent(
       {
@@ -297,7 +359,9 @@ const registry = defineComponentRegistry<
         title: "Satisfaction links",
         description: "Requirement-to-element evidence",
       },
-      ({ data }) => <SatisfactionLinks data={data} />,
+      ({ data, context }) => (
+        <SatisfactionLinks data={data} context={context} />
+      ),
     ),
   },
   defaultSurface: defaultComponentSurface(
@@ -312,7 +376,7 @@ void startSysonViewerApp({
     view: "requirementsTrace",
     validateContent: isRequirementsTrace,
   },
-  loadingLabel: "Waiting for requirements trace data…",
+  loadingLabel: surfaceLabel("loadingTrace"),
 }).catch((error) =>
   console.error("[requirements-trace] Failed to start", error)
 );

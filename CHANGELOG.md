@@ -4,6 +4,8 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-09-05
+
 ### Added
 
 - Reproducible README capture: `docs/fixtures/requirements-trace-session.json`
@@ -16,27 +18,39 @@ All notable changes to `@casys/mcp-syson` will be documented in this file.
 
 ### Changed
 
+- Package, App manifest and current server identity are `0.8.7`.
+- Viewer presentation pins the audited `@casys/mcp-view-components@0.9.0` split
+  (kit commit `b08802d`) while keeping `@casys/mcp-view@0.9.3` and
+  `@casys/mcp-view-contracts@0.1.0`. Interface copy follows the host locale
+  through the kit `createTranslator`; literal contract states stay untranslated.
+  Rejected recorded sessions keep `code: "session-rejected"` and resolve
+  title/message through kit `SurfaceLabel` callbacks at render, so a locale
+  change does not re-parse or refetch. `documentLanguage: sysonMessages.locale`
+  stamps `document.documentElement.lang`. The trace-list empty state for filter
+  `all` uses a natural English/French phrase; `linked`/`unlinked`/`unresolved`
+  remain literal.
+- Requirements-trace coverage uses `FocusedView`/`Disclosure` for one primary
+  visualization, and authored-limit row IDs sit behind a closed disclosure.
+  Theme-only host updates stay in place on the CSS-token surfaces.
 - Requirements-trace, validation, query-results and model-explorer viewers read
   as datasheets: ident + one reading + provenance once, host-locale `Intl`
   number and date formatting (UTC), the recorded basis as the requirement set's
   provenance ("Recorded from tps03 r15"), operator glyphs (≤ ≥ = ≠) and grouped
   limit values, and no single-row `KeyValueList` field dumps.
-- Viewers now boot through `@casys/mcp-view-components` 0.7.0
-  `startPreactSurfaceApp` (kit-owned statuses, host-context remount and surface
-  selection; the recorded-mode standalone lock,
-  `data-mode`/`data-display-mode`/`data-platform` stamps and the `aria-label`
-  are gone).
+- Viewers boot through `@casys/mcp-view-components` `startPreactSurfaceApp`
+  (kit-owned statuses, host-context remount and surface selection; the
+  recorded-mode standalone lock, `data-mode`/`data-display-mode`/`data-platform`
+  stamps and the `aria-label` are gone).
 - Kit status wording replaces the facade's: a missing host surface reads "This
   App exposes components and requires a host-selected surface." and a rejected
-  one renders the "Surface invalid" title, a recorded session whose fingerprint
-  fails renders "Session rejected" (`code: "session-rejected"`); the kit stamps
+  one renders the "Surface invalid" title; the kit stamps
   `data-casys-surface-*` on the document element on every host-context change.
   The `data-display-mode="fullscreen"` layout rule (`min-height: 100vh`) is gone
   with the stamp it keyed on.
 - Viewer builds require the audited `@casys/mcp-view@0.9.3` +
-  `@casys/mcp-view-contracts@0.1.0` + `@casys/mcp-view-components@0.7.0` split
-  (kit commit 59eeb37); the kit fonts are installed at boot. With 0.7.0 a
-  complete `tool-input`, not only a partial one, returns the App to `loading`.
+  `@casys/mcp-view-contracts@0.1.0` + `@casys/mcp-view-components@0.9.0` split
+  (kit commit `b08802d`); the kit fonts are installed at boot. A complete
+  `tool-input`, not only a partial one, returns the App to `loading`.
 
 ## [0.8.6] - 2026-08-31
 

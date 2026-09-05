@@ -27,6 +27,8 @@ import {
   publishSelection,
   startSysonViewerApp,
   type SurfaceAppContext,
+  surfaceLabel,
+  sysonMessages,
   type SysonViewData,
 } from "../../shared/preact-surface";
 import {
@@ -64,20 +66,26 @@ function kindVisual(kind: string): { icon: string; tone: string } {
   return KIND_MAP[shortSysmlKind(kind)] ?? { icon: "○", tone: "neutral" };
 }
 
-function Summary({ data }: { data: ChildrenData }) {
+function Summary(
+  { data, context }: {
+    data: ChildrenData;
+    context: SurfaceAppContext<ChildrenData>;
+  },
+) {
+  const t = sysonMessages(context.hostContext.locale);
   return (
     <SemanticElement
       reference={sysmlRef("model-children", data.parentId)}
       density="card"
       ident={
         <ElementIdent
-          label="Model children"
-          detail={data.parentId || "root"}
+          label={t("modelChildren")}
+          detail={data.parentId || t("root")}
         />
       }
       reading={
         <ElementReading
-          label="Elements"
+          label={t("elements")}
           value={String(data.count)}
         />
       }
@@ -91,6 +99,7 @@ function Elements(
     context: SurfaceAppContext<ChildrenData>;
   },
 ) {
+  const t = sysonMessages(context.hostContext.locale);
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<string>();
   const digest = recordedProjectionDigest(context);
@@ -104,12 +113,12 @@ function Elements(
   }, [data.children, filter]);
   return (
     <Card
-      eyebrow={data.parentId || "root"}
-      title="Children"
+      eyebrow={data.parentId || t("root")}
+      title={t("children")}
       actions={
         <TextInput
-          label="Filter model elements"
-          placeholder="Filter elements…"
+          label={t("filterModelElements")}
+          placeholder={t("filterElementsPlaceholder")}
           value={filter}
           onValueInput={setFilter}
         />
@@ -117,7 +126,7 @@ function Elements(
     >
       {elements.length
         ? (
-          <SemanticList label="Model elements" scrollable>
+          <SemanticList label={t("modelElements")} scrollable>
             {elements.map((element) => {
               const kind = shortSysmlKind(element.kind);
               const visual = kindVisual(element.kind);
@@ -138,11 +147,13 @@ function Elements(
                           {visual.icon}
                         </span>
                       }
-                      label={element.label || "(unnamed)"}
+                      label={element.label || t("unnamed")}
                       detail={`${kind} · ${element.id}`}
                     />
                   }
-                  activationLabel={`Select ${element.label || element.id}`}
+                  activationLabel={t("selectItem", {
+                    label: element.label || element.id,
+                  })}
                   onActivate={() => {
                     setSelected(element.id);
                     publishSelection(
@@ -161,37 +172,49 @@ function Elements(
             })}
           </SemanticList>
         )
-        : <EmptyState>No matching children</EmptyState>}
+        : <EmptyState>{t("noMatchingChildren")}</EmptyState>}
     </Card>
   );
 }
 
-function KindBreakdown({ data }: { data: ChildrenData }) {
+function KindBreakdown(
+  { data, context }: {
+    data: ChildrenData;
+    context: SurfaceAppContext<ChildrenData>;
+  },
+) {
+  const t = sysonMessages(context.hostContext.locale);
   const counts = new Map<string, number>();
   data.children.forEach((element) => {
     const kind = shortSysmlKind(element.kind);
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   });
   return (
-    <Card title="Kinds">
-      <BadgeGroup label="Element kind counts">
+    <Card title={t("kinds")}>
+      <BadgeGroup label={t("kindCounts")}>
         {[...counts.entries()].map(([kind, count]) => (
           <Badge key={kind}>{kind}: {count}</Badge>
         ))}
-        {!counts.size && <EmptyState>No kinds</EmptyState>}
+        {!counts.size && <EmptyState>{t("noKinds")}</EmptyState>}
       </BadgeGroup>
     </Card>
   );
 }
 
-function ParentContext({ data }: { data: ChildrenData }) {
+function ParentContext(
+  { data, context }: {
+    data: ChildrenData;
+    context: SurfaceAppContext<ChildrenData>;
+  },
+) {
+  const t = sysonMessages(context.hostContext.locale);
   return (
     <SemanticElement
       reference={sysmlRef("element", data.parentId || "root")}
       density="card"
       ident={
         <ElementIdent
-          label="Parent"
+          label={t("parent")}
           detail={data.parentId
             ? <InlineCode>{data.parentId}</InlineCode>
             : undefined}
@@ -199,7 +222,7 @@ function ParentContext({ data }: { data: ChildrenData }) {
       }
       reading={
         <ElementReading
-          label="Children"
+          label={t("children")}
           value={String(data.count)}
         />
       }
@@ -216,7 +239,7 @@ const registry = defineComponentRegistry<
     [keys[0]]: definePreactComponent({
       title: "Model summary",
       description: "Child count for one parent",
-    }, ({ data }) => <Summary data={data} />),
+    }, ({ data, context }) => <Summary data={data} context={context} />),
     [keys[1]]: definePreactComponent({
       title: "Model elements",
       description: "Filterable, selectable element list",
@@ -224,11 +247,11 @@ const registry = defineComponentRegistry<
     [keys[2]]: definePreactComponent({
       title: "Kind breakdown",
       description: "Counts grouped by SysML kind",
-    }, ({ data }) => <KindBreakdown data={data} />),
+    }, ({ data, context }) => <KindBreakdown data={data} context={context} />),
     [keys[3]]: definePreactComponent({
       title: "Parent context",
       description: "Stable parent element identifier",
-    }, ({ data }) => <ParentContext data={data} />),
+    }, ({ data, context }) => <ParentContext data={data} context={context} />),
   },
   defaultSurface: defaultComponentSurface(
     VIEWER_DEFAULT_SURFACE_KEYS.modelExplorer,
@@ -243,5 +266,5 @@ void startSysonViewerApp({
     validateContent: isModelChildren,
     adaptContent: adaptModelExplorerRecordedContent,
   },
-  loadingLabel: "Waiting for model elements…",
+  loadingLabel: surfaceLabel("loadingModel"),
 }).catch((error) => console.error("[model-explorer] Failed to start", error));

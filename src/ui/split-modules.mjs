@@ -12,7 +12,7 @@ const PACKAGE_EXPECTATIONS = Object.freeze({
   }),
   components: Object.freeze({
     name: "@casys/mcp-view-components",
-    version: "0.7.1",
+    version: "0.9.0",
   }),
 });
 

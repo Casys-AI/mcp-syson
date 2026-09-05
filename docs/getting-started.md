@@ -41,14 +41,14 @@ docker compose up -d
 HTTP is the default transport:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.8.6/server
+deno run -A jsr:@casys/mcp-syson@0.8.7/server
 ```
 
 The default endpoint is <http://127.0.0.1:3009/mcp>. Both forms of each CLI
 option are accepted:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.8.6/server \
+deno run -A jsr:@casys/mcp-syson@0.8.7/server \
   --hostname 127.0.0.1 \
   --port 3009
 ```
@@ -62,7 +62,7 @@ reverse proxy.
 Use stdio when an MCP client launches one provider process:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.8.6/server --stdio
+deno run -A jsr:@casys/mcp-syson@0.8.7/server --stdio
 ```
 
 `--stdio` cannot be combined with `--port` or `--hostname`. It uses the same
@@ -75,7 +75,7 @@ The published image contains this provider and `z3`, not SysON or PostgreSQL:
 ```bash
 docker run --rm --publish 127.0.0.1:3009:3009 \
   --env SYSON_URL=http://host.docker.internal:8180 \
-  ghcr.io/casys-ai/mcp-syson:v0.8.6
+  ghcr.io/casys-ai/mcp-syson:v0.8.7
 ```
 
 For deployment, resolve and pin the immutable index digest attached to the
@@ -88,7 +88,7 @@ smokes both HTTP and stdio before publishing the JSR package.
 An operator can expose only the provider areas needed by a host:
 
 ```bash
-deno run -A jsr:@casys/mcp-syson@0.8.6/server \
+deno run -A jsr:@casys/mcp-syson@0.8.7/server \
   --categories project,element,query
 ```
 
